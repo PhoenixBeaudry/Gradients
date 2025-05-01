@@ -1,6 +1,6 @@
 FROM axolotlai/axolotl:main-latest
 
-RUN pip install mlflow huggingface_hub wandb protobuf
+RUN pip install mlflow huggingface_hub wandb protobuf optuna
 
 WORKDIR /workspace/axolotl
 RUN mkdir -p /workspace/axolotl/configs \
