@@ -1,6 +1,6 @@
-FROM axolotlai/axolotl:main-20241128-py3.11-cu124-2.5.1
+FROM axolotlai/axolotl:main-latest
 
-RUN pip install mlflow huggingface_hub wandb
+RUN pip install mlflow huggingface_hub wandb protobuf
 
 WORKDIR /workspace/axolotl
 RUN mkdir -p /workspace/axolotl/configs \
@@ -20,9 +20,6 @@ RUN mkdir -p /root/.aws && \
     echo "[default]\nregion=us-east-1" > /root/.aws/config
 
 CMD echo 'Preparing data...' && \
-    pip install mlflow && \
-    pip install protobuf && \
-    pip install --upgrade huggingface_hub && \
     if [ -n "$HUGGINGFACE_TOKEN" ]; then \
     echo "Attempting to log in to Hugging Face" && \
     huggingface-cli login --token "$HUGGINGFACE_TOKEN" --add-to-git-credential; \
@@ -40,4 +37,5 @@ CMD echo 'Preparing data...' && \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/axolotl/${DATASET_FILENAME}; \
     fi && \
     echo 'Starting training command' && \
-    accelerate launch -m axolotl.cli.train ${CONFIG_DIR}/${JOB_ID}.yml
+    axolotl train ${CONFIG_DIR}/${JOB_ID}.yml
+

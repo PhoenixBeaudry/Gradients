@@ -14,11 +14,10 @@ try:
 except (TypeError, ValueError):
     NETUID = DEFAULT_NETUID
 
-IS_PROD_ENV = NETUID == DEFAULT_NETUID
-
-MINER_DOCKER_IMAGE = "weightswandering/tuning_miner:latest"
-MINER_DOCKER_IMAGE_DIFFUSION = "diagonalge/miner-diffusion-flux:latest"
+MINER_DOCKER_IMAGE = "phoenixbeaudry/god-text-miner:custom"
+MINER_DOCKER_IMAGE_DIFFUSION = "phoenixbeaudry/god-text-miner-diffusion:custom"
 VALIDATOR_DOCKER_IMAGE = "weightswandering/tuning_vali:latest"
+VALIDATOR_DOCKER_IMAGE_DPO = "weightswandering/tuning_vali_dpo:latest"
 VALIDATOR_DOCKER_IMAGE_DIFFUSION = "diagonalge/tuning_validator_diffusion:latest"
 
 CONTAINER_EVAL_RESULTS_PATH = "/aplp/evaluation_results.json"
@@ -29,6 +28,7 @@ CACHE_DIR = "~/.cache/huggingface"
 CACHE_DIR_HUB = os.path.expanduser("~/.cache/huggingface/hub")
 DIFFUSION_DATASET_DIR = "core/dataset/images"
 CONTAINER_FLUX_PATH = "/app/flux/unet"
+JOB_BACKUP_DIR = "core/job_backups/"
 
 DIFFUSION_SDXL_REPEATS = 10
 DIFFUSION_FLUX_REPEATS = 1
@@ -45,6 +45,10 @@ CONFIG_TEMPLATE_PATH_DIFFUSION_FLUX = CONFIG_DIR + "base_diffusion_flux.toml"
 CONFIG_TEMPLATE_PATH = CONFIG_DIR + "base.yml"
 
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+# Redis Configuration
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = os.getenv("REDIS_PORT")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 WANDB_TOKEN = os.getenv("WANDB_TOKEN")

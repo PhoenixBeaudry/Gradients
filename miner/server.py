@@ -5,7 +5,9 @@ from fastapi import FastAPI
 from fiber.logging_utils import get_logger
 from fiber.miner.core import configuration
 
+# from miner.config import factory_worker_config # Removed
 from miner.endpoints.tuning import factory_router as tuning_factory_router
+# from miner.logic.training_worker import load_job_backups # Removed - File deleted
 
 
 logger = get_logger(__name__)
@@ -20,6 +22,9 @@ def factory_app(debug: bool = False) -> FastAPI:
         if metagraph.substrate is not None:
             sync_thread = threading.Thread(target=metagraph.periodically_sync_nodes, daemon=True)
             sync_thread.start()
+        
+        # Old backup restoration logic removed - RQ handles job persistence via Redis
+        logger.info("Miner server started. Ready to enqueue jobs to RQ.")
 
         yield
 

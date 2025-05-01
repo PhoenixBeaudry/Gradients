@@ -1,17 +1,18 @@
+import asyncio # Import asyncio
 import json
 import os
 import shutil
 import uuid
 from dataclasses import dataclass
-
+from transformers import AutoConfig
 import docker
 import pandas as pd
 import toml
 import yaml
 from docker.errors import DockerException
+from requests.exceptions import ReadTimeout # Import ReadTimeout from requests
 from fiber.logging_utils import get_logger
 from huggingface_hub import HfApi
-
 from core import constants as cst
 from core.config.config_handler import create_dataset_entry
 from core.config.config_handler import save_config
@@ -20,6 +21,7 @@ from core.config.config_handler import update_flash_attention
 from core.config.config_handler import update_model_info
 from core.dataset.prepare_diffusion_dataset import prepare_dataset
 from core.docker_utils import stream_logs
+from core.utils import download_s3_file # Import the download utility
 from core.models.utility_models import DiffusionJob
 from core.models.utility_models import DPODatasetType
 from core.models.utility_models import FileFormat
@@ -86,6 +88,26 @@ def _load_and_modify_config(
 
     config = update_flash_attention(config, model)
     config = update_model_info(config, model, task_id, expected_repo_name)
+    hf_cfg = AutoConfig.from_pretrained(model)
+ 
+    max_pos = getattr(hf_cfg, "max_position_embeddings", None) or getattr(hf_cfg, "n_ctx", None)
+
+    # clamp sequence_len to the model’s max
+    desired_len = 8192
+    if max_pos is not None and desired_len > max_pos:
+        logger.warning(f"Requested seq_len={desired_len} > model max {max_pos}; falling back to {max_pos}")
+        config["sequence_len"] = max_pos
+        logger.info(f"Sequence Length set to: {max_pos}")
+    else:
+        config["sequence_len"] = desired_len
+
+    # change hyper params based on model size
+    if config["model_params_count"] != 0:
+        if config["model_params_count"] < 4_000_000_000:
+            # If less than 4b do full finetune with higher LR
+            config["learning_rate"] = 5e-4
+            pass
+
     config["mlflow_experiment_name"] = dataset
 
     return config
@@ -143,7 +165,7 @@ def create_job_text(
     )
 
 
-def start_tuning_container_diffusion(job: DiffusionJob):
+def start_tuning_container_diffusion(job: DiffusionJob, hours_to_complete: int):
     logger.info("=" * 80)
     logger.info("STARTING THE DIFFUSION TUNING CONTAINER")
     logger.info("=" * 80)
@@ -158,8 +180,29 @@ def start_tuning_container_diffusion(job: DiffusionJob):
         logger.info(f"Downloading flux unet from {job.model}")
         flux_unet_path = download_flux_unet(job.model)
 
+    # Download the dataset zip file using the URI stored in the job object
+    logger.info(f"Downloading dataset zip from URI: {job.dataset_zip}")
+    try:
+        # Define a local path for the downloaded zip
+        local_zip_path = os.path.join(cst.DIFFUSION_DATASET_DIR, f"{job.job_id}_downloaded.zip")
+        # Ensure the target directory exists
+        os.makedirs(os.path.dirname(local_zip_path), exist_ok=True)
+        
+        # Perform the download (assuming download_s3_file is async, but job handler is sync)
+        # NOTE: If download_s3_file is async, this needs adjustment (e.g., run in event loop or make job handler async)
+        # For now, assuming it can be called synchronously or we adapt it.
+        # If it MUST be async, we'd need asyncio.run() or similar here.
+        # Let's assume for now it's adapted or can work synchronously for simplicity.
+        # If download_s3_file is strictly async, this will need `asyncio.run(download_s3_file(...))` # Confirmed async needed
+        # Run the async download function synchronously using asyncio.run()
+        downloaded_local_zip_path = asyncio.run(download_s3_file(job.dataset_zip, local_zip_path))
+        logger.info(f"Dataset zip downloaded to: {downloaded_local_zip_path}")
+    except Exception as e:
+        logger.error(f"Failed to download dataset zip from {job.dataset_zip}: {e}")
+        raise # Re-raise the exception to fail the job
+
     prepare_dataset(
-        training_images_zip_path=job.dataset_zip,
+        training_images_zip_path=downloaded_local_zip_path, # Use the downloaded path
         training_images_repeat=cst.DIFFUSION_SDXL_REPEATS if job.model_type == ImageModelType.SDXL else cst.DIFFUSION_FLUX_REPEATS,
         instance_prompt=cst.DIFFUSION_DEFAULT_INSTANCE_PROMPT,
         class_prompt=cst.DIFFUSION_DEFAULT_CLASS_PROMPT,
@@ -169,7 +212,23 @@ def start_tuning_container_diffusion(job: DiffusionJob):
     docker_env = DockerEnvironmentDiffusion(
         huggingface_token=cst.HUGGINGFACE_TOKEN, wandb_token=cst.WANDB_TOKEN, job_id=job.job_id, base_model=job.model_type.value
     ).to_dict()
+
+    # Get assigned GPUs from worker environment
+    assigned_gpus = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if assigned_gpus:
+        logger.info(f"Worker assigned GPUs: {assigned_gpus}")
+        # Pass GPU assignment into the container environment
+        docker_env["CUDA_VISIBLE_DEVICES"] = assigned_gpus
+        # Revert device_requests to allow container to see all assigned GPUs, rely on env var inside.
+        device_requests = [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
+    else:
+        logger.warning("CUDA_VISIBLE_DEVICES not set for worker, container will see all GPUs.")
+        # Default: request all GPUs if not specified
+        device_requests = [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
+
     logger.info(f"Docker environment: {docker_env}")
+    logger.info(f"Docker device requests: {device_requests}")
+
 
     try:
         docker_client = docker.from_env()
@@ -200,7 +259,12 @@ def start_tuning_container_diffusion(job: DiffusionJob):
             environment=docker_env,
             volumes=volume_bindings,
             runtime="nvidia",
-            device_requests=[docker.types.DeviceRequest(count=1, capabilities=[["gpu"]])],
+            ulimits=[
+                docker.types.Ulimit(name="memlock", soft=-1, hard=-1),
+                docker.types.Ulimit(name="stack",  soft=67108864, hard=67108864),
+            ],
+            shm_size="32g",
+            device_requests=device_requests, # Use specific GPUs if assigned
             detach=True,
             tty=True,
         )
@@ -208,21 +272,47 @@ def start_tuning_container_diffusion(job: DiffusionJob):
         # Use the shared stream_logs function
         stream_logs(container)
 
-        result = container.wait()
+        timeout_seconds = hours_to_complete * 3600 * 0.95
+        logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
 
-        if result["StatusCode"] != 0:
-            raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
-
-    except Exception as e:
-        logger.error(f"Error processing job: {str(e)}")
-        raise
+        try:
+            result = container.wait(timeout=timeout_seconds)
+            logger.info(f"Container {container.id} finished with result: {result}")
+            if result["StatusCode"] != 0:
+                raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
+        except ReadTimeout: # Catch the correct exception from requests
+            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit of {hours_to_complete} hours. Attempting graceful stop...")
+            try:
+                container.stop(timeout=60) # 60 second grace period
+                logger.info(f"Container {container.id} stopped gracefully.")
+            except Exception as stop_err:
+                logger.error(f"Failed to gracefully stop container {container.id}: {stop_err}. It might be forcefully killed.")
+            # Raise a specific error to indicate timeout
+            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit of {hours_to_complete} hours.")
+        except Exception as e:
+            logger.error(f"Error waiting for or processing container {container.id}: {str(e)}")
+            raise # Re-raise other exceptions
 
     finally:
-        if "container" in locals():
-            container.remove(force=True)
+        # Ensure container object exists before trying to remove
+        if "container" in locals() and container:
+            try:
+                container.remove(force=True)
+                logger.info(f"Removed container for job {job.job_id}")
+            except Exception as e:
+                 logger.warning(f"Failed to remove container for job {job.job_id}: {e}")
 
+
+        # Clean up the specific downloaded zip file if it exists
+        if 'downloaded_local_zip_path' in locals() and os.path.exists(downloaded_local_zip_path):
+             try:
+                 os.remove(downloaded_local_zip_path)
+                 logger.info(f"Removed downloaded zip: {downloaded_local_zip_path}")
+             except Exception as e:
+                 logger.warning(f"Failed to remove downloaded zip {downloaded_local_zip_path}: {e}")
+
+        # Clean up the extracted training data directory
         train_data_path = f"{cst.DIFFUSION_DATASET_DIR}/{job.job_id}"
-
         if os.path.exists(train_data_path):
             shutil.rmtree(train_data_path)
 
@@ -295,7 +385,7 @@ def _adapt_columns_for_dpo_dataset(dataset_path: str, dataset_type: DPODatasetTy
         json.dump(output_data, f, indent=2)
 
 
-def start_tuning_container(job: TextJob):
+def start_tuning_container(job: TextJob, hours_to_complete: int):
     logger.info("=" * 80)
     logger.info("STARTING THE TUNING CONTAINER")
     logger.info("=" * 80)
@@ -324,7 +414,22 @@ def start_tuning_container(job: TextJob):
         dataset_type=cst.CUSTOM_DATASET_TYPE,
         dataset_filename=os.path.basename(job.dataset) if job.file_format != FileFormat.HF else "",
     ).to_dict()
+
+    # Get assigned GPUs from worker environment
+    assigned_gpus = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if assigned_gpus:
+        logger.info(f"Worker assigned GPUs: {assigned_gpus}")
+        # Pass GPU assignment into the container environment
+        docker_env["CUDA_VISIBLE_DEVICES"] = assigned_gpus
+        # Revert device_requests to allow container to see all assigned GPUs, rely on env var inside.
+        device_requests = [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
+    else:
+        logger.warning("CUDA_VISIBLE_DEVICES not set for worker, container will see all GPUs.")
+        # Default: request all GPUs if not specified
+        device_requests = [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
+
     logger.info(f"Docker environment: {docker_env}")
+    logger.info(f"Docker device requests: {device_requests}")
 
     try:
         docker_client = docker.from_env()
@@ -338,6 +443,10 @@ def start_tuning_container(job: TextJob):
                 "bind": "/workspace/axolotl/outputs",
                 "mode": "rw",
             },
+        }
+        volume_bindings[ os.path.expanduser("~/.cache/huggingface") ] = {
+            "bind": "/root/.cache/huggingface",
+            "mode": "rw"
         }
 
         if job.file_format != FileFormat.HF:
@@ -358,7 +467,12 @@ def start_tuning_container(job: TextJob):
             environment=docker_env,
             volumes=volume_bindings,
             runtime="nvidia",
-            device_requests=[docker.types.DeviceRequest(count=1, capabilities=[["gpu"]])],
+            ulimits=[
+                docker.types.Ulimit(name="memlock", soft=-1, hard=-1),
+                docker.types.Ulimit(name="stack",  soft=67108864, hard=67108864),
+            ],
+            shm_size="64g",
+            device_requests=device_requests, # Use specific GPUs if assigned
             detach=True,
             tty=True,
         )
@@ -366,23 +480,39 @@ def start_tuning_container(job: TextJob):
         # Use the shared stream_logs function
         stream_logs(container)
 
-        result = container.wait()
+        timeout_seconds = hours_to_complete * 3600 * 0.95
+        logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
 
-        if result["StatusCode"] != 0:
-            raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
-
-    except Exception as e:
-        logger.error(f"Error processing job: {str(e)}")
-        raise
+        try:
+            result = container.wait(timeout=timeout_seconds)
+            logger.info(f"Container {container.id} finished with result: {result}")
+            if result["StatusCode"] != 0:
+                raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
+        except ReadTimeout: # Catch the correct exception from requests
+            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit of {hours_to_complete} hours. Attempting graceful stop...")
+            try:
+                container.stop(timeout=60) # 60 second grace period
+                logger.info(f"Container {container.id} stopped gracefully.")
+            except Exception as stop_err:
+                logger.error(f"Failed to gracefully stop container {container.id}: {stop_err}. It might be forcefully killed.")
+            # Raise a specific error to indicate timeout
+            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit of {hours_to_complete} hours.")
+        except Exception as e:
+            logger.error(f"Error waiting for or processing container {container.id}: {str(e)}")
+            raise # Re-raise other exceptions
 
     finally:
         repo = config.get("hub_model_id", None)
         if repo:
-            hf_api = HfApi(token=cst.HUGGINGFACE_TOKEN)
-            hf_api.update_repo_visibility(repo_id=repo, private=False, token=cst.HUGGINGFACE_TOKEN)
-            logger.info(f"Successfully made repository {repo} public")
+            try:
+                hf_api = HfApi(token=cst.HUGGINGFACE_TOKEN)
+                hf_api.update_repo_settings(repo_id=repo, private=False, token=cst.HUGGINGFACE_TOKEN)
+                logger.info(f"Successfully made repository {repo} public")
+            except Exception as hf_err:
+                logger.warning(f"Failed to make repository {repo} public: {hf_err}")
 
-        if "container" in locals():
+        # Ensure container object exists before trying to remove
+        if "container" in locals() and container:
             try:
                 container.remove(force=True)
                 logger.info("Container removed")

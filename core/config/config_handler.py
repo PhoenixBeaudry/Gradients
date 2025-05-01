@@ -1,11 +1,11 @@
 import os
 import uuid
-
+import re
 import toml
 import yaml
 from fiber.logging_utils import get_logger
 from transformers import AutoTokenizer
-
+from huggingface_hub import HfApi
 import core.constants as cst
 from core.models.utility_models import DPODatasetType
 from core.models.utility_models import FileFormat
@@ -13,7 +13,7 @@ from core.models.utility_models import InstructDatasetType
 
 
 logger = get_logger(__name__)
-
+hf_api = HfApi()
 
 def create_dataset_entry(
     dataset: str,
@@ -42,7 +42,7 @@ def create_dataset_entry(
 
 def update_flash_attention(config: dict, model: str):
     # You might want to make this model-dependent
-    config["flash_attention"] = False
+    config["flash_attention"] = True
     return config
 
 
@@ -51,6 +51,17 @@ def update_model_info(config: dict, model: str, job_id: str = "", expected_repo_
     tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
     if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
         config["special_tokens"] = {"pad_token": tokenizer.eos_token}
+
+    try:
+        model_info = hf_api.model_info(model)
+        size = model_info.safetensors.total
+        config["model_params_count"] = size
+    except Exception as e:
+        logger.warning(f"Error getting model size from safetensors: {e}")
+        model_size = re.search(r"(\d+)(?=[bB])", model)
+        model_size = int(model_size.group(1)) * 1_000_000_000 if model_size else None
+        logger.info(f"Model size from regex: {model_size}")
+        config["model_params_count"] = model_size
 
     config["base_model"] = model
     config["wandb_runid"] = job_id
