@@ -36,6 +36,9 @@ CMD echo 'Preparing data...' && \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/axolotl/data/${DATASET_FILENAME}; \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/axolotl/${DATASET_FILENAME}; \
     fi && \
-    echo 'Starting training command' && \
-    axolotl train ${CONFIG_DIR}/${JOB_ID}.yml
+    echo "==> Running HPO..." && \
+    python /workspace/axolotl/hpo.py && \
+    echo "==> HPO done. Now training final model with best params." && \
+    # assume hpo.py wrote best‐params.yml
+    axolotl train ${CONFIG_DIR}/${JOB_ID}_best.yml
 
