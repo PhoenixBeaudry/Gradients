@@ -26,24 +26,35 @@ HPO_WANDB_PROJ = os.environ.get("HPO_WANDB_PROJECT", BASE_WANDB_PROJ + "-hpo")
 #─── HELPERS ─────────────────────────────────────────────────────────────────────
 def run_trial(cfg_path: str, trial_num: int) -> float:
     """
-    Run a short, single-trial training and return the final eval_loss.
+    Run a short, single-trial Axolotl training and return the final eval_loss.
     """
+    # each trial writes to its own output dir to avoid collisions
     trial_out = f"./outputs/trial_{trial_num}"
     os.makedirs(trial_out, exist_ok=True)
+
     cmd = [
         "axolotl", "train", cfg_path,
-        "--max-steps", str(MAX_EVAL_STEPS),
-        "--output-dir", trial_out
+        "--max_steps", str(MAX_EVAL_STEPS),
+        "--output_dir", trial_out,
+        "--no_push_hf"
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
+
+    # crash or other failure
     if proc.returncode != 0:
         raise RuntimeError(f"Trial {trial_num} failed:\n{proc.stderr}")
+
     logs = proc.stdout + proc.stderr
+
+    # parse the last "{'eval_loss': X.XXXX, ...}" line
+    pattern = re.compile(r"'eval_loss'\s*:\s*([0-9]+(?:\.[0-9]+)?)")
     for line in reversed(logs.splitlines()):
-        m = re.search(r"eval_loss:\s*([0-9]*\.?[0-9]+)", line)
+        m = pattern.search(line)
         if m:
             return float(m.group(1))
-    raise RuntimeError(f"Could not parse eval_loss from logs of trial {trial_num}")
+
+    # if we get here, parsing failed
+    raise RuntimeError(f"Could not parse eval_loss from logs of trial {trial_num}:\n{logs}")
 
 #─── OBJECTIVE ───────────────────────────────────────────────────────────────────
 def objective(trial: optuna.Trial) -> float:
@@ -87,7 +98,9 @@ def objective(trial: optuna.Trial) -> float:
             trial.set_user_attr("axolotl_error", str(e))  
             # this will be recorded as a pruned trial rather than an outright failure
             raise optuna.exceptions.TrialPruned()
+        
         trial.report(loss, step=MAX_EVAL_STEPS)
+
         if trial.should_prune():
             raise TrialPruned()
 
