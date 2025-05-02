@@ -33,7 +33,7 @@ def run_trial(cfg_path: str, trial_num: int) -> float:
     cmd = [
         "axolotl", "train", cfg_path,
         "--max-steps", str(MAX_EVAL_STEPS),
-        "--output_dir", trial_out
+        "--output-dir", trial_out
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
