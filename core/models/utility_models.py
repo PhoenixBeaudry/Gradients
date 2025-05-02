@@ -93,6 +93,7 @@ class Job(BaseModel):
     status: JobStatus = JobStatus.QUEUED
     error_message: str | None = None
     expected_repo_name: str | None = None
+    hours_to_complete: int | None = None
 
 
 class TextJob(Job):

@@ -77,13 +77,13 @@ async def tune_model_text(
         dataset_type=train_request.dataset_type,
         file_format=train_request.file_format,
         expected_repo_name=train_request.expected_repo_name,
+        hours_to_complete=train_request.hours_to_complete
     )
     logger.info(f"Created job {job}")
     # worker_config.trainer.enqueue_job(job) # Replaced with RQ
     rq_job = rq_queue.enqueue(
         start_tuning_container,
         job,
-        train_request.hours_to_complete,
         job_timeout=int(train_request.hours_to_complete * 3600 * 1.1), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
         failure_ttl=86400  # Keep failure info for 1 day
@@ -117,13 +117,13 @@ async def tune_model_diffusion(
         model=train_request.model,
         model_type=train_request.model_type,
         expected_repo_name=train_request.expected_repo_name,
+        hours_to_complete=train_request.hours_to_complete
     )
     logger.info(f"Created job {job}")
     # worker_config.trainer.enqueue_job(job) # Replaced with RQ
     rq_job = rq_queue.enqueue(
         start_tuning_container_diffusion,
         job,
-        train_request.hours_to_complete,
         job_timeout=int(train_request.hours_to_complete * 3600 * 1.1), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
         failure_ttl=86400  # Keep failure info for 1 day

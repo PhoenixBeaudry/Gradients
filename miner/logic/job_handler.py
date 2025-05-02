@@ -70,6 +70,7 @@ def _load_and_modify_config(
     file_format: FileFormat,
     task_id: str,
     expected_repo_name: str | None,
+    hours_to_complete: int
 ) -> dict:
     """
     Loads the config template and modifies it to create a new job config.
@@ -85,6 +86,8 @@ def _load_and_modify_config(
 
     if isinstance(dataset_type, DPODatasetType):
         config["rl"] = "dpo"
+
+    config["hours_to_complete"] = hours_to_complete
 
     config = update_flash_attention(config, model)
     config = update_model_info(config, model, task_id, expected_repo_name)
@@ -117,6 +120,7 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     """
     Loads the config template and modifies it to create a new job config.
     """
+    config["hours_to_complete"] = job.hours_to_complete
     logger.info("Loading config template")
     if job.model_type == ImageModelType.SDXL:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_SDXL, "r") as file:
@@ -142,9 +146,10 @@ def create_job_diffusion(
     model: str,
     dataset_zip: str,
     model_type: ImageModelType,
-    expected_repo_name: str | None
+    expected_repo_name: str | None,
+    hours_to_complete: int
 ):
-    return DiffusionJob(job_id=job_id, model=model, dataset_zip=dataset_zip, model_type=model_type, expected_repo_name=expected_repo_name)
+    return DiffusionJob(job_id=job_id, model=model, dataset_zip=dataset_zip, model_type=model_type, expected_repo_name=expected_repo_name, hours_to_complete=hours_to_complete)
 
 
 def create_job_text(
@@ -154,6 +159,7 @@ def create_job_text(
     dataset_type: InstructDatasetType,
     file_format: FileFormat,
     expected_repo_name: str | None,
+    hours_to_complete: int
 ):
     return TextJob(
         job_id=job_id,
@@ -162,10 +168,11 @@ def create_job_text(
         dataset_type=dataset_type,
         file_format=file_format,
         expected_repo_name=expected_repo_name,
+        hours_to_complete=hours_to_complete
     )
 
 
-def start_tuning_container_diffusion(job: DiffusionJob, hours_to_complete: int):
+def start_tuning_container_diffusion(job: DiffusionJob):
     logger.info("=" * 80)
     logger.info("STARTING THE DIFFUSION TUNING CONTAINER")
     logger.info("=" * 80)
@@ -179,7 +186,7 @@ def start_tuning_container_diffusion(job: DiffusionJob, hours_to_complete: int):
     if job.model_type == ImageModelType.FLUX:
         logger.info(f"Downloading flux unet from {job.model}")
         flux_unet_path = download_flux_unet(job.model)
-
+    hours_to_complete = job.hours_to_complete
     # Download the dataset zip file using the URI stored in the job object
     logger.info(f"Downloading dataset zip from URI: {job.dataset_zip}")
     try:
@@ -385,7 +392,7 @@ def _adapt_columns_for_dpo_dataset(dataset_path: str, dataset_type: DPODatasetTy
         json.dump(output_data, f, indent=2)
 
 
-def start_tuning_container(job: TextJob, hours_to_complete: int):
+def start_tuning_container(job: TextJob):
     logger.info("=" * 80)
     logger.info("STARTING THE TUNING CONTAINER")
     logger.info("=" * 80)
@@ -400,12 +407,14 @@ def start_tuning_container(job: TextJob, hours_to_complete: int):
         job.file_format,
         job.job_id,
         job.expected_repo_name,
+        job.hours_to_complete
     )
     save_config(config, config_path)
 
     logger.info(config)
 
     logger.info(os.path.basename(job.dataset) if job.file_format != FileFormat.HF else "")
+    hours_to_complete = job.hours_to_complete
 
     docker_env = DockerEnvironment(
         huggingface_token=cst.HUGGINGFACE_TOKEN,

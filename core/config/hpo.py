@@ -16,7 +16,6 @@ CONFIG_DIR = os.environ.get("CONFIG_DIR", "/workspace/axolotl/configs")
 JOB_ID = os.environ["JOB_ID"]  # e.g. "my_job"
 TEMPLATE = os.path.join(CONFIG_DIR, f"{JOB_ID}.yml")
 
-N_TRIALS = int(os.environ.get("HPO_TRIALS", 10))
 MAX_EVAL_STEPS = int(os.environ.get("HPO_MAX_STEPS", 10))
 PRUNER = HyperbandPruner(min_resource=1, max_resource=MAX_EVAL_STEPS, reduction_factor=3)
 
@@ -114,24 +113,44 @@ def objective(trial: optuna.Trial) -> float:
 
 #─── MAIN ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    # 1) Create the study as before
     study = optuna.create_study(
         direction="minimize",
         pruner=PRUNER,
     )
-    study.optimize(objective, n_trials=N_TRIALS)
 
+    # 2) Load your base config to read hours_to_complete
+    with open(TEMPLATE, "r") as f:
+        base_cfg = yaml.safe_load(f)
+    hours = base_cfg.get("hours_to_complete")
+    if hours is None:
+        raise ValueError(
+            "'hours_to_complete' not found in your base config "
+            f"({TEMPLATE})."
+        )
+
+    # 3) Compute a time budget: 1/10th of total hours, in seconds
+    time_budget_sec = (hours / 10) * 3600
+    print(f"Running HPO for up to {time_budget_sec:.0f}s "
+          f"({hours/10:.2f}h) ...")
+
+    # 4) Optimize until timeout rather than trial-count
+    study.optimize(objective, timeout=time_budget_sec)
+
+    # 5) Report best trial as before
     print(">> Best hyperparameters:")
     for k, v in study.best_trial.params.items():
         print(f"   • {k} = {v}")
 
-    # write best config
+    # 6) Write out the best config
     with open(TEMPLATE, "r") as f:
         best_cfg = yaml.safe_load(f)
     best_cfg.update(study.best_trial.params)
-    best_cfg["hub_strategy"] = "checkpoint"
-    best_cfg["wandb_project"] = BASE_WANDB_PROJ
+    best_cfg["hub_strategy"]   = "checkpoint"
+    best_cfg["wandb_project"]  = BASE_WANDB_PROJ
 
     out_path = os.path.join(CONFIG_DIR, f"{JOB_ID}_best.yml")
     with open(out_path, "w") as f:
         yaml.dump(best_cfg, f)
     print(f"Wrote best config to {out_path}")
+
