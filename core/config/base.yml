@@ -64,7 +64,7 @@ eval_strategy: steps
 num_epochs: 2
 save_steps: 20
 eval_steps: 10
-warmup_ratio: 0.1
+warmup_steps: 10
 eval_max_new_tokens: 128
 
 debug:
