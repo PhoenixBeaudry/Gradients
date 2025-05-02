@@ -120,11 +120,12 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     """
     Loads the config template and modifies it to create a new job config.
     """
-    config["hours_to_complete"] = job.hours_to_complete
+    
     logger.info("Loading config template")
     if job.model_type == ImageModelType.SDXL:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_SDXL, "r") as file:
             config = toml.load(file)
+        config["hours_to_complete"] = job.hours_to_complete
         config["pretrained_model_name_or_path"] = job.model
         config["train_data_dir"] = f"/dataset/images/{job.job_id}/img/"
         config["huggingface_token"] = cst.HUGGINGFACE_TOKEN
@@ -132,6 +133,7 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     elif job.model_type == ImageModelType.FLUX:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_FLUX, "r") as file:
             config = toml.load(file)
+        config["hours_to_complete"] = job.hours_to_complete
         config["pretrained_model_name_or_path"] = f"{cst.CONTAINER_FLUX_PATH}/flux_unet_{job.model.replace('/', '_')}.safetensors"
         config["train_data_dir"] = f"/dataset/images/{job.job_id}/img/"
         config["huggingface_token"] = cst.HUGGINGFACE_TOKEN
