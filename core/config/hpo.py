@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import yaml
 import re
-
+import shutil
 import optuna
 from optuna.pruners import HyperbandPruner
 from optuna.exceptions import TrialPruned
@@ -30,29 +30,32 @@ def run_trial(cfg_path: str, trial_num: int) -> float:
     # each trial writes to its own output dir to avoid collisions
     trial_out = f"./outputs/trial_{trial_num}"
     os.makedirs(trial_out, exist_ok=True)
+    try:
+        cmd = [
+            "axolotl", "train", cfg_path,
+            "--max-steps", str(MAX_EVAL_STEPS),
+            "--output-dir", trial_out,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
 
-    cmd = [
-        "axolotl", "train", cfg_path,
-        "--max-steps", str(MAX_EVAL_STEPS),
-        "--output-dir", trial_out,
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+        # crash or other failure
+        if proc.returncode != 0:
+            raise RuntimeError(f"Trial {trial_num} failed:\n{proc.stderr}")
 
-    # crash or other failure
-    if proc.returncode != 0:
-        raise RuntimeError(f"Trial {trial_num} failed:\n{proc.stderr}")
+        logs = proc.stdout + proc.stderr
 
-    logs = proc.stdout + proc.stderr
+        # parse the last "{'eval_loss': X.XXXX, ...}" line
+        pattern = re.compile(r"'eval_loss'\s*:\s*([0-9]+(?:\.[0-9]+)?)")
+        for line in reversed(logs.splitlines()):
+            m = pattern.search(line)
+            if m:
+                return float(m.group(1))
 
-    # parse the last "{'eval_loss': X.XXXX, ...}" line
-    pattern = re.compile(r"'eval_loss'\s*:\s*([0-9]+(?:\.[0-9]+)?)")
-    for line in reversed(logs.splitlines()):
-        m = pattern.search(line)
-        if m:
-            return float(m.group(1))
-
-    # if we get here, parsing failed
-    raise RuntimeError(f"Could not parse eval_loss from logs of trial {trial_num}:\n{logs}")
+        # if we get here, parsing failed
+        raise RuntimeError(f"Could not parse eval_loss from logs of trial {trial_num}:\n{logs}")
+    finally:
+        # delete the entire trial directory
+        shutil.rmtree(trial_out, ignore_errors=True)
 
 #─── OBJECTIVE ───────────────────────────────────────────────────────────────────
 def objective(trial: optuna.Trial) -> float:
