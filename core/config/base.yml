@@ -61,7 +61,7 @@ early_stopping_patience: 3
 metric_for_best_model: eval_loss
 greater_is_better: false
 eval_strategy: steps
-num_epochs: 2
+max_steps: 2000
 save_steps: 20
 eval_steps: 10
 warmup_steps: 10
