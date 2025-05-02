@@ -96,6 +96,7 @@ def objective(trial: optuna.Trial) -> float:
             loss = run_trial(tmp_path, trial.number)
         except RuntimeError as e:
             trial.set_user_attr("axolotl_error", str(e))  
+            print(f"Trial Pruned due to error: {str(e)}")
             # this will be recorded as a pruned trial rather than an outright failure
             raise optuna.exceptions.TrialPruned()
         
