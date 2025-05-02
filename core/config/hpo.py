@@ -148,8 +148,6 @@ if __name__ == "__main__":
     with open(TEMPLATE, "r") as f:
         best_cfg = yaml.safe_load(f)
     best_cfg.update(study.best_trial.params)
-    best_cfg["hub_strategy"]   = "checkpoint"
-    best_cfg["wandb_project"]  = BASE_WANDB_PROJ
 
     out_path = os.path.join(CONFIG_DIR, f"{JOB_ID}_best.yml")
     with open(out_path, "w") as f:
