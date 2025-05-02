@@ -1,6 +1,6 @@
 FROM axolotlai/axolotl:main-latest
 
-RUN pip install mlflow huggingface_hub wandb protobuf optuna
+RUN pip install mlflow huggingface_hub wandb protobuf
 
 WORKDIR /workspace/axolotl
 RUN mkdir -p /workspace/axolotl/configs \
@@ -36,7 +36,6 @@ CMD echo 'Preparing data...' && \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/axolotl/data/${DATASET_FILENAME}; \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/axolotl/${DATASET_FILENAME}; \
     fi && \
-    echo "==> Running Trainer..." && \
-    # assume hpo.py wrote best‐params.yml
+    echo 'Starting training command' && \
     axolotl train ${CONFIG_DIR}/${JOB_ID}.yml
 

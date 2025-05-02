@@ -14,7 +14,7 @@ try:
 except (TypeError, ValueError):
     NETUID = DEFAULT_NETUID
 
-MINER_DOCKER_IMAGE = "phoenixbeaudry/gradients-miner:nohpo"
+MINER_DOCKER_IMAGE = "phoenixbeaudry/god-text-miner:custom"
 MINER_DOCKER_IMAGE_DIFFUSION = "phoenixbeaudry/god-text-miner-diffusion:custom"
 VALIDATOR_DOCKER_IMAGE = "weightswandering/tuning_vali:latest"
 VALIDATOR_DOCKER_IMAGE_DPO = "weightswandering/tuning_vali_dpo:latest"
