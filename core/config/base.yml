@@ -66,7 +66,7 @@ greater_is_better: false
 eval_strategy: steps
 save_steps: 40
 eval_steps: 20
-warmup_steps: 150
+warmup_steps: 10
 eval_max_new_tokens: 128
 max_steps: 2500
 
