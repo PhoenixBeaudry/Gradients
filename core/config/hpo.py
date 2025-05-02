@@ -5,9 +5,11 @@ import os
 import subprocess
 import tempfile
 import yaml
+from pathlib import Path
 import re
 import shutil
 import optuna
+from subprocess import TimeoutExpired
 from optuna.pruners import HyperbandPruner
 from optuna.exceptions import TrialPruned
 
@@ -22,40 +24,78 @@ PRUNER = HyperbandPruner(min_resource=1, max_resource=MAX_EVAL_STEPS, reduction_
 BASE_WANDB_PROJ = os.environ.get("WANDB_PROJECT", "Gradients-On-Demand")
 HPO_WANDB_PROJ = os.environ.get("HPO_WANDB_PROJECT", BASE_WANDB_PROJ + "-hpo")
 
-#─── HELPERS ─────────────────────────────────────────────────────────────────────
-def run_trial(cfg_path: str, trial_num: int) -> float:
+
+from optuna.exceptions import TrialPruned
+
+LOG_PATTERN = re.compile(r"'eval_loss'\s*:\s*([0-9]+(?:\.[0-9]+)?)")
+
+def _parse_loss(log_text: str) -> float:
+    for line in reversed(log_text.splitlines()):
+        m = LOG_PATTERN.search(line)
+        if m:
+            return float(m.group(1))
+    raise RuntimeError(f"Could not parse eval_loss:\n{log_text!r}")
+
+def run_trial(cfg: dict, trial_num: int, timeout: float) -> float:
     """
-    Run a short, single-trial Axolotl training and return the final eval_loss.
+    1) Write a one-off temp YAML from `cfg`.  
+    2) Create a trial workspace under ./outputs/trial_{trial_num}/.  
+    3) Launch axolotl with separate train+eval step caps, streaming its stdout.  
+    4) Enforce a hard `timeout` on the whole subprocess.  
+    5) Parse out the final eval_loss and return it.  
+    6) Clean up everything, no matter what.
     """
-    # each trial writes to its own output dir to avoid collisions
-    trial_out = f"./outputs/trial_{trial_num}"
-    os.makedirs(trial_out, exist_ok=True)
+    # 1) Dump temp config
+    tmp_cfg = tempfile.NamedTemporaryFile(suffix=".yml", delete=False)
     try:
-        cmd = [
-            "axolotl", "train", cfg_path,
-            "--max-steps", str(MAX_EVAL_STEPS),
-            "--output-dir", trial_out,
-        ]
-        proc = subprocess.run(cmd, text=True)
-
-        # crash or other failure
-        if proc.returncode != 0:
-            raise RuntimeError(f"Trial {trial_num} failed:\n{proc.stderr}")
-
-        logs = proc.stdout + proc.stderr
-
-        # parse the last "{'eval_loss': X.XXXX, ...}" line
-        pattern = re.compile(r"'eval_loss'\s*:\s*([0-9]+(?:\.[0-9]+)?)")
-        for line in reversed(logs.splitlines()):
-            m = pattern.search(line)
-            if m:
-                return float(m.group(1))
-
-        # if we get here, parsing failed
-        raise RuntimeError(f"Could not parse eval_loss from logs of trial {trial_num}:\n{logs}")
+        yaml.safe_dump(cfg, tmp_cfg)
+        tmp_cfg.flush()
+        tmp_path = tmp_cfg.name
     finally:
-        # delete the entire trial directory
-        shutil.rmtree(trial_out, ignore_errors=True)
+        tmp_cfg.close()
+
+    # 2) Prepare trial dir
+    trial_dir = Path("outputs") / f"trial_{trial_num}"
+    trial_dir.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "axolotl", "train", tmp_path,
+        "--max_train_steps", str(cfg["eval_steps"]),
+        "--max_eval_steps",  str(cfg["eval_steps"]),
+        "--output-dir",      str(trial_dir),
+    ]
+
+    try:
+        # 3) Launch & stream logs
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+
+        # 4) Wait up to `timeout` seconds for completion
+        try:
+            logs, _ = proc.communicate()
+        except TimeoutExpired:
+            proc.kill()
+            raise TrialPruned(f"Trial #{trial_num} timed out after {timeout}s")
+
+        if proc.returncode != 0:
+            raise RuntimeError(f"Trial #{trial_num} failed (exit {proc.returncode})\n{logs}")
+
+        # 5) Extract loss
+        return _parse_loss(logs)
+
+    finally:
+        # 6) Cleanup both temp config and trial outputs
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        shutil.rmtree(trial_dir, ignore_errors=True)
+
 
 #─── OBJECTIVE ───────────────────────────────────────────────────────────────────
 def objective(trial: optuna.Trial) -> float:
