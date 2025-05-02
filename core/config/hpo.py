@@ -75,6 +75,7 @@ def objective(trial: optuna.Trial) -> float:
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
         "lora_dropout": dropout,
+        "eval_steps": 2,
         # disable HF push
         "hub_strategy": "none",
         "hub_model_id": "",
