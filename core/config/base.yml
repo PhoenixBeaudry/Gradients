@@ -26,9 +26,6 @@ lora_r: 64
 lora_alpha: 128
 lora_dropout: 0.0
 lora_target_linear: true
-lora_mlp_kernel: true
-lora_qkv_kernel: true
-lora_o_kernel: true
 
 auto_find_batch_size: true
 gradient_accumulation_steps: 4
