@@ -16,8 +16,8 @@ CONFIG_DIR = os.environ.get("CONFIG_DIR", "/workspace/axolotl/configs")
 JOB_ID = os.environ["JOB_ID"]  # e.g. "my_job"
 TEMPLATE = os.path.join(CONFIG_DIR, f"{JOB_ID}.yml")
 
-N_TRIALS = int(os.environ.get("HPO_TRIALS", 20))
-MAX_EVAL_STEPS = int(os.environ.get("HPO_MAX_STEPS", 20))
+N_TRIALS = int(os.environ.get("HPO_TRIALS", 10))
+MAX_EVAL_STEPS = int(os.environ.get("HPO_MAX_STEPS", 10))
 PRUNER = HyperbandPruner(min_resource=1, max_resource=MAX_EVAL_STEPS, reduction_factor=3)
 
 BASE_WANDB_PROJ = os.environ.get("WANDB_PROJECT", "Gradients-On-Demand")
