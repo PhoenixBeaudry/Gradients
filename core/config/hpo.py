@@ -81,7 +81,12 @@ def objective(trial: optuna.Trial) -> float:
             yaml.dump(cfg, f)
 
         # 4) run & report
-        loss = run_trial(tmp_path, trial.number)
+        try:
+            loss = run_trial(tmp_path, trial.number)
+        except RuntimeError as e:
+            trial.set_user_attr("axolotl_error", str(e))  
+            # this will be recorded as a pruned trial rather than an outright failure
+            raise optuna.exceptions.TrialPruned()
         trial.report(loss, step=MAX_EVAL_STEPS)
         if trial.should_prune():
             raise TrialPruned()
