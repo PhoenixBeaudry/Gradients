@@ -36,7 +36,7 @@ def _parse_loss(log_text: str) -> float:
             return float(m.group(1))
     raise RuntimeError(f"Could not parse eval_loss:\n{log_text!r}")
 
-def run_trial(cfg: dict, trial_num: int, timeout: float) -> float:
+def run_trial(cfg: dict, trial_num: int) -> float:
     """
     1) Write a one-off temp YAML from `cfg`.  
     2) Create a trial workspace under ./outputs/trial_{trial_num}/.  
