@@ -132,7 +132,7 @@ if __name__ == "__main__":
         )
 
     # 3) Compute a time budget: 1/10th of total hours, in seconds
-    time_budget_sec = (hours / 10) * 3600
+    time_budget_sec = 600 #(hours / 10) * 3600
     print(f"Running HPO for up to {time_budget_sec:.0f}s "
           f"({hours/10:.2f}h) ...")
 
