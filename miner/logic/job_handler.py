@@ -94,12 +94,12 @@ def _load_and_modify_config(
 
     # clamp sequence_len to the model’s max
     desired_len = 8192
-    # if max_pos is not None and desired_len > max_pos:
-    #     logger.warning(f"Requested seq_len={desired_len} > model max {max_pos}; falling back to {max_pos}")
-    #     config["sequence_len"] = max_pos
-    #     logger.info(f"Sequence Length set to: {max_pos}")
-    # else:
-    config["sequence_len"] = desired_len
+    if max_pos is not None and desired_len > max_pos:
+        logger.warning(f"Requested seq_len={desired_len} > model max {max_pos}; falling back to {max_pos}")
+        config["sequence_len"] = max_pos
+        logger.info(f"Sequence Length set to: {max_pos}")
+    else:
+        config["sequence_len"] = desired_len
 
     # change hyper params based on model size
     if config["model_params_count"] != 0:
