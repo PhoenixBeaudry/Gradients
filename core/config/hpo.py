@@ -36,7 +36,7 @@ def run_trial(cfg_path: str, trial_num: int) -> float:
             "--max-steps", str(MAX_EVAL_STEPS),
             "--output-dir", trial_out,
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, text=True)
 
         # crash or other failure
         if proc.returncode != 0:
