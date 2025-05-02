@@ -32,9 +32,8 @@ def run_trial(cfg_path: str, trial_num: int) -> float:
     os.makedirs(trial_out, exist_ok=True)
     cmd = [
         "axolotl", "train", cfg_path,
-        "--max_steps", str(MAX_EVAL_STEPS),
-        "--output_dir", trial_out,
-        "--no_push_hf"
+        "--max-steps", str(MAX_EVAL_STEPS),
+        "--output_dir", trial_out
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
