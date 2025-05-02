@@ -16,7 +16,7 @@ CONFIG_DIR = os.environ.get("CONFIG_DIR", "/workspace/axolotl/configs")
 JOB_ID = os.environ["JOB_ID"]  # e.g. "my_job"
 TEMPLATE = os.path.join(CONFIG_DIR, f"{JOB_ID}.yml")
 
-MAX_EVAL_STEPS = int(os.environ.get("HPO_MAX_STEPS", 9))
+MAX_EVAL_STEPS = int(os.environ.get("HPO_MAX_STEPS", 10))
 PRUNER = HyperbandPruner(min_resource=1, max_resource=MAX_EVAL_STEPS, reduction_factor=3)
 
 BASE_WANDB_PROJ = os.environ.get("WANDB_PROJECT", "Gradients-On-Demand")
@@ -79,6 +79,7 @@ def objective(trial: optuna.Trial) -> float:
         "lora_alpha": lora_alpha,
         "lora_dropout": dropout,
         "eval_steps": 2,
+        "max_steps": MAX_EVAL_STEPS,
         "warmup_steps": 2,
         "logging_steps": 2,
         # disable HF push
