@@ -111,6 +111,21 @@ def _load_and_modify_config(
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
 
+    hf_cfg = AutoConfig.from_pretrained(model)
+ 
+    max_pos = getattr(hf_cfg, "max_position_embeddings", None) or getattr(hf_cfg, "n_ctx", None)
+
+    # clamp sequence_len to the model’s max
+    desired_len = 8192
+    if max_pos is not None and desired_len > max_pos:
+        logger.warning(f"Requested seq_len={desired_len} > model max {max_pos}; falling back to {max_pos}")
+        config["sequence_len"] = max_pos
+        logger.info(f"Sequence Length set to: {max_pos}")
+    else:
+        config["sequence_len"] = desired_len
+
+    config["mlflow_experiment_name"] = dataset
+
     config = setup_lora_config(config, config["model_params_count"])
 
     return config
