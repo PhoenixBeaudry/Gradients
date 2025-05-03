@@ -39,3 +39,5 @@ CMD echo 'Preparing data...' && \
     echo 'Starting training command' && \
     axolotl train ${CONFIG_DIR}/${JOB_ID}.yml
 
+
+# save to phoenixbeaudry/gradients-miner:base

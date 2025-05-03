@@ -104,12 +104,6 @@ def _load_and_modify_config(
     else:
         config["sequence_len"] = desired_len
 
-    # change hyper params based on model size
-    if config["model_params_count"] != 0:
-        if config["model_params_count"] < 4_000_000_000:
-            # If less than 4b do full finetune with higher LR
-            config["learning_rate"] = 5e-4
-            pass
 
     config["mlflow_experiment_name"] = dataset
 
@@ -277,9 +271,6 @@ def start_tuning_container_diffusion(job: DiffusionJob):
             detach=True,
             tty=True,
         )
-
-        # Use the shared stream_logs function
-        stream_logs(container)
 
         timeout_seconds = hours_to_complete * 3600 * 0.95
         logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
@@ -487,9 +478,6 @@ def start_tuning_container(job: TextJob):
             detach=True,
             tty=True,
         )
-
-        # Use the shared stream_logs function
-        stream_logs(container)
 
         timeout_seconds = hours_to_complete * 3600 * 0.95
         logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")

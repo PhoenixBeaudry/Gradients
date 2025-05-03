@@ -86,7 +86,8 @@ async def tune_model_text(
         job,
         job_timeout=int(train_request.hours_to_complete * 3600 * 1.1), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
-        failure_ttl=86400  # Keep failure info for 1 day
+        failure_ttl=86400,  # Keep failure info for 1 day
+        job_id=job.job_id
     )
     logger.info(f"Enqueued job {rq_job.id} to RQ")
 
@@ -126,7 +127,8 @@ async def tune_model_diffusion(
         job,
         job_timeout=int(train_request.hours_to_complete * 3600 * 1.1), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
-        failure_ttl=86400  # Keep failure info for 1 day
+        failure_ttl=86400,  # Keep failure info for 1 day
+        job_id=job.job_id
     )
     logger.info(f"Enqueued job {rq_job.id} to RQ")
 
@@ -183,9 +185,9 @@ async def task_offer(
 
         # Check model parameter count
         # Reject if model size is 32B or larger
-        if request.model_params_count is not None and request.model_params_count >= 82_000_000_000:
+        if request.model_params_count is not None and request.model_params_count >= 42_000_000_000:
             logger.info(f"Rejecting offer: Model size too large ({request.model_params_count / 1_000_000_000:.1f}B >= 32B)")
-            return MinerTaskResponse(message="Model size too large (>= 82B)", accepted=False)
+            return MinerTaskResponse(message="Model size too large (>= 42B)", accepted=False)
 
         # Check RQ queue length and running jobs
         queued_count = rq_queue.count
