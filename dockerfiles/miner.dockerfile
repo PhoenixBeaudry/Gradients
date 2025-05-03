@@ -1,7 +1,7 @@
 FROM axolotlai/axolotl:main-latest
 
 RUN pip install mlflow huggingface_hub wandb protobuf
-RUN pip install --upgrade accelerate
+RUN pip install --upgrade accelerate transformers huggingface_hub
 
 WORKDIR /workspace/axolotl
 RUN mkdir -p /workspace/axolotl/configs \
