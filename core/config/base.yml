@@ -62,6 +62,7 @@ metric_for_best_model: eval_loss
 greater_is_better: false
 saves_per_epoch: 10
 save_strategy: best
+logging_steps: 2
 
 
 debug:
