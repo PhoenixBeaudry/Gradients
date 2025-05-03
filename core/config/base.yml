@@ -43,7 +43,6 @@ tf32: false
 gradient_checkpointing: true
 resume_from_checkpoint:
 local_rank:
-logging_steps: 10
 flash_attention: true
 s2_attention:
 
@@ -57,21 +56,17 @@ hub_repo:
 hub_strategy: checkpoint
 hub_token:
 
-early_stopping_patience: 3
-load_best_model_at_end: true
+num_epochs: 3
+warmup_ratio: 0.1
+evals_per_epoch: 20
+save_strategy: best
 metric_for_best_model: eval_loss
 greater_is_better: false
-eval_strategy: steps
-save_steps: 40
-eval_steps: 20
-warmup_steps: 40
-eval_max_new_tokens: 128
-max_steps: 2500
 
 debug:
 
 deepspeed: /workspace/axolotl/configs/deepspeed_stage1.json
-  
+
 weight_decay: 0.01
 plugins:
   - axolotl.integrations.liger.LigerPlugin
