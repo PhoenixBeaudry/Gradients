@@ -110,8 +110,8 @@ def _load_and_modify_config(
         # lower LR
         config["learning_rate"] = 1e-4
         # Batch params
-        config["micro_batch_size"] = 8
-        config["gradient_accumulation_steps"] = 16
+        config["micro_batch_size"] = 16
+        config["gradient_accumulation_steps"] = 8
 
     elif config["model_params_count"] < 15_000_000_000:
         print("Large model detected...updating params...")
