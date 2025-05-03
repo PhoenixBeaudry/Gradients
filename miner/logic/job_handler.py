@@ -84,9 +84,6 @@ def _load_and_modify_config(
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
 
-    if isinstance(dataset_type, DPODatasetType):
-        config["rl"] = "dpo"
-
     config["hours_to_complete"] = hours_to_complete
 
     config = update_flash_attention(config, model)
@@ -131,6 +128,12 @@ def _load_and_modify_config(
         # Batch params
         config["micro_batch_size"] = 8
         config["gradient_accumulation_steps"] = 16
+
+    # RL specific params
+    if isinstance(dataset_type, DPODatasetType):
+        config["rl"] = "dpo"
+        config["rl_beta"] = 0.1
+        config["learning_rate"] = 5e-5
 
     return config
 
