@@ -29,18 +29,18 @@ lora_target_linear: true
 
 auto_find_batch_size: true
 gradient_accumulation_steps: 4
-micro_batch_size: 8
-optimizer: adamw_8bit
+micro_batch_size: 4
+eval_batch_size: 4
+optimizer: adamw_torch_fused
 lr_scheduler: cosine
 learning_rate: 2e-4
 group_by_length: true
 
 train_on_inputs: false
-bf16: true
-fp16: false
-tf32: false
+bf16: auto
+tf32: true
 
-gradient_checkpointing: true
+gradient_checkpointing: false
 resume_from_checkpoint:
 local_rank:
 flash_attention: true
@@ -56,19 +56,20 @@ hub_repo:
 hub_strategy: checkpoint
 hub_token:
 
-num_epochs: 3
-warmup_steps: 12
-evals_per_epoch: 40
+max_steps: 1000
+warmup_steps: 20
+eval_steps: 10
 metric_for_best_model: eval_loss
 greater_is_better: false
-saves_per_epoch: 40
-save_strategy: best
-logging_steps: 2
+save_steps: 10
+logging_steps: 1
+early_stopping_patience: 3
+eval_strategy: steps
+save_strategy: steps
+eval_max_new_tokens: 128
 
 
 debug:
-
-deepspeed: /workspace/axolotl/configs/deepspeed_stage1.json
 
 weight_decay: 0.01
 plugins:
@@ -78,5 +79,3 @@ liger_rms_norm: true
 liger_glu_activation: true
 liger_layer_norm: true
 liger_fused_linear_cross_entropy: true
-
-

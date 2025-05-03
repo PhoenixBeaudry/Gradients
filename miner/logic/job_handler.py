@@ -92,50 +92,26 @@ def _load_and_modify_config(
     # Modify config based on Model Size
     if config["model_params_count"] < 2_000_000_000:
         print("Small model detected...updating params...")
-        # Small model: do full fine tune
-        config["adapter"] = None
-        # Higher LR
         config["learning_rate"] = 1e-4
-        # Batch params
-        config["micro_batch_size"] = 32
-        config["gradient_accumulation_steps"] = 4
 
     elif config["model_params_count"] < 8_000_000_000:
         print("Medium model detected...updating params...")
-        # Small model: switch to lora
-        config["adapter"] = "lora"
-        # lower LR
         config["learning_rate"] = 1e-4
-        # Batch params
-        config["micro_batch_size"] = 16
-        config["gradient_accumulation_steps"] = 8
 
     elif config["model_params_count"] < 15_000_000_000:
         print("Large model detected...updating params...")
-        # Small model: switch to lora
-        config["adapter"] = "lora"
-        # lower LR
         config["learning_rate"] = 3e-5
-        # Batch params
-        config["micro_batch_size"] = 16
-        config["gradient_accumulation_steps"] = 16
 
     elif config["model_params_count"] < 40_000_000_000:
-        # Small model: switch to lora
-        config["adapter"] = "lora"
-        # lower LR
         config["learning_rate"] = 1e-5
-        # Batch params
-        config["micro_batch_size"] = 16
-        config["gradient_accumulation_steps"] = 16
+
 
     # RL specific params
     if isinstance(dataset_type, DPODatasetType):
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
-        config["learning_rate"] = 5e-5
-        config["val_set_size"] = 0.0
-        config["metric_for_best_model"] = "loss"
+
+    config = setup_lora_config(config, config["model_params_count"])
 
     return config
 
@@ -166,6 +142,13 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
         logger.error(f"Unknown model type: {job.model_type}")
     return config
 
+def setup_lora_config(config, model_size):
+    """Setup QLoRA configuration for more efficient adaptation"""
+    config["adapter"] = "lora"
+    config["lora_r"] = min(256, max(64, int(model_size / 50_000_000)))
+    config["lora_alpha"] = config["lora_r"] * 2
+    config["lora_dropout"] = 0.05
+    return config
 
 def create_job_diffusion(
     job_id: str,
@@ -245,6 +228,8 @@ def start_tuning_container_diffusion(job: DiffusionJob):
     docker_env = DockerEnvironmentDiffusion(
         huggingface_token=cst.HUGGINGFACE_TOKEN, wandb_token=cst.WANDB_TOKEN, job_id=job.job_id, base_model=job.model_type.value
     ).to_dict()
+    docker_env["NUMEXPR_MAX_THREADS"] = 64
+    docker_env["NCCL_P2P_LEVEL"] = "NVL"
 
     # Get assigned GPUs from worker environment
     assigned_gpus = os.environ.get("CUDA_VISIBLE_DEVICES")
@@ -292,6 +277,7 @@ def start_tuning_container_diffusion(job: DiffusionJob):
             environment=docker_env,
             volumes=volume_bindings,
             runtime="nvidia",
+            ipc_mode="host",
             ulimits=[
                 docker.types.Ulimit(name="memlock", soft=-1, hard=-1),
                 docker.types.Ulimit(name="stack",  soft=67108864, hard=67108864),
@@ -447,6 +433,9 @@ def start_tuning_container(job: TextJob):
         dataset_filename=os.path.basename(job.dataset) if job.file_format != FileFormat.HF else "",
     ).to_dict()
 
+    docker_env["NUMEXPR_MAX_THREADS"] = 64
+    docker_env["NCCL_P2P_LEVEL"] = "NVL"
+
     # Get assigned GPUs from worker environment
     assigned_gpus = os.environ.get("CUDA_VISIBLE_DEVICES")
     if assigned_gpus:
@@ -499,6 +488,7 @@ def start_tuning_container(job: TextJob):
             environment=docker_env,
             volumes=volume_bindings,
             runtime="nvidia",
+            ipc_mode="host",
             ulimits=[
                 docker.types.Ulimit(name="memlock", soft=-1, hard=-1),
                 docker.types.Ulimit(name="stack",  soft=67108864, hard=67108864),
