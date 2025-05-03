@@ -107,7 +107,7 @@ def _load_and_modify_config(
         # lower LR
         config["learning_rate"] = 1e-4
         # Batch params
-        config["micro_batch_size"] = 8
+        config["micro_batch_size"] = 16
         config["gradient_accumulation_steps"] = 8
 
     elif config["model_params_count"] < 15_000_000_000:
@@ -134,6 +134,9 @@ def _load_and_modify_config(
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
         config["learning_rate"] = 5e-5
+        config["val_set_size"] = 0
+        config["evals_per_epoch"] = None
+        config["metric_for_best_model"] = "loss"
 
     return config
 
