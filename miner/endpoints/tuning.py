@@ -36,6 +36,8 @@ from miner.logic.job_handler import create_job_text
 from miner.logic.job_handler import start_tuning_container, start_tuning_container_diffusion # Import job functions
 
 
+NUM_WORKERS = 4
+
 logger = get_logger(__name__)
 
 # Connect to Redis and initialize RQ Queue
@@ -194,7 +196,7 @@ async def task_offer(
         started_registry = StartedJobRegistry(queue=rq_queue)
         running_count = started_registry.count
         total_active = queued_count + running_count
-        capacity = 2 
+        capacity = NUM_WORKERS
 
         if total_active >= capacity: # Keep existing buffer logic
             logger.info(f"Rejecting offer: Queue full (queued={queued_count}, running={running_count}, total={total_active})")
@@ -235,7 +237,7 @@ async def task_offer_image(
         started_registry = StartedJobRegistry(queue=rq_queue)
         running_count = started_registry.count
         total_active = queued_count + running_count
-        capacity = 2 
+        capacity = NUM_WORKERS
 
         if total_active >= capacity: # Keep existing buffer logic
             logger.info(f"Rejecting offer: Queue full (queued={queued_count}, running={running_count}, total={total_active})")
