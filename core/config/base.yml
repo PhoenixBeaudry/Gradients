@@ -57,6 +57,7 @@ hub_strategy: checkpoint
 hub_token:
 
 num_epochs: 3
+early_stopping_patience: 3
 warmup_steps: 12
 evals_per_epoch: 100
 metric_for_best_model: eval_loss
