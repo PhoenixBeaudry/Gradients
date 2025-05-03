@@ -134,6 +134,7 @@ def _load_and_modify_config(
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
         config["learning_rate"] = 5e-5
+        config["val_set_size"] = 0.0
         config["metric_for_best_model"] = "loss"
 
     return config

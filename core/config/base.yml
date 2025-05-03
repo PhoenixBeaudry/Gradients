@@ -10,7 +10,7 @@ strict: false
 chat_template: llama3
 datasets:
 dataset_prepared_path:
-val_set_size: 0.05
+val_set_size: 0.1
 output_dir: miner_id_24
 
 sequence_len: 2048
@@ -58,11 +58,11 @@ hub_token:
 
 num_epochs: 3
 warmup_steps: 12
-eval_steps: 10
+evals_per_epoch: 40
 metric_for_best_model: eval_loss
 greater_is_better: false
+saves_per_epoch: 40
 save_strategy: best
-early_stopping_patience: 3
 logging_steps: 2
 
 
