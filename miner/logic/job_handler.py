@@ -95,7 +95,7 @@ def _load_and_modify_config(
         # Small model: do full fine tune
         config["adapter"] = None
         # Higher LR
-        config["learning_rate"] = 3e-4
+        config["learning_rate"] = 1e-4
         # Batch params
         config["micro_batch_size"] = 32
         config["gradient_accumulation_steps"] = 4
