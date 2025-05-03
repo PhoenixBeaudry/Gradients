@@ -97,8 +97,8 @@ def _load_and_modify_config(
         # Higher LR
         config["learning_rate"] = 3e-4
         # Batch params
-        config["micro_batch_size"] = 16
-        config["gradient_accumulation_steps"] = 8
+        config["micro_batch_size"] = 32
+        config["gradient_accumulation_steps"] = 4
 
     elif config["model_params_count"] < 8_000_000_000:
         print("Medium model detected...updating params...")
@@ -107,7 +107,7 @@ def _load_and_modify_config(
         # lower LR
         config["learning_rate"] = 1e-4
         # Batch params
-        config["micro_batch_size"] = 16
+        config["micro_batch_size"] = 32
         config["gradient_accumulation_steps"] = 8
 
     elif config["model_params_count"] < 15_000_000_000:
@@ -117,7 +117,7 @@ def _load_and_modify_config(
         # lower LR
         config["learning_rate"] = 3e-5
         # Batch params
-        config["micro_batch_size"] = 8
+        config["micro_batch_size"] = 16
         config["gradient_accumulation_steps"] = 16
 
     elif config["model_params_count"] < 40_000_000_000:
@@ -126,7 +126,7 @@ def _load_and_modify_config(
         # lower LR
         config["learning_rate"] = 1e-5
         # Batch params
-        config["micro_batch_size"] = 8
+        config["micro_batch_size"] = 16
         config["gradient_accumulation_steps"] = 16
 
     # RL specific params
