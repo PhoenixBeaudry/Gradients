@@ -60,6 +60,7 @@ warmup_steps: 12
 evals_per_epoch: 20
 metric_for_best_model: eval_loss
 greater_is_better: false
+saves_per_epoch: 10
 save_strategy: best
 
 
