@@ -57,13 +57,13 @@ hub_strategy: checkpoint
 hub_token:
 
 num_epochs: 3
-early_stopping_patience: 3
 warmup_steps: 12
-evals_per_epoch: 100
+evals_per_epoch: 50
 metric_for_best_model: eval_loss
 greater_is_better: false
 saves_per_epoch: 50
 save_strategy: best
+early_stopping_patience: 3
 logging_steps: 2
 
 
