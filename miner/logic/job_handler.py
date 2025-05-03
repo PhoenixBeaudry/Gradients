@@ -91,21 +91,43 @@ def _load_and_modify_config(
 
     config = update_flash_attention(config, model)
     config = update_model_info(config, model, task_id, expected_repo_name)
-    hf_cfg = AutoConfig.from_pretrained(model)
- 
-    max_pos = getattr(hf_cfg, "max_position_embeddings", None) or getattr(hf_cfg, "n_ctx", None)
 
-    # clamp sequence_len to the model’s max
-    desired_len = 8192
-    if max_pos is not None and desired_len > max_pos:
-        logger.warning(f"Requested seq_len={desired_len} > model max {max_pos}; falling back to {max_pos}")
-        config["sequence_len"] = max_pos
-        logger.info(f"Sequence Length set to: {max_pos}")
-    else:
-        config["sequence_len"] = desired_len
+    # Modify config based on Model Size
+    if config["model_params_count"] < 1_000_000_000:
+        # Small model: do full fine tune
+        config["adapter"] = None
+        # Higher LR
+        config["learning_rate"] = 3e-4
+        # Batch params
+        config["micro_batch_size"] = 16
+        config["gradient_accumulation_steps"] = 8
 
+    elif config["model_params_count"] < 8_000_000_000:
+        # Small model: switch to lora
+        config["adapter"] = "lora"
+        # lower LR
+        config["learning_rate"] = 1e-4
+        # Batch params
+        config["micro_batch_size"] = 8
+        config["gradient_accumulation_steps"] = 16
 
-    config["mlflow_experiment_name"] = dataset
+    elif config["model_params_count"] < 15_000_000_000:
+        # Small model: switch to lora
+        config["adapter"] = "lora"
+        # lower LR
+        config["learning_rate"] = 3e-5
+        # Batch params
+        config["micro_batch_size"] = 8
+        config["gradient_accumulation_steps"] = 16
+
+    elif config["model_params_count"] < 40_000_000_000:
+        # Small model: switch to lora
+        config["adapter"] = "lora"
+        # lower LR
+        config["learning_rate"] = 1e-5
+        # Batch params
+        config["micro_batch_size"] = 8
+        config["gradient_accumulation_steps"] = 16
 
     return config
 
