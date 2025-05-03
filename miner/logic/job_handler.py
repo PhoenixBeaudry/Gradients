@@ -90,7 +90,7 @@ def _load_and_modify_config(
     config = update_model_info(config, model, task_id, expected_repo_name)
 
     # Modify config based on Model Size
-    if config["model_params_count"] < 1_000_000_000:
+    if config["model_params_count"] < 2_000_000_000:
         print("Small model detected...updating params...")
         # Small model: do full fine tune
         config["adapter"] = None
