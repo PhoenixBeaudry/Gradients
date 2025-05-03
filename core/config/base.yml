@@ -61,7 +61,6 @@ warmup_steps: 12
 eval_steps: 10
 metric_for_best_model: eval_loss
 greater_is_better: false
-save_steps: 10
 save_strategy: best
 early_stopping_patience: 3
 logging_steps: 2
