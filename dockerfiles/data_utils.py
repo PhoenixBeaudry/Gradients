@@ -31,244 +31,224 @@ from typing import Any, Callable, Dict, List, Sequence, Tuple
 import torch
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
-
-__all__ = [
-    "prepare_tokenizer",
-    "load_and_tokenise_dataset",
-    "ChatDataCollator",
-]
-
-# ---------------------------------------------------------------------------
-# 1. Chat‑family → template registry
-# ---------------------------------------------------------------------------
-_LL3_START, _LL3_END, _EOT = "<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>"
-_CHATML_BEG, _CHATML_END = "<|im_start|>", "<|im_end|>"
-
-
-def _tmpl_llama3(system: str, user: str, assistant: str = "") -> str:
-    return (
-        f"{_LL3_START}system{_LL3_END}\n{system}{_EOT}\n"
-        f"{_LL3_START}user{_LL3_END}\n{user}{_EOT}\n"
-        f"{_LL3_START}assistant{_LL3_END}\n{assistant}"
-    )
-
-
-def _tmpl_llama2(system: str, user: str, assistant: str = "") -> str:
-    sys_block = f"<<SYS>>\n{system}\n<</SYS>>\n\n" if system else ""
-    return f"<s>[INST] {sys_block}{user} [/INST] {assistant}"
-
-
-def _tmpl_qwen(system: str, user: str, assistant: str = "") -> str:
-    return (
-        f"{_CHATML_BEG}system\n{system}{_CHATML_END}\n"
-        f"{_CHATML_BEG}user\n{user}{_CHATML_END}\n"
-        f"{_CHATML_BEG}assistant\n{assistant}"
-    )
-
-
-def _tmpl_phi(system: str, user: str, assistant: str = "") -> str:
-    return f"<|system|>\n{system}\n<|user|>\n{user}\n<|assistant|>\n{assistant}"
-
-
-def _tmpl_plain(system: str, user: str, assistant: str = "") -> str:
-    return f"{user}\n{assistant}"
-
-
-_TEMPLATE_TABLE: dict[str, Callable[[str, str, str], str]] = {
-    "llama-3": _tmpl_llama3,
-    "llama3": _tmpl_llama3,
-    "llama-2": _tmpl_llama2,
-    "llama2": _tmpl_llama2,
-    "mistral": _tmpl_llama2,
-    "mixtral": _tmpl_llama2,
-    "qwen": _tmpl_qwen,
-    "zephyr": _tmpl_qwen,
-    "phi": _tmpl_phi,
-}
-
-
-def _select_template(model_name: str, explicit: str | None) -> Callable[[str, str, str], str]:
-    key = (explicit or model_name).lower()
-    for sub, fn in _TEMPLATE_TABLE.items():
-        if sub in key:
-            return fn
-    return _tmpl_plain
-
-
-# ---------------------------------------------------------------------------
-# 2. Schema detection
-# ---------------------------------------------------------------------------
-
-def _detect_schema(example: Dict[str, Any]) -> str:
-    keys = {k.lower() for k in example}
-    if {"instruction", "output"} <= keys:
-        return "instruct"
-    if {"question", "answer"} <= keys:
-        return "qa"
-    if ("prompt" in keys) and ("completion" in keys or "response" in keys):
-        return "prompt_completion"
-    if {"chosen", "rejected"} <= keys:
-        return "dpo"
-    return "plain"
-
-
-# ---------------------------------------------------------------------------
-# 3. Processor factory
-# ---------------------------------------------------------------------------
-
-def _build_processor(cfg: dict, tokenizer: PreTrainedTokenizerBase):
-    seq_len = int(cfg.get("sequence_len", 2048))
-    mask_inputs = not cfg.get("train_on_inputs", False)
-    tmpl_fn = _select_template(cfg["base_model"], cfg.get("chat_template"))
-    sys_msg = cfg.get("system_prompt", "You are a helpful assistant.")
-
-    def _proc(ex: Dict[str, Any]):  # may return None to drop row
-        schema = _detect_schema(ex)
-
-        # -------- extract prompt & answer ----------------------------------
-        if schema == "instruct":
-            prompt = ex["instruction"] + (" " + ex["input"] if ex.get("input") else "")
-            answer = ex.get("output", "")
-        elif schema == "qa":
-            if "label" in ex and ex["label"] not in (1, True):
-                return None  # negative example
-            prompt, answer = ex["question"], ex["answer"]
-        elif schema == "prompt_completion":
-            prompt = ex["prompt"]
-            answer = ex.get("completion") or ex.get("response", "")
-        elif schema == "dpo":
-            prompt, answer = ex["prompt"], ex["chosen"]
-        else:  # plain – first field is the whole supervised sequence
-            first_key = next(iter(ex))
-            prompt, answer = "", str(ex[first_key])
-
-        # -------- build chat prompt ----------------------------------------
-        chat = tmpl_fn(sys_msg, prompt)
-        full = chat + answer + (tokenizer.eos_token or "")
-
-        # -------- tokenise --------------------------------------------------
-        enc = tokenizer(full, truncation=True, max_length=seq_len, return_attention_mask=False)
-        ids = enc["input_ids"]
-        labels = ids.copy()
-
-        if mask_inputs:
-            prompt_ids = tokenizer(chat, add_special_tokens=False)["input_ids"]
-            cutoff = min(len(prompt_ids), len(labels))
-            labels[:cutoff] = [-100] * cutoff
-
-        return {"input_ids": ids, "labels": labels}
-
-    return _proc
-
-
-# ---------------------------------------------------------------------------
-# 4. Dataset loader (public)
-# ---------------------------------------------------------------------------
-
-def load_and_tokenise_dataset(cfg: dict, tokenizer: PreTrainedTokenizerBase) -> Tuple[Dataset, Dataset | None]:
-    """Load dataset, map processor, return (train, eval) Datasets."""
-
-    ds_spec = cfg["datasets"][0]
-    dtype = ds_spec.get("ds_type", ds_spec.get("type", "hf")).lower()
-
-    # 1 ◇ raw load -----------------------------------------------------------
-    if dtype in {"json", "csv", "text"}:
-        raw = load_dataset(dtype, data_files={"train": ds_spec["path"]})["train"]
-    else:
-        raw = load_dataset(ds_spec["path"], split=ds_spec.get("split", "train"))
-
-    # 2 ◇ optional val split -------------------------------------------------
-    val_ratio = float(cfg.get("val_set_size", 0))
-    if 0.0 < val_ratio < 1.0:
-        split = raw.train_test_split(test_size=val_ratio, seed=42, shuffle=True)
-        train, eval_ = split["train"], split["test"]
-    else:
-        train, eval_ = raw, None
-
-    processor = _build_processor(cfg, tokenizer)
-
-    # 3 ◇ map & drop None rows ----------------------------------------------
-    train = train.map(processor, remove_columns=train.column_names)
-    train = train.filter(lambda x: x["input_ids"] is not None)
-    if eval_:
-        eval_ = eval_.map(processor, remove_columns=eval_.column_names)
-        eval_ = eval_.filter(lambda x: x["input_ids"] is not None)
-
-    return train, eval_
-
-
-# ---------------------------------------------------------------------------
-# 5. Tokenizer preparation
-# ---------------------------------------------------------------------------
-_CHAT_TOKENS: Sequence[str] = [
-    "<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>",
-    "<|im_start|>", "<|im_end|>",
-    "<<SYS>>", "<</SYS>>", "[INST]", "[/INST]",
-    "<|system|>", "<|user|>", "<|assistant|>",
-]
-
-
-def prepare_tokenizer(model_name: str, hub_token: str | None, cfg: dict) -> PreTrainedTokenizerBase:
-    """Load HF tokenizer, inject missing chat tokens, ensure PAD.
-
-    Sets ``tokenizer._added_tokens`` bool so caller can resize embeddings.
-    Returns the tokenizer (single object – main script API).
+def prepare_tokenizer(model_name: str, hub_token=None, cfg=None):
     """
+    Prepares and configures the tokenizer for the given model.
+    
+    Args:
+        model_name: Name or path of the model
+        hub_token: Optional Hugging Face token for private models
+        cfg: Configuration dictionary with additional tokenizer settings
+        
+    Returns:
+        Configured tokenizer
+    """
+    cfg = cfg or {}
+    tokenizer_kwargs = {
+        "use_auth_token": hub_token,
+        "trust_remote_code": True,
+        "padding_side": "right",  # Most common for causal LM training
+        "use_fast": True,  # Use fast tokenizer when available
+    }
+    
+    # Load the tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
+    
+    # Ensure we have the needed special tokens for the model architecture
+    # Different model families need different special tokens
+    if tokenizer.pad_token is None:
+        if tokenizer.eos_token:
+            tokenizer.pad_token = tokenizer.eos_token
+        else:
+            tokenizer.pad_token = tokenizer.eos_token = "</s>"
+    
+    # Apply custom chat template if specified
+    chat_template = cfg.get("chat_template")
+    if chat_template:
+        tokenizer.chat_template = chat_template
+    
+    # Add special tokens if specified
+    special_tokens = cfg.get("special_tokens", {})
+    if special_tokens:
+        num_added = tokenizer.add_special_tokens(special_tokens)
+        setattr(tokenizer, "_added_tokens", num_added > 0)
+    
+    # Apply token length limits
+    max_length = cfg.get("max_length", 2048)
+    tokenizer.model_max_length = max_length
+    
+    return tokenizer
 
-    tok = AutoTokenizer.from_pretrained(
-        model_name,
-        use_fast=True,
-        use_auth_token=hub_token,
-        trust_remote_code=True,
-    )
 
-    # a) existing specials ---------------------------------------------------
-    raw_vals = tok.special_tokens_map_extended.values()
-    flat = list(
-        chain.from_iterable(val if isinstance(val, (list, tuple)) else [val] for val in raw_vals)
-    )
-    existing = set(flat)
-
-    # b) add missing chat tokens --------------------------------------------
-    missing = [t for t in _CHAT_TOKENS if t not in existing]
-    tok._added_tokens = False  # default
-    if missing:
-        tok.add_special_tokens({"additional_special_tokens": missing})
-        tok._added_tokens = True
-
-    # c) ensure PAD token ----------------------------------------------------
-    if tok.pad_token_id is None:
-        tok.pad_token = tok.eos_token
-        tok._added_tokens = True
-
-    # d) padding side --------------------------------------------------------
-    tok.padding_side = cfg.get("padding_side", "right")
-
-    return tok
-
-
-# ---------------------------------------------------------------------------
-# 6. Collator
-# ---------------------------------------------------------------------------
-class ChatDataCollator:
-    """Pads to longest sequence in batch & aligns labels (‑100 padding)."""
-
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, pad_to_multiple_of: int | None = 8):
-        self.tok = tokenizer
-        self.mult = pad_to_multiple_of
-
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        batch_inputs = self.tok(
-            [f["input_ids"] for f in features],
-            padding=True,
-            truncation=False,
-            return_tensors="pt",
-            pad_to_multiple_of=self.mult,
+def load_and_tokenise_dataset(cfg: dict, tokenizer) -> Tuple[Dataset, Dataset]:
+    """
+    Load and tokenize datasets for training and evaluation.
+    
+    Args:
+        cfg: Configuration dictionary with dataset settings
+        tokenizer: Tokenizer to use for processing
+        
+    Returns:
+        Tuple of (train_dataset, eval_dataset)
+    """
+    # Extract config parameters
+    dataset_name = cfg.get("dataset_name")
+    dataset_path = cfg.get("dataset_path")
+    train_split = cfg.get("train_split", "train")
+    eval_split = cfg.get("eval_split", "validation")
+    text_column = cfg.get("text_column", "text")
+    prompt_column = cfg.get("prompt_column")
+    response_column = cfg.get("response_column")
+    max_length = cfg.get("max_length", tokenizer.model_max_length)
+    streaming = cfg.get("streaming", False)
+    
+    # Load dataset based on source specification
+    if dataset_name:
+        # Load from Hugging Face datasets hub
+        dataset = load_dataset(
+            dataset_name,
+            streaming=streaming,
+            use_auth_token=cfg.get("hub_token"),
+            trust_remote_code=True
         )
-        max_len = batch_inputs["input_ids"].shape[1]
+    elif dataset_path:
+        # Load from local path
+        if dataset_path.endswith(('.json', '.jsonl')):
+            dataset = load_dataset('json', data_files=dataset_path)
+        elif dataset_path.endswith('.csv'):
+            dataset = load_dataset('csv', data_files=dataset_path)
+        elif dataset_path.endswith('.parquet'):
+            dataset = load_dataset('parquet', data_files=dataset_path) 
+        else:
+            # Try to load as a directory
+            dataset = load_dataset(dataset_path)
+    else:
+        raise ValueError("Either dataset_name or dataset_path must be provided")
+    
+    # Split dataset into train and eval if they exist
+    train_ds = dataset[train_split] if train_split in dataset else dataset
+    eval_ds = dataset[eval_split] if eval_split in dataset and eval_split in dataset else None
+    
+    # Create tokenization function based on data format
+    def is_chat_dataset():
+        """Check if dataset has conversation structure"""
+        if prompt_column and response_column:
+            return True
+        # Check if any sample is a list of messages
+        sample = train_ds[0] if not streaming else next(iter(train_ds))
+        return isinstance(sample.get("messages", None), list)
+    
+    def tokenize_function(examples):
+        """Tokenize based on dataset format"""
+        if is_chat_dataset():
+            if "messages" in examples:
+                # Handle chat format with messages field
+                formatted = [
+                    tokenizer.apply_chat_template(chat, tokenize=False)
+                    for chat in examples["messages"]
+                ]
+            else:
+                # Handle explicit prompt/response format
+                formatted = []
+                for i in range(len(examples[prompt_column])):
+                    chat = [
+                        {"role": "user", "content": str(examples[prompt_column][i])},
+                        {"role": "assistant", "content": str(examples[response_column][i])}
+                    ]
+                    formatted.append(tokenizer.apply_chat_template(chat, tokenize=False))
+            
+            result = tokenizer(
+                formatted,
+                max_length=max_length,
+                padding="max_length" if cfg.get("pad_to_max_length", False) else False,
+                truncation=True,
+                return_tensors="pt",
+                return_attention_mask=True,
+            )
+            # Create labels for causal LM (shift input_ids right)
+            result["labels"] = result["input_ids"].clone()
+            return result
+        else:
+            # Handle plain text format
+            text_data = examples[text_column]
+            if isinstance(text_data, list):
+                text_data = [str(t) for t in text_data]
+            else:
+                text_data = str(text_data)
+                
+            result = tokenizer(
+                text_data,
+                max_length=max_length,
+                padding="max_length" if cfg.get("pad_to_max_length", False) else False,
+                truncation=True,
+                return_tensors="pt",
+                return_attention_mask=True,
+            )
+            # Create labels for causal LM (shift input_ids right)
+            result["labels"] = result["input_ids"].clone()
+            return result
+    
+    # Apply tokenization to datasets
+    if streaming:
+        # For streaming datasets
+        train_ds = train_ds.map(tokenize_function, batched=True)
+        if eval_ds:
+            eval_ds = eval_ds.map(tokenize_function, batched=True)
+    else:
+        # For non-streaming datasets
+        train_ds = train_ds.map(
+            tokenize_function,
+            batched=True,
+            num_proc=cfg.get("preprocessing_num_workers", 4),
+            remove_columns=[col for col in train_ds.column_names if col not in ["input_ids", "attention_mask", "labels"]],
+        )
+        if eval_ds:
+            eval_ds = eval_ds.map(
+                tokenize_function,
+                batched=True,
+                num_proc=cfg.get("preprocessing_num_workers", 4),
+                remove_columns=[col for col in eval_ds.column_names if col not in ["input_ids", "attention_mask", "labels"]],
+            )
+    
+    return train_ds, eval_ds
 
-        padded_labels = [
-            f["labels"] + [-100] * (max_len - len(f["labels"])) for f in features
-        ]
-        batch_inputs["labels"] = torch.tensor(padded_labels, dtype=torch.long)
-        return batch_inputs
+
+class ChatDataCollator:
+    """
+    Data collator that handles dynamic padding for chat datasets.
+    
+    Args:
+        tokenizer: The tokenizer used to process the data
+        pad_to_multiple_of: Optional requirement to pad to multiple of value (for hardware optimization)
+    """
+    def __init__(self, tokenizer, pad_to_multiple_of=None):
+        self.tokenizer = tokenizer
+        self.pad_to_multiple_of = pad_to_multiple_of
+    
+    def __call__(self, features):
+        # Pad input_ids and attention_mask to the same length
+        batch = self.tokenizer.pad(
+            {"input_ids": [f["input_ids"] for f in features],
+             "attention_mask": [f["attention_mask"] for f in features]},
+            padding=True,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors="pt",
+        )
+        
+        # Handle labels for causal LM
+        labels = [f.get("labels", f["input_ids"].clone()) for f in features]
+        max_label_length = max(len(l) for l in labels)
+        
+        # Pad labels to max length
+        padded_labels = []
+        for label in labels:
+            # For causal LM, we use -100 as padding token ID so loss ignores it
+            padding_length = max_label_length - len(label)
+            if padding_length > 0:
+                padded_label = torch.cat([label, torch.full((padding_length,), -100, dtype=torch.long)])
+            else:
+                padded_label = label
+            padded_labels.append(padded_label)
+        
+        batch["labels"] = torch.stack(padded_labels)
+        return batch
