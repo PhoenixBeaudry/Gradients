@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.train import setup_model_and_tokenizer
+from axolotl.utils.dict import DictDefault
 from accelerate import Accelerator
 import wandb
 from transformers import (
@@ -72,8 +73,9 @@ def parse_args():
 
 
 def load_config(path: str) -> dict:
-    with open(path, 'r') as f:
-        return yaml.safe_load(f)
+    with open(path, encoding="utf-8") as file:
+        cfg: DictDefault = DictDefault(yaml.safe_load(file))
+    return cfg
 
 
 def setup_logger() -> logging.Logger:
