@@ -7,7 +7,7 @@ import logging
 from functools import partial
 from datasets import load_dataset, Dataset
 from hpo_optuna import run_optuna 
-from data_utils import load_and_tokenise_dataset, prepare_tokenizer
+from data_utils import load_and_tokenise_dataset, prepare_tokenizer, CausalLMDataCollator
 from typing import Tuple, Dict, Any, List
 import yaml
 from ignite.engine import Engine, Events
@@ -168,13 +168,13 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     )
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
-
+    collator = CausalLMDataCollator(tokenizer, pad_to_multiple_of=8)
     return Trainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=8),
+        data_collator=collator,
         callbacks=callbacks,
         processing_class=tokenizer,
     )

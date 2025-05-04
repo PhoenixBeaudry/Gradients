@@ -189,3 +189,39 @@ def prepare_tokenizer(model_name: str, hub_token: str | None, cfg: dict):
         tokenizer.pad_token = tokenizer.eos_token
 
     return tokenizer
+
+
+from typing import List
+from transformers import PreTrainedTokenizerBase
+import torch
+
+class CausalLMDataCollator:
+    """
+    Pads input_ids & labels to the longest sequence in the batch.
+    Labels are padded with –100, everything else with tokenizer.pad_token_id.
+    """
+    def __init__(self,
+                 tokenizer: PreTrainedTokenizerBase,
+                 pad_to_multiple_of: int | None = 8):
+        self.tok = tokenizer
+        self.mult = pad_to_multiple_of
+
+    def __call__(self, features: List[dict]) -> dict:
+        # We rely on tokenizer.pad for input_ids & attention_mask
+        batch = self.tok.pad(
+            features,
+            padding=True,
+            return_tensors="pt",
+            pad_to_multiple_of=self.mult,
+        )
+
+        # ---- labels ---------------------------------------------------------
+        max_len = batch["input_ids"].size(1)
+        padded_labels = []
+        for f in features:
+            lbl = f["labels"]
+            pad = max_len - len(lbl)
+            padded_labels.append(lbl + [-100] * pad)
+        batch["labels"] = torch.tensor(padded_labels, dtype=torch.long)
+        return batch
+
