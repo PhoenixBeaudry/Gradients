@@ -76,8 +76,6 @@ max_steps: 10000
 
 debug:
 
-deepspeed: /workspace/axolotl/configs/deepspeed_stage2.json
-
 weight_decay: 0.01
 plugins:
   - axolotl.integrations.liger.LigerPlugin
