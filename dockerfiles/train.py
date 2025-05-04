@@ -4,7 +4,7 @@ import argparse
 import logging
 from functools import partial
 from datasets import load_dataset, Dataset
-from data_utils import load_and_tokenise_dataset
+from data_utils import load_and_tokenise_dataset, prepare_tokenizer
 from typing import Tuple, Dict, Any, List
 import yaml
 from ignite.engine import Engine, Events
@@ -82,30 +82,6 @@ def setup_logger() -> logging.Logger:
         format="%(asctime)s %(levelname)s %(message)s"
     )
     return logging.getLogger(__name__)
-
-
-def prepare_tokenizer(model_name: str, hub_token: str = None, max_length: int = 2048):
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        use_fast=True,
-        use_auth_token=hub_token,
-    )
-    # 1) force left‐padding
-    tokenizer.padding_side = "left"
-
-    # 2) default truncation to max_length
-    if hasattr(tokenizer, "enable_truncation"):
-        tokenizer.enable_truncation(max_length=max_length)
-
-    # 3) default padding on every call
-    if hasattr(tokenizer, "enable_padding"):
-        tokenizer.enable_padding()
-
-    # fallback EOS→PAD
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    return tokenizer
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:

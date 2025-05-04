@@ -9,7 +9,8 @@ Usage
 
 from typing import Tuple, Dict, Any
 from datasets import load_dataset, Dataset
-
+from transformers import AutoTokenizer
+from itertools import chain
 # ──────────────────────────────────────────────────────────────────────────────
 # Chat‑template helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -145,3 +146,57 @@ def load_and_tokenise_dataset(cfg: dict, tokenizer) -> Tuple[Dataset, Dataset | 
         eval_ = eval_.map(processor, remove_columns=eval_.column_names)
 
     return train, eval_
+
+
+# All chat special tokens we inject anywhere in data_utils
+_CHAT_TOKENS = [
+    "<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>",
+    "<|im_start|>", "<|im_end|>",
+    "<<SYS>>", "<</SYS>>", "[INST]", "[/INST]",
+    "<|system|>", "<|user|>", "<|assistant|>"
+]
+
+def prepare_tokenizer(model_name: str,
+                      hub_token: str | None = None,
+                      cfg: dict | None = None):
+    """
+    Returns a tokenizer with:
+    • needed chat special tokens ensured
+    • PAD token present (new or reused)
+    • truncation not hard‑wired; leave that to TrainingArguments
+    • padding side picked from cfg['padding_side'] or defaults
+    """
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        use_fast=True,
+        use_auth_token=hub_token,
+        trust_remote_code=True      # safe for HF Official + custom
+    )
+
+    # ----- 1. add missing chat tokens ----------------------------------------
+    special_set = set(tokenizer.special_tokens_map_extended.values())
+    missing = [tok for tok in _CHAT_TOKENS if tok not in special_set]
+    if missing:
+        tokenizer.add_special_tokens({"additional_special_tokens": missing})
+        # If we add, caller must later resize embeddings:
+        tokenizer._added_tokens = True
+
+    # ----- 2. ensure PAD token -----------------------------------------------
+    if tokenizer.pad_token_id is None:
+        # common trick: reuse EOS
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer._added_tokens = True
+
+    # ----- 3. choose padding side --------------------------------------------
+    pad_side_cfg = (cfg or {}).get("padding_side", None)
+    if pad_side_cfg in {"left", "right"}:
+        tokenizer.padding_side = pad_side_cfg
+    else:
+        # default heuristic: chat‑style models → left padding for generation,
+        #                   but right padding during training for speed.
+        tokenizer.padding_side = "right"
+
+    # ----- 4. do NOT hard‑wire truncation here -------------------------------
+    # let HF Trainer handle it via DataCollator or TrainingArguments.max_length
+
+    return tokenizer
