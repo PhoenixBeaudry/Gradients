@@ -193,8 +193,10 @@ def main():
 
     # after loading cfg...
     seq_len = int(cfg.get("sequence_len", 2048))
-    tokenizer = prepare_tokenizer(cfg["base_model"], cfg.get("hub_token"), max_length=seq_len)
+    tokenizer = prepare_tokenizer(cfg["base_model"], cfg.get("hub_token"), cfg)
     model = load_model(cfg['base_model'], cfg)
+    if getattr(tokenizer, "_added_tokens", False):
+        model.resize_token_embeddings(len(tokenizer))
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
