@@ -476,11 +476,11 @@ def start_tuning_container(job: TextJob):
 
         volume_bindings = {
             os.path.abspath(cst.CONFIG_DIR): {
-                "bind": "/workspace/axolotl/configs",
+                "bind": "/workspace/configs",
                 "mode": "rw",
             },
             os.path.abspath(cst.OUTPUT_DIR): {
-                "bind": "/workspace/axolotl/outputs",
+                "bind": "/workspace/outputs",
                 "mode": "rw",
             },
         }
