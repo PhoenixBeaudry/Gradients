@@ -73,9 +73,8 @@ def parse_args():
 
 
 def load_config(path: str) -> dict:
-    with open(path, encoding="utf-8") as file:
-        cfg: DictDefault = DictDefault(yaml.safe_load(file))
-    return cfg
+    with open(path, 'r') as f:
+        return yaml.safe_load(f)
 
 
 def setup_logger() -> logging.Logger:
