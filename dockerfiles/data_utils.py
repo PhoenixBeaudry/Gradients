@@ -196,32 +196,30 @@ from transformers import PreTrainedTokenizerBase
 import torch
 
 class CausalLMDataCollator:
-    """
-    Pads input_ids & labels to the longest sequence in the batch.
-    Labels are padded with –100, everything else with tokenizer.pad_token_id.
-    """
-    def __init__(self,
-                 tokenizer: PreTrainedTokenizerBase,
-                 pad_to_multiple_of: int | None = 8):
+    def __init__(self, tokenizer, pad_to_multiple_of: int | None = 8):
         self.tok = tokenizer
         self.mult = pad_to_multiple_of
 
-    def __call__(self, features: List[dict]) -> dict:
-        # We rely on tokenizer.pad for input_ids & attention_mask
+    def __call__(self, features):
+        # 1️⃣  Extract labels and drop them from the dicts sent to tokenizer.pad
+        label_lists = [f.pop("labels") for f in features]
+
+        # 2️⃣  Let tokenizer.pad handle input_ids / attention_mask
         batch = self.tok.pad(
-            features,
+            features,                    # <- now has no "labels" key
             padding=True,
             return_tensors="pt",
             pad_to_multiple_of=self.mult,
         )
 
-        # ---- labels ---------------------------------------------------------
+        # 3️⃣  Pad labels ourselves to the same max length
         max_len = batch["input_ids"].size(1)
-        padded_labels = []
-        for f in features:
-            lbl = f["labels"]
-            pad = max_len - len(lbl)
-            padded_labels.append(lbl + [-100] * pad)
-        batch["labels"] = torch.tensor(padded_labels, dtype=torch.long)
+        padded = [
+            lbl + [-100] * (max_len - len(lbl))
+            for lbl in label_lists
+        ]
+        batch["labels"] = torch.tensor(padded, dtype=torch.long)
+
         return batch
+
 
