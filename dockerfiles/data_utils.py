@@ -191,35 +191,46 @@ def prepare_tokenizer(model_name: str, hub_token: str | None, cfg: dict):
     return tokenizer
 
 
-from typing import List
-from transformers import PreTrainedTokenizerBase
+# put this beside TimeLimitCallback in train.py
+from typing import List, Dict
 import torch
+from transformers import PreTrainedTokenizerBase
 
-class CausalLMDataCollator:
-    def __init__(self, tokenizer, pad_to_multiple_of: int | None = 8):
-        self.tok = tokenizer
-        self.mult = pad_to_multiple_of
+class ChatDataCollator:
+    """
+    Quick, memory‑efficient collator for causal‑LM SFT.
+    • Pads input_ids & attention_mask with tokenizer.__call__(…, padding='longest')
+    • Pads labels with –100 by hand (so they match sequence length)
+    """
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizerBase,
+        pad_to_multiple_of: int | None = 8,
+    ):
+        self.tok   = tokenizer
+        self.mult  = pad_to_multiple_of
+        self.padid = tokenizer.pad_token_id
 
-    def __call__(self, features):
-        # 1️⃣  Extract labels and drop them from the dicts sent to tokenizer.pad
-        label_lists = [f.pop("labels") for f in features]
-
-        # 2️⃣  Let tokenizer.pad handle input_ids / attention_mask
-        batch = self.tok.pad(
-            features,                    # <- now has no "labels" key
-            padding=True,
+    def __call__(self, features: List[Dict]) -> Dict[str, torch.Tensor]:
+        # 1) Split out the pieces we want the tokenizer to pad.
+        batch_inputs = self.tok(
+            [f["input_ids"] for f in features],
+            padding=True,                      # fastest path for fast tokenizers
+            truncation=False,                  # already truncated in the dataset
             return_tensors="pt",
             pad_to_multiple_of=self.mult,
         )
+        max_len = batch_inputs["input_ids"].size(1)
 
-        # 3️⃣  Pad labels ourselves to the same max length
-        max_len = batch["input_ids"].size(1)
-        padded = [
-            lbl + [-100] * (max_len - len(lbl))
-            for lbl in label_lists
-        ]
-        batch["labels"] = torch.tensor(padded, dtype=torch.long)
+        # 2) Manually pad labels to max_len with –100
+        padded_labels = []
+        for f in features:
+            lbl = f["labels"]
+            lbl = lbl + [-100] * (max_len - len(lbl))
+            padded_labels.append(lbl)
+        batch_inputs["labels"] = torch.tensor(padded_labels, dtype=torch.long)
 
-        return batch
+        return batch_inputs
+
 
 
