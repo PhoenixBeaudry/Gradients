@@ -168,7 +168,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     )
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
-    collator = CausalLMDataCollator(tokenizer, pad_to_multiple_of=8)
+    collator = ChatDataCollator(tokenizer, pad_to_multiple_of=8)
     return Trainer(
         model=model,
         args=tf_args,
