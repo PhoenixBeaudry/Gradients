@@ -180,12 +180,6 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 def main():
     args = parse_args()
     cfg = load_config(args.config)
-    axo_config_alt = load_config(args.config)
-    axo_config_alt["save_strategy"] = "steps"
-    out_path = os.path.join(f"{args.config}_axo.yml")
-    with open(out_path, "w") as f:
-        yaml.dump(axo_config_alt, f)
-    axo_cfg = load_cfg(f"{args.config}_axo.yml")
     logger = setup_logger()
     
     # Performance flags
@@ -198,7 +192,7 @@ def main():
     
     # after loading cfg...
     dataset_meta = load_datasets(cfg=cfg, cli_args=None)
-    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg, dataset_meta=dataset_meta)
+    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=cfg, dataset_meta=dataset_meta)
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
