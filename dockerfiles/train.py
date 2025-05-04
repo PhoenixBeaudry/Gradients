@@ -203,7 +203,7 @@ def main():
     train_ds, eval_ds = load_and_tokenise_dataset(cfg, tokenizer)
     max_hours = int(cfg.get('hours_to_complete'))  # e.g. 4.0
 
-    if cfg.get("run_hpo", True):
+    if cfg['run_hpo']:
         best_params = run_optuna(
             cfg,
             dataset_pair=(train_ds, eval_ds),
