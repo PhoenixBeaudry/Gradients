@@ -2,6 +2,9 @@
 import os
 import argparse
 import logging
+from functools import partial
+from datasets import load_dataset, Dataset
+from typing import Tuple, Dict, Any, List
 import yaml
 from ignite.engine import Engine, Events
 from ignite.handlers.lr_finder import FastaiLRFinder
@@ -9,7 +12,6 @@ from torch.utils.data import DataLoader
 import torch
 from accelerate import Accelerator
 import wandb
-from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -80,30 +82,164 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
+# ============== 1. Schema detection utilities =================================
+def _lower_keys(example: Dict[str, Any]) -> Dict[str, Any]:
+    return {k.lower(): v for k, v in example.items()}
 
-def prepare_tokenizer(model_name: str, hub_token: str = None, max_length: int = 2048):
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        use_fast=True,
-        use_auth_token=hub_token,
+def detect_schema(example: Dict[str, Any]) -> str:
+    """Return one of: 'instruct', 'qa', 'prompt_completion', 'dpo', 'plain'."""
+    e = _lower_keys(example)
+    keys = set(e)
+    if {"instruction", "output"}.issubset(keys):
+        return "instruct"
+    if {"question", "answer"}.issubset(keys):
+        return "qa"
+    if {"prompt", "completion"}.issubset(keys) or {"prompt", "response"}.issubset(keys):
+        return "prompt_completion"
+    if {"chosen", "rejected"}.issubset(keys):
+        return "dpo"
+    return "plain"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2.  Chat‑template helpers  (multi‑model)
+# ──────────────────────────────────────────────────────────────────────────────
+#  ── token strings used by each family ──
+_LL3_START  = "<|start_header_id|>"
+_LL3_END    = "<|end_header_id|>"
+_EOT        = "<|eot_id|>"
+
+_CHATML_BEG = "<|im_start|>"
+_CHATML_END = "<|im_end|>"
+
+#  ── concrete builders ──
+def llama3_chat(system: str, user: str, assistant: str = "") -> str:
+    return (
+        f"{_LL3_START}system{_LL3_END}\n{system}{_EOT}\n"
+        f"{_LL3_START}user{_LL3_END}\n{user}{_EOT}\n"
+        f"{_LL3_START}assistant{_LL3_END}\n{assistant}"
     )
-    # 1) force left‐padding
-    tokenizer.padding_side = "left"
 
-    # 2) default truncation to max_length
-    if hasattr(tokenizer, "enable_truncation"):
-        tokenizer.enable_truncation(max_length=max_length)
+def llama2_chat(system: str, user: str, assistant: str = "") -> str:
+    # works for Llama‑2 **and** Mistral chat / Mixtral
+    sys = f"<<SYS>>\n{system}\n<</SYS>>\n\n" if system else ""
+    return f"<s>[INST] {sys}{user} [/INST] {assistant}"
 
-    # 3) default padding on every call
-    if hasattr(tokenizer, "enable_padding"):
-        tokenizer.enable_padding()
+def qwen_chat(system: str, user: str, assistant: str = "") -> str:
+    return (
+        f"{_CHATML_BEG}system\n{system}{_CHATML_END}\n"
+        f"{_CHATML_BEG}user\n{user}{_CHATML_END}\n"
+        f"{_CHATML_BEG}assistant\n{assistant}"
+    )
 
-    # fallback EOS→PAD
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
+def phi_chat(system: str, user: str, assistant: str = "") -> str:
+    return f"<|system|>\n{system}\n<|user|>\n{user}\n<|assistant|>\n{assistant}"
 
-    return tokenizer
+def plain_chat(system: str, user: str, assistant: str = "") -> str:
+    return f"{user}\n{assistant}"
 
+#  ── mapping: model‑name → template fn ──
+_TEMPLATE_REGISTRY = {
+    "llama‑3":    llama3_chat,
+    "llama3":     llama3_chat,
+    "llama‑2":    llama2_chat,
+    "llama2":     llama2_chat,
+    "mistral":    llama2_chat,
+    "mixtral":    llama2_chat,
+    "qwen":       qwen_chat,
+    "phi":        phi_chat,
+    "zephyr":     qwen_chat,      # Zephyr uses ChatML tokens
+}
+
+def get_template_fn(model_name: str, explicit: str | None = None):
+    """Return a template builder based on explicit cfg or model name."""
+    key = (explicit or model_name).lower()
+    for substr, fn in _TEMPLATE_REGISTRY.items():
+        if substr in key:
+            return fn
+    return plain_chat  # fallback
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 3.  Example → (input_ids, labels)
+# ──────────────────────────────────────────────────────────────────────────────
+def build_processor(cfg: dict, tokenizer):
+    seq_len         = int(cfg.get("sequence_len", 2048))
+    train_on_inputs = bool(cfg.get("train_on_inputs", False))
+    tmpl_fn         = get_template_fn(
+        cfg["base_model"],
+        cfg.get("chat_template"),     # optional override in YAML
+    )
+    SYS_MSG         = cfg.get(
+        "system_prompt",
+        "You are a helpful assistant."
+    )
+
+    def proc(example: Dict[str, Any]) -> Dict[str, Any]:
+        schema = detect_schema(example)
+
+        # ---- build prompt + answer ------------------------------------------
+        if schema == "instruct":
+            prompt  = example["instruction"]
+            if (inp := example.get("input")):
+                prompt = f"{prompt} {inp}"
+            answer  = str(example.get("output", ""))
+        elif schema == "qa":
+            prompt, answer = example["question"], example["answer"]
+        elif schema == "prompt_completion":
+            prompt  = example["prompt"]
+            answer  = example.get("completion") or example.get("response", "")
+        elif schema == "dpo":
+            prompt, answer = example["prompt"], example["chosen"]
+        else:  # 'plain'
+            prompt, answer = "", str(example[next(iter(example))])
+
+        chat_prompt = tmpl_fn(SYS_MSG, prompt)
+        full_text   = chat_prompt + answer + tokenizer.eos_token
+
+        # ---- tokenise -------------------------------------------------------
+        enc = tokenizer(
+            full_text,
+            truncation=True,
+            max_length=seq_len,
+            return_attention_mask=False,
+        )
+        input_ids = enc["input_ids"]
+        labels    = input_ids.copy()
+
+        # ---- mask prompt tokens, if desired ---------------------------------
+        if not train_on_inputs:
+            prompt_len = len(
+                tokenizer(chat_prompt, add_special_tokens=False)["input_ids"]
+            )
+            labels[:prompt_len] = [-100] * prompt_len
+
+        return {"input_ids": input_ids, "labels": labels}
+
+    return proc
+
+# ============== 4. Public loader =============================================
+def load_and_tokenise_dataset(cfg: dict, tokenizer) -> Tuple[Dataset, Dataset | None]:
+    ds_cfg = cfg["datasets"][0]
+    ds_type = ds_cfg.get("ds_type", ds_cfg.get("type", "hf")).lower()
+
+    # -- Load raw dataset ------------------------------------------------------
+    if ds_type in {"json", "csv", "text"}:
+        raw = load_dataset(ds_type, data_files={"train": ds_cfg["path"]})["train"]
+    else:  # assume HF repo path
+        raw = load_dataset(ds_cfg["path"], split=ds_cfg.get("split", "train"))
+
+    val_size = float(cfg.get("val_set_size", 0))
+    train_ds, eval_ds = (raw, None)
+    if val_size > 0:
+        splits = raw.train_test_split(test_size=val_size, seed=42, shuffle=True)
+        train_ds, eval_ds = splits["train"], splits["test"]
+
+    # -- Tokenise + label ------------------------------------------------------
+    processor = build_processor(cfg, tokenizer)
+    train_ds = train_ds.map(processor, remove_columns=train_ds.column_names)
+    if eval_ds:
+        eval_ds = eval_ds.map(processor, remove_columns=eval_ds.column_names)
+
+    return train_ds, eval_ds
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
@@ -149,39 +285,6 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         task_type='CAUSAL_LM'
     )
     return get_peft_model(model, peft_config)
-
-
-def load_sft_datasets(cfg: dict, tokenizer: AutoTokenizer):
-    ds_cfg = cfg['datasets'][0]
-    ds_type = ds_cfg.get('ds_type', ds_cfg.get('type', 'hf')).lower()
-    if ds_type in ('json', 'csv', 'text'):
-        raw = load_dataset(ds_type, data_files={'train': ds_cfg['path']}, split=ds_cfg.get('split', 'train'))
-    else:
-        raw = load_dataset(ds_cfg['path'], split=ds_cfg.get('split', 'train'))
-
-    val_size = cfg.get('val_set_size', 0)
-    if val_size > 0:
-        splits = raw.shuffle(seed=cfg.get('seed', 42)).train_test_split(test_size=val_size)
-        train_ds, eval_ds = splits['train'], splits['test']
-    else:
-        train_ds, eval_ds = raw, None
-
-    # Identify text column
-    text_col = ds_cfg.get('text_field')
-    if not text_col:
-        text_cols = [k for k, v in train_ds.features.items() if getattr(v, 'dtype', None) == 'string']
-        text_col = text_cols[0] if text_cols else None
-        if not text_col:
-            raise ValueError("No string column found for SFT tokenization.")
-
-    def tokenize_fn(batch):
-        return tokenizer(batch[text_col], padding=True, truncation=True, max_length=int(cfg.get('sequence_len', 2048)))
-
-    train_ds = train_ds.map(tokenize_fn, batched=True)
-    if eval_ds:
-        eval_ds = eval_ds.map(tokenize_fn, batched=True)
-
-    return train_ds, eval_ds
 
 
 
@@ -254,8 +357,7 @@ def main():
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
-    load_fn = load_sft_datasets
-    train_ds, eval_ds = load_fn(cfg, tokenizer)
+    train_ds, eval_ds = load_and_tokenise_dataset(cfg, tokenizer)
 
     callbacks = []
     if cfg.get('early_stopping', True):
