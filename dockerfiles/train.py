@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.train import setup_model_and_tokenizer
-from axolotl.cli.config import load_cfg
 from accelerate import Accelerator
 import wandb
 from transformers import (
@@ -71,6 +70,10 @@ def parse_args():
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
     return parser.parse_args()
 
+
+def load_config(path: str) -> dict:
+    with open(path, 'r') as f:
+        return yaml.safe_load(f)
 
 
 def setup_logger() -> logging.Logger:
@@ -175,7 +178,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 
 def main():
     args = parse_args()
-    cfg = load_cfg(args.config)
+    cfg = load_config(args.config)
     logger = setup_logger()
     
     # Performance flags

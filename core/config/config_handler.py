@@ -67,6 +67,7 @@ def update_model_info(config: dict, model: str, job_id: str = "", expected_repo_
         config["model_params_count"] = model_size
 
     config["base_model"] = model
+    config["base_model_config"] = model
     config["wandb_runid"] = job_id
     config["wandb_name"] = job_id
     config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{expected_repo_name or str(uuid.uuid4())}"
