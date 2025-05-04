@@ -103,34 +103,6 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, **common_kwargs)
 
 
-def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
-    if get_peft_model is None:
-        raise ImportError("peft library is required for LoRA adapters.")
-
-    if cfg.get('load_in_8bit', False):
-        model = prepare_model_for_kbit_training(model)
-
-    # Determine target modules for LoRA
-    targets = cfg.get('target_modules') or []
-    if not targets:
-        for name, module in model.named_modules():
-            if isinstance(module, torch.nn.Linear) and any(x in name.lower() for x in ('attn', 'attention')):
-                targets.append(name.split('.')[-1])
-        targets = list(set(targets))
-        if not targets:
-            raise ValueError("Could not auto-detect attention modules for LoRA. Please set 'target_modules' in config.")
-
-    peft_config = LoraConfig(
-        r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_alpha', 16)),
-        target_modules=targets,
-        lora_dropout=float(cfg.get('lora_dropout', 0.05)),
-        bias='none',
-        task_type='CAUSAL_LM'
-    )
-    return get_peft_model(model, peft_config)
-
-
 
 def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
@@ -201,9 +173,6 @@ def main():
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg)
-
-    if cfg.get('adapter') == 'lora':
-        model = apply_lora_adapter(model, cfg)
 
     train_dataset = dataset_meta.train_dataset
     eval_dataset = dataset_meta.eval_dataset
