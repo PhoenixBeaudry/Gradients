@@ -7,7 +7,7 @@ import logging
 from functools import partial
 from datasets import load_dataset, Dataset
 from hpo_optuna import run_optuna 
-from data_utils import load_and_tokenise_dataset, prepare_tokenizer, CausalLMDataCollator
+from data_utils import load_and_tokenise_dataset, prepare_tokenizer, ChatDataCollator
 from typing import Tuple, Dict, Any, List
 import yaml
 from ignite.engine import Engine, Events
