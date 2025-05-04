@@ -2,6 +2,8 @@ base_model: NousResearch/Meta-Llama-3-8B-Instruct
 model_type: AutoModelForCausalLM
 tokenizer_type: AutoTokenizer
 model_params_count: 0
+run_hpo: true
+hpo_max_steps: 50 
 
 load_in_8bit: false
 load_in_4bit: false

@@ -4,6 +4,7 @@ import argparse
 import logging
 from functools import partial
 from datasets import load_dataset, Dataset
+from hpo_optuna import run_optuna 
 from data_utils import load_and_tokenise_dataset, prepare_tokenizer
 from typing import Tuple, Dict, Any, List
 import yaml
@@ -202,14 +203,27 @@ def main():
         model = apply_lora_adapter(model, cfg)
 
     train_ds, eval_ds = load_and_tokenise_dataset(cfg, tokenizer)
+    max_hours = int(cfg.get('hours_to_complete'))  # e.g. 4.0
+
+    if cfg.get("run_hpo", True):
+        best_params = run_optuna(
+            cfg,
+            dataset_pair=(train_ds, eval_ds),
+            tokenizer=tokenizer,
+            logger=logger,
+            timeout_sec=max_hours*3600*0.1, # 10% for hpo
+            load_model_fn=load_model,
+            apply_adapter_fn=apply_lora_adapter,
+            build_trainer_fn=build_trainer,
+        )
+        cfg.update(best_params)
 
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
             EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
         )
-    # add time‐limit
-    max_hours = int(cfg.get('hours_to_complete'))  # e.g. 4.0
+    
     if max_hours is not None:
         callbacks.append(TimeLimitCallback(max_hours))
 
