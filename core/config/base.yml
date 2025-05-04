@@ -32,7 +32,7 @@ auto_find_batch_size: true
 gradient_accumulation_steps: 4
 micro_batch_size: 4
 eval_batch_size: 4
-optimizer: adamw_torch_fused
+optimizer: adamw_8bit
 lr_scheduler: cosine
 learning_rate: 2e-4
 group_by_length: true
