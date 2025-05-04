@@ -176,7 +176,11 @@ async def task_offer(
         if request.task_type == TaskType.INSTRUCTTEXTTASK:
             logger.info("Task Type: Instruct")
         if request.task_type == TaskType.DPOTASK:
-            logger.info("Task Type: DPO")
+            return MinerTaskResponse(
+                message=f"This endpoint only accepts instruct tasks: "
+                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
+                accepted=False
+            )
 
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
             return MinerTaskResponse(
@@ -187,7 +191,7 @@ async def task_offer(
 
         # Check model parameter count
         # Reject if model size is 32B or larger
-        if request.model_params_count is not None and request.model_params_count >= 40_000_000_000:
+        if request.model_params_count is not None and request.model_params_count >= 30_000_000_000:
             logger.info(f"Rejecting offer: Model size too large ({request.model_params_count / 1_000_000_000:.1f}B >= 40B)")
             return MinerTaskResponse(message="Model size too large (>= 40B)", accepted=False)
 
@@ -228,7 +232,7 @@ async def task_offer_image(
 ) -> MinerTaskResponse:
     try:
         logger.info("An image offer has come through")
-
+        return MinerTaskResponse(message=f"No images :(", accepted=False)
         if request.task_type != TaskType.IMAGETASK:
             return MinerTaskResponse(message="This endpoint only accepts image tasks", accepted=False)
 
