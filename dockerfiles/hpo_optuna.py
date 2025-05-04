@@ -65,7 +65,7 @@ def _objective(
         max_steps     = min(int(base_cfg.get("hpo_max_steps", 300)),
                             int(base_cfg.get("max_steps", 10_000))),
         save_strategy = "no",
-        logging_steps = 0,
+        logging_steps = 2,
         push_to_hub   = False,
         hub_strategy  = "never",
         wandb_run     = f"trial_{trial.number}",

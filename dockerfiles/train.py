@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import argparse
+import json, tempfile
+from pathlib import Path
 import logging
 from functools import partial
 from datasets import load_dataset, Dataset
@@ -203,17 +205,34 @@ def main():
     train_ds, eval_ds = load_and_tokenise_dataset(cfg, tokenizer)
     max_hours = int(cfg.get('hours_to_complete'))  # e.g. 4.0
 
+    # ── run 1‑hour Optuna on *one* GPU ──────────────────────────
     if cfg.get("run_hpo", True):
-        best_params = run_optuna(
-            cfg,
-            dataset_pair=(train_ds, eval_ds),
-            tokenizer=tokenizer,
-            logger=logger,
-            timeout_sec=max_hours*3600*0.1, # 10% for hpo
-            load_model_fn=load_model,
-            apply_adapter_fn=apply_lora_adapter,
-            build_trainer_fn=build_trainer,
-        )
+        best_params = None
+        tmp_file = Path(tempfile.gettempdir()) / "best_params.json"
+
+        if accelerator.is_local_main_process:
+            # rank‑0 actually does the sweep
+            best_params = run_optuna(
+                cfg,
+                dataset_pair=(train_ds, eval_ds),
+                tokenizer=tokenizer,
+                logger=logger,
+                timeout_sec=3600,
+                load_model_fn=load_model,
+                apply_adapter_fn=apply_lora_adapter,
+                build_trainer_fn=build_trainer,
+            )
+            # save to a temp file for the others
+            with tmp_file.open("w") as f:
+                json.dump(best_params, f)
+
+        # sync point: wait until file exists
+        accelerator.wait_for_everyone()
+
+        if best_params is None:          # non‑main ranks load params
+            with tmp_file.open() as f:
+                best_params = json.load(f)
+
         cfg.update(best_params)
 
     accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
