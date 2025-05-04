@@ -85,6 +85,8 @@ def _build_processor(cfg: dict, tokenizer):
             prompt = ex["instruction"] + (" " + ex["input"] if ex.get("input") else "")
             answer = ex.get("output", "")
         elif schema == "qa":
+            if "label" in ex and ex["label"] != 1:
+                return None           # filter out negative example
             prompt, answer = ex["question"], ex["answer"]
         elif schema == "prompt_completion":
             prompt = ex["prompt"]; answer = ex.get("completion") or ex.get("response", "")
