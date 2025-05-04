@@ -271,15 +271,47 @@ async def requeue_job(job_id: str):
     """
     try:
         # Fetch the job by ID using the connection
+        logger.info(f"Attempting to fetch job {job_id} from Redis")
         job = Job.fetch(job_id, connection=redis_conn)
-
+        
+        # Log detailed job information for debugging
+        logger.info(f"Job {job_id} found with status: {job.get_status()}")
+        logger.info(f"Job details - is_finished: {job.is_finished}, is_failed: {job.is_failed}")
+        logger.info(f"Job function: {job.func_name}")
+        
         # Check if the job is failed or finished
         if job.is_failed or job.is_finished:
             original_status = "failed" if job.is_failed else "finished"
             logger.info(f"Requeuing {original_status} job {job_id}")
-            # job.requeue() resets status and puts it back in the queue
-            job.requeue()
-            return {"message": f"{original_status.capitalize()} job {job_id} successfully requeued."}
+            
+            try:
+                # Try to get original job arguments
+                logger.info("Extracting job arguments")
+                func_name = job.func_name
+                args = job.args
+                kwargs = job.kwargs
+                timeout = job.timeout
+                
+                # Create a new job instead of using requeue()
+                logger.info(f"Creating new job with same parameters: func={func_name}, args={args}")
+                new_job = rq_queue.enqueue_call(
+                    func=func_name,
+                    args=args,
+                    kwargs=kwargs,
+                    timeout=timeout,
+                    result_ttl=86400,
+                    failure_ttl=86400
+                )
+                
+                logger.info(f"Successfully created new job with ID: {new_job.id}")
+                return {"message": f"{original_status.capitalize()} job {job_id} successfully requeued as {new_job.id}."}
+            except Exception as inner_e:
+                logger.error(f"Error during manual requeue: {str(inner_e)}")
+                logger.error(f"Error type: {type(inner_e)}")
+                # Fall back to standard requeue if manual approach fails
+                logger.info("Falling back to standard requeue method")
+                job.requeue()
+                return {"message": f"{original_status.capitalize()} job {job_id} successfully requeued using fallback method."}
         else:
             # If job exists but isn't failed or finished, report its status
             current_status = job.get_status()
@@ -294,7 +326,11 @@ async def requeue_job(job_id: str):
         logger.error(f"Job {job_id} not found in Redis.")
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except Exception as e:
+        # Log detailed error information
         logger.error(f"Error processing requeue for job {job_id}: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error processing requeue for job {job_id}: {str(e)}")
 
 
