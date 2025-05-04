@@ -180,7 +180,9 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 def main():
     args = parse_args()
     cfg = load_config(args.config)
+    ### Patched Axo Config for Model Load ###
     axo_cfg = load_cfg(args.config)
+    axo_cfg.save_strategy = "steps"
     logger = setup_logger()
     
     # Performance flags
