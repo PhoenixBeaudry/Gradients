@@ -70,7 +70,7 @@ eval_max_new_tokens: 128
 
 debug:
 
-deepspeed: /workspace/axolotl/configs/deepspeed_stage1.json
+deepspeed: /workspace/axolotl/configs/deepspeed_stage2.json
 
 weight_decay: 0.01
 plugins:
