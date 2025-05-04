@@ -33,6 +33,9 @@ ENV TOKENIZERS_PARALLELISM="false"
 
 # Copy the train file
 COPY dockerfiles/train.py /workspace/train.py
+COPY dockerfiles/data_utils.py /workspace/data_utils.py
+COPY dockerfiles/hpo_optuna.py /workspace/hpo_optuna.py
+
 CMD echo 'Preparing data...' && \
     if [ -n "$HUGGINGFACE_TOKEN" ]; then \
     echo "Attempting to log in to Hugging Face" && \

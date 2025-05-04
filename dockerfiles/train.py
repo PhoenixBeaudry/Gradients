@@ -203,17 +203,18 @@ def main():
     train_ds, eval_ds = load_and_tokenise_dataset(cfg, tokenizer)
     max_hours = int(cfg.get('hours_to_complete'))  # e.g. 4.0
 
-    best_params = run_optuna(
-        cfg,
-        dataset_pair=(train_ds, eval_ds),
-        tokenizer=tokenizer,
-        logger=logger,
-        timeout_sec=max_hours*3600*0.1, # 10% for hpo
-        load_model_fn=load_model,
-        apply_adapter_fn=apply_lora_adapter,
-        build_trainer_fn=build_trainer,
-    )
-    cfg.update(best_params)
+    if cfg.get("run_hpo", True):
+        best_params = run_optuna(
+            cfg,
+            dataset_pair=(train_ds, eval_ds),
+            tokenizer=tokenizer,
+            logger=logger,
+            timeout_sec=max_hours*3600*0.1, # 10% for hpo
+            load_model_fn=load_model,
+            apply_adapter_fn=apply_lora_adapter,
+            build_trainer_fn=build_trainer,
+        )
+        cfg.update(best_params)
 
     accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     callbacks = []
