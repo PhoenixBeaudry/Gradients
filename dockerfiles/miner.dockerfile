@@ -10,12 +10,13 @@ RUN apt-get update \
 # Install dependencies
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install ninja packaging
-RUN pip install mlflow protobuf huggingface_hub wandb transformers accelerate peft trl datasets sentencepiece liger-kernel
+RUN pip install mlflow protobuf huggingface_hub wandb transformers accelerate peft trl datasets sentencepiece liger-kernel deepspeed
 RUN pip install flash-attn --no-build-isolation
 RUN pip install pytorch-ignite
 RUN pip install bitsandbytes
 RUN pip install optuna
 RUN pip install --no-build-isolation axolotl
+
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data
