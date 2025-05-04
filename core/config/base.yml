@@ -10,7 +10,6 @@ strict: false
 chat_template: llama3
 datasets:
 dataset_prepared_path:
-test_datasets:
 val_set_size: 0.05
 output_dir: miner_id_24
 
