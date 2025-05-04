@@ -111,6 +111,7 @@ def _load_and_modify_config(
     if isinstance(dataset_type, DPODatasetType):
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
+        config["test_datasets"] = []
         config["test_datasets"].append(dataset_entry)
 
     hf_cfg = AutoConfig.from_pretrained(model)
