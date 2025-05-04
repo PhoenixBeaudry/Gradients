@@ -14,6 +14,7 @@ RUN pip install mlflow protobuf huggingface_hub wandb transformers accelerate pe
 RUN pip install flash-attn --no-build-isolation
 RUN pip install pytorch-ignite
 RUN pip install bitsandbytes
+RUN pip install optuna
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data
