@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.train import setup_model_and_tokenizer
-from axolotl.utils.dict import DictDefault
+from axolotl.cli.config import load_cfg
 from accelerate import Accelerator
 import wandb
 from transformers import (
@@ -181,6 +181,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 def main():
     args = parse_args()
     cfg = load_config(args.config)
+    axo_cfg = load_cfg(args.config)
     logger = setup_logger()
     
     # Performance flags
@@ -193,7 +194,7 @@ def main():
     
     # after loading cfg...
     dataset_meta = load_datasets(cfg=cfg, cli_args=None)
-    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=cfg, dataset_meta=dataset_meta)
+    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg, dataset_meta=dataset_meta)
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
