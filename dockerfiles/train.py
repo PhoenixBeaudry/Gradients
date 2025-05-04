@@ -20,7 +20,7 @@ from transformers import (
     AutoModelForCausalLM,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling,
+    DataCollatorForSeq2Seq,
     EarlyStoppingCallback,
     SchedulerType,
 )
@@ -144,7 +144,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=8),
+        data_collator=DataCollatorForSeq2Seq(tokenizer),
         processing_class=processor,
         callbacks=callbacks,
     )
