@@ -43,7 +43,7 @@ tf32: true
 gradient_checkpointing: true
 resume_from_checkpoint:
 local_rank:
-flash_attention: true
+flash_attention: false
 s2_attention:
 
 wandb_project: Gradients-On-Demand

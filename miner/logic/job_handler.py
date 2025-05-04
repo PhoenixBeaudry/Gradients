@@ -87,7 +87,6 @@ def _load_and_modify_config(
 
     config["hours_to_complete"] = hours_to_complete
 
-    config = update_flash_attention(config, model)
     config = update_model_info(config, model, task_id, expected_repo_name)
 
     # Modify config based on Model Size
