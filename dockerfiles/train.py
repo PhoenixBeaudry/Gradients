@@ -82,6 +82,30 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
+
+def prepare_tokenizer(model_name: str, hub_token: str = None, max_length: int = 2048):
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        use_fast=True,
+        use_auth_token=hub_token,
+    )
+    # 1) force left‐padding
+    tokenizer.padding_side = "left"
+
+    # 2) default truncation to max_length
+    if hasattr(tokenizer, "enable_truncation"):
+        tokenizer.enable_truncation(max_length=max_length)
+
+    # 3) default padding on every call
+    if hasattr(tokenizer, "enable_padding"):
+        tokenizer.enable_padding()
+
+    # fallback EOS→PAD
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    return tokenizer
+
 # ============== 1. Schema detection utilities =================================
 def _lower_keys(example: Dict[str, Any]) -> Dict[str, Any]:
     return {k.lower(): v for k, v in example.items()}
