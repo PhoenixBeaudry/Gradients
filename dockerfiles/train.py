@@ -12,6 +12,7 @@ import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.train import setup_model_and_tokenizer
 from axolotl.cli.config import load_cfg
+from axolotl.cli.args import TrainerCliArgs
 from accelerate import Accelerator
 import wandb
 from transformers import (
@@ -198,7 +199,7 @@ def main():
     accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     
     # after loading cfg...
-    dataset_meta = load_datasets(cfg=axo_cfg, cli_args=None)
+    dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg, dataset_meta=dataset_meta)
 
     if cfg.get('adapter') == 'lora':
