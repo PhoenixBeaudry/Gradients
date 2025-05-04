@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 import os
 import argparse
-import json, tempfile
 from pathlib import Path
 import logging
-from functools import partial
-from datasets import load_dataset, Dataset
 from hpo_optuna import run_optuna 
-from data_utils import load_and_tokenise_dataset, prepare_tokenizer, ChatDataCollator
-from typing import Tuple, Dict, Any, List
 import yaml
 from ignite.engine import Engine, Events
 from ignite.handlers.lr_finder import FastaiLRFinder
 from torch.utils.data import DataLoader
 import torch
+from axolotl.common.datasets import load_datasets
+from axolotl.train import setup_model_and_trainer
 from accelerate import Accelerator
 import wandb
 from transformers import (
@@ -185,27 +182,26 @@ def main():
     args = parse_args()
     cfg = load_config(args.config)
     logger = setup_logger()
-
+    
     # Performance flags
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.benchmark = True
 
     logger.info("Loaded config from %s", args.config)
     accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
+    accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     
     # after loading cfg...
-    tokenizer = prepare_tokenizer(cfg["base_model"], cfg.get("hub_token"), cfg)
-    model = load_model(cfg['base_model'], cfg)
-    if getattr(tokenizer, "_added_tokens", False):
-        model.resize_token_embeddings(len(tokenizer))
+    dataset_meta = load_datasets(cfg=cfg, cli_args=None)
+    model, tokenizer, _trainer = setup_model_and_trainer(cfg=cfg, dataset_meta=dataset_meta)
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
-    train_ds, eval_ds = load_and_tokenise_dataset(cfg, tokenizer)
-    max_hours = int(cfg.get('hours_to_complete'))  # e.g. 4.0
+    train_dataset = dataset_meta.train_dataset
+    eval_dataset = dataset_meta.eval_dataset
+    max_hours = int(cfg.get('hours_to_complete')) 
 
-    accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
@@ -215,7 +211,7 @@ def main():
     if max_hours is not None:
         callbacks.append(TimeLimitCallback(max_hours*0.9))
 
-    trainer = build_trainer(cfg, model, tokenizer, train_ds, eval_ds, callbacks)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset, callbacks)
 
     logger.info("Starting Full Model Training...")
 
