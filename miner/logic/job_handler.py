@@ -84,6 +84,7 @@ def _load_and_modify_config(
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
 
+
     config["hours_to_complete"] = hours_to_complete
 
     config = update_flash_attention(config, model)
@@ -110,10 +111,7 @@ def _load_and_modify_config(
     if isinstance(dataset_type, DPODatasetType):
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
-        config["val_set_size"] = 0.0
-        config["eval_strategy"] = "no"
-        config["eval_steps"] = None
-        config["early_stopping_patience"] = None
+        config["test_datasets"].append(dataset_entry)
 
     hf_cfg = AutoConfig.from_pretrained(model)
  
