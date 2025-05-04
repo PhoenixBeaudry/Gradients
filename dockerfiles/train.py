@@ -217,7 +217,7 @@ def main():
             build_trainer_fn=build_trainer,
         )
         cfg.update(best_params)
-        
+
     accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     callbacks = []
     if cfg.get('early_stopping', True):
@@ -226,7 +226,7 @@ def main():
         )
     
     if max_hours is not None:
-        callbacks.append(TimeLimitCallback(max_hours))
+        callbacks.append(TimeLimitCallback(max_hours*0.9))
 
     trainer = build_trainer(cfg, model, tokenizer, train_ds, eval_ds, callbacks)
 
