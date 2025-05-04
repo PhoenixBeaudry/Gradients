@@ -15,7 +15,7 @@ RUN pip install flash-attn --no-build-isolation
 RUN pip install pytorch-ignite
 RUN pip install bitsandbytes
 RUN pip install optuna
-RUN pip install --build-isolation axolotl
+RUN pip install --no-build-isolation axolotl
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data
