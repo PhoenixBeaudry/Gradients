@@ -311,7 +311,6 @@ def start_tuning_container_diffusion(job: DiffusionJob):
 
         timeout_seconds = hours_to_complete * 3600 * 0.95
         logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
-        stream_logs(container)
         try:
             result = container.wait(timeout=timeout_seconds)
             logger.info(f"Container {container.id} finished with result: {result}")
@@ -520,7 +519,6 @@ def start_tuning_container(job: TextJob):
             tty=True,
         )
 
-        stream_logs(container)
         timeout_seconds = hours_to_complete * 3600 * 0.95
         logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
 
