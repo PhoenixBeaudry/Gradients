@@ -10,7 +10,7 @@ from ignite.handlers.lr_finder import FastaiLRFinder
 from torch.utils.data import DataLoader
 import torch
 from axolotl.common.datasets import load_datasets
-from axolotl.train import setup_model_and_trainer
+from axolotl.train import setup_model_and_tokenizer
 from accelerate import Accelerator
 import wandb
 from transformers import (
@@ -130,7 +130,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
 
 
-def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
+def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
         output_dir=cfg.get('output_dir', './outputs'),
@@ -165,15 +165,13 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     )
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
-    collator = ChatDataCollator(tokenizer, pad_to_multiple_of=8)
     return Trainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=collator,
+        processor=processor,
         callbacks=callbacks,
-        processing_class=tokenizer,
     )
 
 
@@ -193,7 +191,7 @@ def main():
     
     # after loading cfg...
     dataset_meta = load_datasets(cfg=cfg, cli_args=None)
-    model, tokenizer, _trainer = setup_model_and_trainer(cfg=cfg, dataset_meta=dataset_meta)
+    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=cfg, dataset_meta=dataset_meta)
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
@@ -211,7 +209,7 @@ def main():
     if max_hours is not None:
         callbacks.append(TimeLimitCallback(max_hours*0.9))
 
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset, callbacks)
+    trainer = build_trainer(cfg, model, tokenizer, processor, train_dataset, eval_dataset, callbacks)
 
     logger.info("Starting Full Model Training...")
 
