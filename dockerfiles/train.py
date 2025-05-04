@@ -191,9 +191,7 @@ def main():
     logger.info("Loaded config from %s", args.config)
     accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
     
-
     # after loading cfg...
-    seq_len = int(cfg.get("sequence_len", 2048))
     tokenizer = prepare_tokenizer(cfg["base_model"], cfg.get("hub_token"), cfg)
     model = load_model(cfg['base_model'], cfg)
     if getattr(tokenizer, "_added_tokens", False):

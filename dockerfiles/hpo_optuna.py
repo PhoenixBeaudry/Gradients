@@ -41,9 +41,8 @@ def sample_hparams(trial: optuna.Trial, _cfg: dict) -> Dict[str, Any]:
         "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.2),
     }
 
-# -------------------------------------------------------------------
-# Objective
-# -------------------------------------------------------------------
+
+
 def _objective(
     trial,
     base_cfg,
@@ -54,25 +53,47 @@ def _objective(
     apply_adapter_fn,
     build_trainer_fn,
 ):
-    import wandb  # local import keeps wandb optional for other use‑cases
+    import os, wandb
 
+    # ------------------------------------------------------------
+    # 1) Build the trial‑specific cfg
+    # ------------------------------------------------------------
     cfg = {**base_cfg, **sample_hparams(trial, base_cfg)}
 
-    # HPO‑specific overrides
     cfg.update(
-        num_epochs     = 1,
-        max_steps      = min(int(base_cfg.get("hpo_max_steps", 300)),
-                             int(base_cfg.get("max_steps", 10_000))),
-        save_strategy  = "no",
-        logging_steps  = 0,
-        push_to_hub    = False,
-        hub_strategy   = "never",
-        wandb_run      = f"trial_{trial.number}",
-        wandb_project  = f"{base_cfg.get('wandb_project', 'project')}-hpo",
-        report_to      = ["wandb"],     # Transformers → active run
+        num_epochs    = 1,
+        max_steps     = min(int(base_cfg.get("hpo_max_steps", 300)),
+                            int(base_cfg.get("max_steps", 10_000))),
+        save_strategy = "no",
+        logging_steps = 0,
+        push_to_hub   = False,
+        hub_strategy  = "never",
+        wandb_run     = f"trial_{trial.number}",
+        wandb_project = f"{base_cfg.get('wandb_project', 'project')}-hpo",
+        report_to     = ["wandb"],
     )
 
-    # start a standalone W&B run for this trial
+    # ------------------------------------------------------------
+    # 2) Make sure Transformers’ WandbCallback *also* sees -hpo
+    # ------------------------------------------------------------
+    prev_project = os.environ.get("WANDB_PROJECT")
+    os.environ["WANDB_PROJECT"] = cfg["wandb_project"]
+
+    # ------------------------------------------------------------
+    # 3) Announce the trial params
+    # ------------------------------------------------------------
+    logger.info("🔍  TRIAL %d params: %s", trial.number, cfg)
+    print(f"\n=== TRIAL {trial.number} PARAMS ===")
+    for k, v in cfg.items():
+        if k in ("wandb_project", "wandb_run", "push_to_hub",
+                 "hub_strategy", "report_to"):
+            continue
+        print(f"{k:>28}: {v}")
+    print("===================================\n")
+
+    # ------------------------------------------------------------
+    # 4) Start a dedicated W&B run
+    # ------------------------------------------------------------
     run = wandb.init(
         project = cfg["wandb_project"],
         name    = cfg["wandb_run"],
@@ -80,6 +101,9 @@ def _objective(
         reinit  = True,
     )
 
+    # ------------------------------------------------------------
+    # 5) Build the model / trainer  (unchanged from previous code)
+    # ------------------------------------------------------------
     train_ds, eval_ds = dataset_pair
     model = load_model_fn(cfg["base_model"], cfg)
     if cfg.get("adapter") == "lora":
@@ -89,13 +113,22 @@ def _objective(
     trainer.train()
     eval_loss = trainer.evaluate().get("eval_loss", float("inf"))
 
-    # log final metric and close the run
+    # ------------------------------------------------------------
+    # 6) Finalise logging and cleanup
+    # ------------------------------------------------------------
     run.log({"eval_loss": eval_loss})
     wandb.finish()
+
+    # restore env‑var so the main run uses the base project
+    if prev_project is not None:
+        os.environ["WANDB_PROJECT"] = prev_project
+    else:
+        os.environ.pop("WANDB_PROJECT", None)
 
     del trainer, model
     torch.cuda.empty_cache()
     return eval_loss
+
 
 # -------------------------------------------------------------------
 # Public entry
