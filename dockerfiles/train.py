@@ -175,7 +175,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 
 def main():
     args = parse_args()
-    cfg = load_config(args.config)
+    cfg = load_cfg(args.config)
     logger = setup_logger()
     
     # Performance flags
