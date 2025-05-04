@@ -67,6 +67,7 @@ early_stopping_patience: 3
 eval_strategy: steps
 save_strategy: steps
 eval_max_new_tokens: 128
+save_total_limit: 5
 
 debug:
 
