@@ -45,33 +45,40 @@ def sample_hparams(trial: optuna.Trial, _cfg: dict) -> Dict[str, Any]:
 # Objective
 # -------------------------------------------------------------------
 def _objective(
-    trial:            optuna.Trial,
-    base_cfg:         dict,
-    dataset_pair:     Tuple[Dataset, Dataset],
+    trial,
+    base_cfg,
+    dataset_pair,
     tokenizer,
     logger,
-    load_model_fn:    Callable,
-    apply_adapter_fn: Callable,
-    build_trainer_fn: Callable,
-) -> float:
+    load_model_fn,
+    apply_adapter_fn,
+    build_trainer_fn,
+):
+    import wandb  # local import keeps wandb optional for other use‑cases
 
     cfg = {**base_cfg, **sample_hparams(trial, base_cfg)}
 
-    # ── HPO‑specific overrides ──────────────────────────────────
+    # HPO‑specific overrides
     cfg.update(
-        num_epochs        = 1,
-        max_steps         = min(int(base_cfg.get("hpo_max_steps", 300)),
-                                int(base_cfg.get("max_steps", 10_000))),
-        save_strategy     = "no",      # no checkpoints
-        logging_steps     = 0,
-        push_to_hub       = False,     # **block uploads**
-        hub_strategy      = "never",
-        wandb_run         = f"trial_{trial.number}",
-        wandb_project     = f"{base_cfg.get('wandb_project', 'project')}-hpo",
+        num_epochs     = 1,
+        max_steps      = min(int(base_cfg.get("hpo_max_steps", 300)),
+                             int(base_cfg.get("max_steps", 10_000))),
+        save_strategy  = "no",
+        logging_steps  = 0,
+        push_to_hub    = False,
+        hub_strategy   = "never",
+        wandb_run      = f"trial_{trial.number}",
+        wandb_project  = f"{base_cfg.get('wandb_project', 'project')}-hpo",
+        report_to      = ["wandb"],     # Transformers → active run
     )
 
-    # ensure W&B uses the separate project
-    os.environ["WANDB_PROJECT"] = cfg["wandb_project"]
+    # start a standalone W&B run for this trial
+    run = wandb.init(
+        project = cfg["wandb_project"],
+        name    = cfg["wandb_run"],
+        config  = cfg,
+        reinit  = True,
+    )
 
     train_ds, eval_ds = dataset_pair
     model = load_model_fn(cfg["base_model"], cfg)
@@ -79,16 +86,13 @@ def _objective(
         model = apply_adapter_fn(model, cfg)
 
     trainer = build_trainer_fn(cfg, model, tokenizer, train_ds, eval_ds, callbacks=[])
-
-    # patch TrainingArguments created inside build_trainer
-    trainer.args.push_to_hub = False
-    trainer.args.hub_strategy = "never"
-
     trainer.train()
-
     eval_loss = trainer.evaluate().get("eval_loss", float("inf"))
 
-    # cleanup
+    # log final metric and close the run
+    run.log({"eval_loss": eval_loss})
+    wandb.finish()
+
     del trainer, model
     torch.cuda.empty_cache()
     return eval_loss
