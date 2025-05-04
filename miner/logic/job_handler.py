@@ -92,11 +92,11 @@ def _load_and_modify_config(
     # Modify config based on Model Size
     if config["model_params_count"] < 2_000_000_000:
         print("Small model detected...updating params...")
-        config["learning_rate"] = 2e-5
+        config["learning_rate"] = 2e-4
 
     elif config["model_params_count"] < 8_000_000_000:
         print("Medium model detected...updating params...")
-        config["learning_rate"] = 2e-5
+        config["learning_rate"] = 2e-4
 
     elif config["model_params_count"] < 15_000_000_000:
         print("Large model detected...updating params...")
