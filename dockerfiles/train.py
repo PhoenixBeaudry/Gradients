@@ -200,7 +200,7 @@ def main():
     
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
-    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg, dataset_meta=dataset_meta)
+    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg)
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
