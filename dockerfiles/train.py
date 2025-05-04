@@ -190,7 +190,7 @@ def main():
 
     logger.info("Loaded config from %s", args.config)
     accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
-    accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
+    
 
     # after loading cfg...
     seq_len = int(cfg.get("sequence_len", 2048))
@@ -217,7 +217,8 @@ def main():
             build_trainer_fn=build_trainer,
         )
         cfg.update(best_params)
-
+        
+    accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
