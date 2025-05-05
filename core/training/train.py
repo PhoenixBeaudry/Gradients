@@ -15,6 +15,7 @@ from transformers import (
     DataCollatorForSeq2Seq,
     EarlyStoppingCallback,
     SchedulerType,
+    AutoModelForCausalLM
 )
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
@@ -71,6 +72,22 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
+def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
+    common_kwargs = {
+        'use_auth_token': cfg.get('hub_token'),
+        'load_in_8bit': bool(cfg.get('load_in_8bit', False)),
+        'torch_dtype': torch.bfloat16,
+    }
+    try:
+        return AutoModelForCausalLM.from_pretrained(
+            model_name,
+            attn_implementation='flash_attention_3',
+            trust_remote_code=True,
+            **common_kwargs
+        )
+    except Exception:
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, **common_kwargs)
+
 
 
 def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
@@ -102,10 +119,10 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         hub_strategy='every_save',
         report_to="wandb",
         gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         bf16=True,
         push_to_hub=True,
         use_liger_kernel=True,
-        auto_find_batch_size=True,
         load_best_model_at_end=True,
     )
     logger = setup_logger()
