@@ -206,16 +206,12 @@ def main():
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     tokenizer = load_tokenizer(axo_cfg)
-    if "qwen" in cfg["base_model"].lower():
-        print("Qwen detected: setting tokenizer padding to left =============")
+    
+    if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral", "starcode")):
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "left"
-    if "mistral" in cfg["base_model"].lower():
-        print("Mistral detected: setting tokenizer padding to left =============")
-        if tokenizer.pad_token_id is None:
-            tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.padding_side = "left"
+
     model = load_model(cfg['base_model'], cfg)
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)

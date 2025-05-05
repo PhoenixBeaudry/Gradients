@@ -75,7 +75,7 @@ def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
     eval_ds   = data_meta.eval_dataset.select(range(min(256,  len(data_meta.eval_dataset))))
     tokenizer = train.load_tokenizer(axo_cfg)
 
-    if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral")):
+    if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral", "starcode")):
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "left"
