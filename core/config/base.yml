@@ -5,7 +5,7 @@ tokenizer_type: AutoTokenizer
 model_params_count: 0
 run_hpo: true
 hpo_max_steps: 50 
-
+dataloader_num_workers: 8
 load_in_8bit: true
 load_in_4bit: false
 strict: false
