@@ -19,7 +19,6 @@ from transformers import (
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
-from optuna.integration import HuggingFacePruningCallback 
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
