@@ -55,7 +55,7 @@ CMD echo 'Preparing data...' && \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/${DATASET_FILENAME}; \
     fi && \
     echo 'Starting training command' && \
-    python hpo_optuna.py \
+    python /workspace/training/hpo_optuna.py \
   --config           ${CONFIG_DIR}/${JOB_ID}.yml \
   --accelerate_yaml  /workspace/configs/accelerate.yaml \
   --timeout_hours    1 \
