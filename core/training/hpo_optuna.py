@@ -110,11 +110,16 @@ def objective(trial: optuna.Trial,
     env["OPTUNA_STUDY_NAME"] = study_name
     env["OPTUNA_TRIAL_ID"]   = str(trial._trial_id)
 
+    if cfg["rl"] == "dpo":
+        path_to_train_file = "/workspace/training/train_dpo.py"
+    else:
+        path_to_train_file = "/workspace/training/train.py"
+
     cmd = [
         "accelerate", "launch",
         "--config_file", acc_yaml,
         "--mixed_precision", "bf16",
-        Path(__file__).with_name("train.py"),
+        path_to_train_file,
         "--config", str(tmp_cfg),
     ]
 
@@ -180,12 +185,21 @@ def write_opt_cfg(base_cfg: str, best: dict) -> str:
     LOG.info("💾  Wrote optimised config → %s", opt_path)
     return opt_path
 
-def launch_training(acc_yaml: str, cfg_path: str):
+def launch_training(acc_yaml: str, cfg_path: str, dpo: bool):
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)
+
+    if cfg["rl"] == "dpo":
+        path_to_train_file = "/workspace/training/train_dpo.py"
+    else:
+        path_to_train_file = "/workspace/training/train.py"
+
+
     cmd = [
         "accelerate", "launch",
         "--config_file", acc_yaml,
         "--mixed_precision", "bf16",
-        Path(__file__).with_name("train.py"),
+        path_to_train_file,
         "--config", cfg_path,
     ]
     LOG.info("🚀  Starting full training run")
