@@ -161,7 +161,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         greater_is_better=bool(cfg['greater_is_better']),
         weight_decay=float(cfg['weight_decay']),
         run_name=cfg['wandb_run'],
-        warmup_steps=cfg['warmup_steps']
+        warmup_steps=cfg['warmup_steps'],
         report_to="wandb",
         auto_find_batch_size=True,
         gradient_checkpointing=True,
