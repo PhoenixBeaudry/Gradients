@@ -19,6 +19,7 @@ from transformers import (
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
+from optuna.storages import RedisStorage
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -80,8 +81,14 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     tid  = os.getenv("OPTUNA_TRIAL_ID")
     url  = os.getenv("OPTUNA_STORAGE")
     study_name  = os.getenv("OPTUNA_STUDY_NAME")
-    if tid and url:
-        study = optuna.load_study(study_name=study_name, storage=url)
+    # Create the correct storage object (Redis) -----------------------------
+    if url.startswith("redis://"):
+        storage = RedisStorage(url)
+    else:                                # fall back to whatever you passed
+        storage = url
+
+    if tid and storage:
+        study = optuna.load_study(study_name=study_name, storage=storage)
         trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(tid)))
         callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
