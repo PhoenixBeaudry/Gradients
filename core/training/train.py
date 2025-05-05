@@ -11,8 +11,6 @@ from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
 from accelerate import Accelerator
 from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
     TrainingArguments,
     Trainer,
     DataCollatorForSeq2Seq,
