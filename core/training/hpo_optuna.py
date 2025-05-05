@@ -53,6 +53,7 @@ def objective(trial: optuna.Trial,
     cfg["wandb_run"]         = f"{cfg.get('job_id', 'job')}_{trial_id}"
     cfg["num_epochs"]        = 1               # speedy
     cfg["hours_to_complete"] = 0.1            # ~6 minutes via TimeLimitCallback
+    cfg["hpo_run"] = True
 
     os.makedirs(cfg["output_dir"], exist_ok=True)
 
