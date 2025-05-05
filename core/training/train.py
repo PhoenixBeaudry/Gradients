@@ -6,7 +6,7 @@ from hpo_optuna import run_optuna
 import yaml
 import torch
 from axolotl.common.datasets import load_datasets
-from axolotl.train import setup_model_and_tokenizer
+from axolotl.utils.models import load_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
 from transformers import (
@@ -20,7 +20,7 @@ from transformers import (
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import bitsandbytes as bnb
-
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 # Disable parallel tokenizer threads to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -81,13 +81,40 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     try:
         return AutoModelForCausalLM.from_pretrained(
             model_name,
-            attn_implementation='flash_attention_3',
+            attn_implementation='flash_attention_2',
             trust_remote_code=True,
             **common_kwargs
         )
     except Exception:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, **common_kwargs)
 
+
+def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
+    if get_peft_model is None:
+        raise ImportError("peft library is required for LoRA adapters.")
+
+    if cfg.get('load_in_8bit', False):
+        model = prepare_model_for_kbit_training(model)
+
+    # Determine target modules for LoRA
+    targets = cfg.get('target_modules') or []
+    if not targets:
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Linear) and any(x in name.lower() for x in ('attn', 'attention')):
+                targets.append(name.split('.')[-1])
+        targets = list(set(targets))
+        if not targets:
+            raise ValueError("Could not auto-detect attention modules for LoRA. Please set 'target_modules' in config.")
+
+    peft_config = LoraConfig(
+        r=int(cfg.get('lora_r', 16)),
+        lora_alpha=int(cfg.get('lora_alpha', 16)),
+        target_modules=targets,
+        lora_dropout=float(cfg.get('lora_dropout', 0.05)),
+        bias='none',
+        task_type='CAUSAL_LM'
+    )
+    return get_peft_model(model, peft_config)
 
 
 def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
@@ -132,8 +159,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=DataCollatorForSeq2Seq(tokenizer),
-        processing_class=processor,
+        processing_class=tokenizer,
         callbacks=callbacks,
     )
 
@@ -157,7 +183,10 @@ def main():
     
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
-    model, tokenizer, peft_config, processor = setup_model_and_tokenizer(cfg=axo_cfg)
+    tokenizer = load_tokenizer(axo_cfg)
+    model = load_model(cfg['base_model'], cfg)
+    if cfg.get('adapter') == 'lora':
+        model = apply_lora_adapter(model, cfg)
 
     train_dataset = dataset_meta.train_dataset
     eval_dataset = dataset_meta.eval_dataset
