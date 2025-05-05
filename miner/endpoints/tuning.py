@@ -36,7 +36,7 @@ from miner.logic.job_handler import create_job_text
 from miner.logic.job_handler import start_tuning_container, start_tuning_container_diffusion # Import job functions
 
 
-NUM_WORKERS = 2
+NUM_WORKERS = 1
 
 logger = get_logger(__name__)
 

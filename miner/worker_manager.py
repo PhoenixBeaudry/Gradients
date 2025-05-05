@@ -17,8 +17,7 @@ logger = get_logger(__name__)
 
 # Define GPU pairs for an 8xH100 system
 GPU_PAIRS = [
-    "0,1,2,3",
-    "4,5,6,7"
+    "0,1,2,3"
 ]
 
 # RQ queue name to listen to
