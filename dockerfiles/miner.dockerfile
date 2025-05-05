@@ -53,4 +53,4 @@ CMD echo 'Preparing data...' && \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/${DATASET_FILENAME}; \
     fi && \
     echo 'Starting training command' && \
-    accelerate launch --multi_gpu --mixed_precision bf16 /workspace/training/train.py --config ${CONFIG_DIR}/${JOB_ID}.yml
+    accelerate launch --config_file /workspace/configs/accelerate.yaml --multi_gpu --mixed_precision bf16 /workspace/training/train.py --config ${CONFIG_DIR}/${JOB_ID}.yml
