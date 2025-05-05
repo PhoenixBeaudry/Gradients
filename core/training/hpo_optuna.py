@@ -77,8 +77,8 @@ def objective(trial: optuna.Trial,
     cfg |= {
         "output_dir":        str(out_dir),
         "wandb_run":         f"{cfg.get('job_id', 'job')}_{trial_id}",
-        "num_epochs":        1,
-        "hours_to_complete": 0.1,       # ~6 min via TimeLimitCallback
+        "max_steps":        50,
+        "hours_to_complete": 0.3,       # ~6 min via TimeLimitCallback
     }
     cfg["hpo_run"] = True
     out_dir.mkdir(parents=True, exist_ok=True)
