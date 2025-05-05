@@ -65,7 +65,7 @@ logging_steps: 1
 save_total_limit: 5
 early_stopping: true
 early_stopping_patience: 4
-save_strategy: best
+save_strategy: steps
 metric_for_best_model: eval_loss
 save_total_limit: 5
 greater_is_better: false

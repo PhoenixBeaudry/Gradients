@@ -125,12 +125,7 @@ def main():
     cfg = load_config(args.config)
 
     ### Temp Axolotl Config to generate Dataset and Model
-    axo_config_alt = load_config(args.config)
-    axo_config_alt["save_strategy"] = "steps"
-    out_path = os.path.join(f"{args.config}_axo.yml")
-    with open(out_path, "w") as f:
-        yaml.dump(axo_config_alt, f)
-    axo_cfg = load_cfg(f"{args.config}_axo.yml")
+    axo_cfg = load_cfg(args.config)
     #####################################################
 
     logger = setup_logger()
