@@ -33,7 +33,7 @@ lora_target_linear: true
 gradient_accumulation_steps: 2
 micro_batch_size: 1
 eval_batch_size: 1
-optimizer: lion_8bit
+optimizer: adamw_8bit
 lr_scheduler: cosine
 learning_rate: 2e-4
 group_by_length: true
