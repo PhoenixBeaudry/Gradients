@@ -59,6 +59,7 @@ def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
     # ── Config for this trial ────────────────────────────────────────────────
     cfg = copy.deepcopy(base_cfg)
     cfg.update(_sample_space(trial, cfg))
+    LOG.info("Starting Optuna Trial")
     cfg["num_epochs"]        = 1                     # fast trial
     cfg["hours_to_complete"] = 0.05                  # 3‑min cap via TimeLimitCallback
     trial_id                 = f"trial{trial.number}_{uuid.uuid4().hex[:4]}"
@@ -115,6 +116,7 @@ def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
 # ╭───────────────────────────── Optuna driver helper ─────────────────────────╮
 def run_optuna(config_path: str, timeout_hours: float = 1.0) -> tuple[dict, str]:
     """Run Optuna study and return (best_params, hpo_project)."""
+    LOG.info("🚀  Starting Optuna HPO ===")
     with open(config_path) as f:
         base_cfg = yaml.safe_load(f)
 
