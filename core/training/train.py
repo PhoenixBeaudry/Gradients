@@ -9,7 +9,6 @@ from axolotl.common.datasets import load_datasets
 from axolotl.train import setup_model_and_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
-from accelerate import Accelerator
 from transformers import (
     TrainingArguments,
     Trainer,
@@ -101,6 +100,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         hub_model_id=cfg['hub_model_id'],
         hub_token=cfg['hub_token'],
         hub_strategy='every_save',
+        report_to="wandb",
         push_to_hub=True,
         use_liger_kernel=True,
         auto_find_batch_size=True,
@@ -120,14 +120,9 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 
 
 
-accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
-device = accelerator.device
-args = parse_args()
-cfg = load_config(args.config)
-accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
-
-
 def main():
+    args = parse_args()
+    cfg = load_config(args.config)
 
     ### Temp Axolotl Config to generate Dataset and Model
     axo_config_alt = load_config(args.config)
