@@ -166,6 +166,12 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     )
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer,
+        model=model,                     # passes label_pad_token_id=-100 automatically
+        padding="longest",               # dynamic per mini‑batch
+        pad_to_multiple_of=8,            # keeps TensorCores happy; optional
+    )
     return Trainer(
         model=model,
         args=tf_args,
@@ -173,7 +179,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         eval_dataset=eval_ds,
         processing_class=tokenizer,
         callbacks=callbacks,
-        data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True)
+        data_collator=data_collator
     )
 
 
