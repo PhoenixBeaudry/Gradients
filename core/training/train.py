@@ -130,7 +130,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
     hf_kwargs = {}
-    if not cfg["hub_run"]:
+    if not cfg["hpo_run"]:
         hf_kwargs = {
             'hub_model_id': cfg['hub_model_id'],
             'hub_token': cfg['hub_token'],
