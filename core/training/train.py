@@ -18,6 +18,8 @@ from transformers import (
 )
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
+import optuna
+from optuna.integration import HuggingFacePruningCallback 
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -51,7 +53,14 @@ class TimeLimitCallback(TrainerCallback):
             print(f"\n⏱️  Reached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
             control.should_training_stop = True
         return control
-
+        
+def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
+    tid  = os.getenv("OPTUNA_TRIAL_ID")
+    url  = os.getenv("OPTUNA_STORAGE")
+    if tid and url:
+        study = optuna.load_study(study_name="optuna", storage=url)
+        trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(tid)))
+        callbacks.append(HuggingFacePruningCallback(trial, monitor="eval_loss"))
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
@@ -138,6 +147,9 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     max_hours = int(cfg.get('hours_to_complete'))
     if max_hours is not None:
         callbacks.append(TimeLimitCallback(max_hours*0.9))
+
+    if cfg["hpo_run"]:
+        add_optuna_callback_if_needed(callbacks)
     ###################
 
     ##### Training Arguments ####

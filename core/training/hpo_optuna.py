@@ -12,7 +12,10 @@ from __future__ import annotations
 import argparse, copy, json, logging, os, re, shutil, subprocess, tempfile, uuid, time
 from pathlib import Path
 import yaml, optuna
+from dotenv import load_dotenv
 from optuna.pruners import HyperbandPruner
+load_dotenv(".optunaenv") 
+STORAGE_URL = os.getenv("OPTUNA_STORAGE", "sqlite:///hpo.db")
 
 # ── logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO,
@@ -95,6 +98,8 @@ def objective(trial: optuna.Trial,
     env["WANDB_PROJECT"] = hpo_project          # override globally
     env.pop("WANDB_RUN_ID",  None)              # avoid carry‑over
     env.pop("WANDB_NAME",    None)
+    env["OPTUNA_STORAGE"]  = STORAGE_URL
+    env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
 
     cmd = [
         "accelerate", "launch",
@@ -137,6 +142,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
 
     study = optuna.create_study(direction="minimize",
+                                storage=STORAGE_URL,
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * 0.15),
