@@ -22,14 +22,14 @@ LOG = logging.getLogger("hpo_optuna")
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     params = {
-        "learning_rate":               trial.suggest_float("learning_rate", 5e-6, 5e-4, log=True),
+        "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
         "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
     }
     if cfg.get("adapter") == "lora":
         params |= {
-            "lora_r":       trial.suggest_int("lora_r", 4, 64),
-            "lora_alpha":   trial.suggest_int("lora_alpha", 4, 128),
+            "lora_r":       trial.suggest_int("lora_r", 32, 256),
+            "lora_alpha":   trial.suggest_int("lora_alpha", 64, 512),
             "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
         }
     return params
@@ -129,7 +129,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     with open(base_cfg_path) as f:
         base_cfg = yaml.safe_load(f)
 
-    base_project = os.environ.get("WANDB_PROJECT", "UnnamedProject")
+    base_project = os.environ.get("WANDB_PROJECT", "Gradients")
     hpo_project  = f"{base_project}-hpo"
 
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
