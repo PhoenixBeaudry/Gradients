@@ -78,8 +78,9 @@ def objective(trial: optuna.Trial,
         "output_dir":        str(out_dir),
         "wandb_run":         f"{cfg.get('job_id', 'job')}_{trial_id}",
         "wandb_project":     hpo_project,
-        "max_steps":        60,
-        "eval_steps":       10,
+        "max_steps":        120,
+        "eval_steps":       20,
+        "save_steps": 200
     }
     cfg["hpo_run"] = True
     out_dir.mkdir(parents=True, exist_ok=True)
