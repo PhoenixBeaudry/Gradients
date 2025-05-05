@@ -485,6 +485,10 @@ def start_tuning_container(job: TextJob):
                 "bind": "/workspace/outputs",
                 "mode": "rw",
             },
+            os.path.abspath(cst.TRAIN_DIR): {
+                "bind": "/workspace/training",
+                "mode": "rw",
+            },
         }
         volume_bindings[ os.path.expanduser("~/.cache/huggingface") ] = {
             "bind": "/root/.cache/huggingface",

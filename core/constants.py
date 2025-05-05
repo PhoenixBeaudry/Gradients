@@ -24,6 +24,7 @@ CONTAINER_EVAL_RESULTS_PATH = "/aplp/evaluation_results.json"
 
 CONFIG_DIR = "core/config/"
 OUTPUT_DIR = "core/outputs/"
+TRAIN_DIR = "core/training/"
 CACHE_DIR = "~/.cache/huggingface"
 CACHE_DIR_HUB = os.path.expanduser("~/.cache/huggingface/hub")
 DIFFUSION_DATASET_DIR = "core/dataset/images"

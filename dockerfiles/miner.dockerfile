@@ -35,11 +35,6 @@ RUN mkdir -p /root/.aws && \
 
 ENV TOKENIZERS_PARALLELISM="false"
 
-# Copy the train file
-COPY dockerfiles/train.py /workspace/train.py
-COPY dockerfiles/data_utils.py /workspace/data_utils.py
-COPY dockerfiles/hpo_optuna.py /workspace/hpo_optuna.py
-
 CMD echo 'Preparing data...' && \
     if [ -n "$HUGGINGFACE_TOKEN" ]; then \
     echo "Attempting to log in to Hugging Face" && \
@@ -58,4 +53,4 @@ CMD echo 'Preparing data...' && \
     cp /workspace/input_data/${DATASET_FILENAME} /workspace/${DATASET_FILENAME}; \
     fi && \
     echo 'Starting training command' && \
-    accelerate launch --multi_gpu /workspace/train.py --config ${CONFIG_DIR}/${JOB_ID}.yml
+    accelerate launch --multi_gpu /workspace/training/train.py --config ${CONFIG_DIR}/${JOB_ID}.yml

@@ -3,7 +3,7 @@ import os
 import argparse
 from pathlib import Path
 import logging
-from hpo_optuna import run_optuna 
+from core.training.hpo_optuna import run_optuna 
 import yaml
 from ignite.engine import Engine, Events
 from ignite.handlers.lr_finder import FastaiLRFinder
