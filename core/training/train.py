@@ -163,7 +163,6 @@ def main():
 
     logger.info("Starting Full Model Training...")
 
-    trainer = accelerator.prepare(trainer)
     trainer.train()
 
 
