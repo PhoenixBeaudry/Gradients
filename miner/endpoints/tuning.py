@@ -188,6 +188,12 @@ async def task_offer(
                         f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
                 accepted=False
             )
+        if "qwen3" in request.model.lower():
+            return MinerTaskResponse(
+                message=f"This endpoint does not currently support Qwen3."
+                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
+                accepted=False
+            )
 
         # Check model parameter count
         # Reject if model size is 32B or larger
