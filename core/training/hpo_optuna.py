@@ -9,7 +9,7 @@ hpo_optuna.py  –  1‑hour Optuna sweep → full training (multi‑GPU compati
     1) wandb-summary.json   2) stdout regex   3) trainer_state.json
 """
 from __future__ import annotations
-import argparse, copy, json, logging, os, re, shutil, subprocess, tempfile, uuid
+import argparse, copy, json, logging, os, re, shutil, subprocess, tempfile, uuid, time
 from pathlib import Path
 import yaml, optuna
 from optuna.pruners import HyperbandPruner
@@ -110,6 +110,8 @@ def objective(trial: optuna.Trial,
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
         LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout)
+        LOG.info("⚠️  Waiting 10s before starting next trial for cleanup...")
+        time.sleep(10)
         return float("inf")
 
     # ── extract eval_loss (3 fallback methods) ──────────────────────────────
