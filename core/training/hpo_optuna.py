@@ -62,7 +62,7 @@ def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
     os.makedirs(cfg["output_dir"], exist_ok=True)
 
     cfg["push_to_hub"]  = False
-    cfg["hub_strategy"] = "none"
+    cfg["hub_strategy"] = None
 
     os.environ["WANDB_PROJECT"] = hpo_project
 
