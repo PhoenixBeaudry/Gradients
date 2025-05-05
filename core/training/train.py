@@ -22,6 +22,7 @@ from transformers import TrainerCallback, TrainerControl, TrainerState
 import bitsandbytes as bnb
 
 accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
+device = accelerator.device
 
 # Disable parallel tokenizer threads to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
