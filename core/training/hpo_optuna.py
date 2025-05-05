@@ -1,178 +1,174 @@
-# hpo_optuna.py
+#!/usr/bin/env python3
 """
-One‑hour Optuna sweep for causal‑LM fine‑tuning.
+hpo_optuna.py  ·  1‑hour Optuna sweep → full training
+────────────────────────────────────────────────────────
+* Runs a 1‑hour hyper‑parameter search on a *slice* of the data.
+* Logs every trial to a **separate WandB project** named
+      "<original‑WANDB_PROJECT>-hpo".
+* Disables any Hugging Face Hub push during trials.
+* After HPO, writes <config>_opt.yml with the best params and
+  launches the normal multi‑GPU training run via `accelerate`.
 
-Public API
-----------
-run_optuna(...)  →  dict
+Place this file in the same directory as your `train.py` and call:
+
+    python hpo_optuna.py \
+        --config          /workspace/configs/my_job.yml \
+        --accelerate_yaml /workspace/configs/accelerate.yaml \
+        --timeout_hours   1
 """
-
 from __future__ import annotations
-import os
-import torch
-import optuna
-from optuna.samplers import TPESampler
+import argparse, copy, gc, importlib.util, json, os, subprocess, tempfile, uuid, logging
+from pathlib import Path
+import yaml, optuna, torch
 from optuna.pruners import HyperbandPruner
-from functools import partial
-from typing import Tuple, Dict, Callable, Any
-from datasets import Dataset
+from accelerate import Accelerator
+from axolotl.common.datasets import load_datasets
+from axolotl.cli.args     import TrainerCliArgs
+from axolotl.cli.config   import load_cfg
 
-# -------------------------------------------------------------------
-# Search‑space
-# -------------------------------------------------------------------
-def sample_hparams(trial: optuna.Trial, _cfg: dict) -> Dict[str, Any]:
-    return {
-        # optimiser & scheduler
-        "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-4, log=True),
-        "warmup_steps":  trial.suggest_int("warmup_steps", 0, 500),
-        "optimizer":     trial.suggest_categorical(
-            "optimizer", ["adamw_torch_fused", "lion_8bit", "paged_adamw_8bit"]
-        ),
+# ─────────────────────────────────────────────────────────────── train.py import
+spec = importlib.util.spec_from_file_location("train", Path(__file__).with_name("train.py"))
+train = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(train)
+# ────────────────────────────────────────────────────────────────────────────────
 
-        # batch‑related
-        "gradient_accumulation_steps": trial.suggest_int("ga_steps", 1, 8),
-        "micro_batch_size":            trial.suggest_int("micro_bs", 2, 32),
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s %(levelname)s %(message)s")
+LOG = logging.getLogger("hpo_optuna")
 
-        # LoRA params (ignored if adapter≠lora)
-        "lora_r":       trial.suggest_int("lora_r", 4, 64),
-        "lora_alpha":   trial.suggest_int("lora_alpha", 8, 128),
-        "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
-
-        "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.2),
+# ╭───────────────────────────── Hyper‑parameter search space ─────────────────╮
+def _sample_space(trial: optuna.Trial, cfg: dict) -> dict:
+    params = {
+        "learning_rate":               trial.suggest_float("learning_rate", 5e-6, 5e-4, log=True),
+        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
+        "gradient_accumulation_steps": trial.suggest_int("gradient_accumulation_steps", 1, 8),
+        "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
     }
-
-
-
-def _objective(
-    trial,
-    base_cfg,
-    dataset_pair,
-    tokenizer,
-    logger,
-    load_model_fn,
-    apply_adapter_fn,
-    build_trainer_fn,
-):
-    import os, wandb
-
-    # ------------------------------------------------------------
-    # 1) Build the trial‑specific cfg
-    # ------------------------------------------------------------
-    cfg = {**base_cfg, **sample_hparams(trial, base_cfg)}
-
-    cfg.update(
-        num_epochs    = 1,
-        max_steps     = min(int(base_cfg.get("hpo_max_steps", 300)),
-                            int(base_cfg.get("max_steps", 10_000))),
-        save_strategy = "no",
-        logging_steps = 2,
-        push_to_hub   = False,
-        hub_strategy  = "never",
-        wandb_run     = f"trial_{trial.number}",
-        wandb_project = f"{base_cfg.get('wandb_project', 'project')}-hpo",
-        report_to     = ["wandb"],
-    )
-
-    # ------------------------------------------------------------
-    # 2) Make sure Transformers’ WandbCallback *also* sees -hpo
-    # ------------------------------------------------------------
-    prev_project = os.environ.get("WANDB_PROJECT")
-    os.environ["WANDB_PROJECT"] = cfg["wandb_project"]
-
-    # ------------------------------------------------------------
-    # 3) Announce the trial params
-    # ------------------------------------------------------------
-    logger.info("🔍  TRIAL %d params: %s", trial.number, cfg)
-    print(f"\n=== TRIAL {trial.number} PARAMS ===")
-    for k, v in cfg.items():
-        if k in ("wandb_project", "wandb_run", "push_to_hub",
-                 "hub_strategy", "report_to"):
-            continue
-        print(f"{k:>28}: {v}")
-    print("===================================\n")
-
-    # ------------------------------------------------------------
-    # 4) Start a dedicated W&B run
-    # ------------------------------------------------------------
-    run = wandb.init(
-        project = cfg["wandb_project"],
-        name    = cfg["wandb_run"],
-        config  = cfg,
-        reinit  = True,
-    )
-
-    # ------------------------------------------------------------
-    # 5) Build the model / trainer  (unchanged from previous code)
-    # ------------------------------------------------------------
-    train_ds, eval_ds = dataset_pair
-    model = load_model_fn(cfg["base_model"], cfg)
     if cfg.get("adapter") == "lora":
-        model = apply_adapter_fn(model, cfg)
+        params |= {
+            "lora_r":       trial.suggest_int("lora_r", 4, 64),
+            "lora_alpha":   trial.suggest_int("lora_alpha", 4, 128),
+            "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
+        }
+    return params
+# ╰─────────────────────────────────────────────────────────────────────────────╯
 
-    trainer = build_trainer_fn(cfg, model, tokenizer, train_ds, eval_ds, callbacks=[])
+# ╭────────────────────────── Objective (single Optuna trial) ──────────────────╮
+def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
+    """Run a *short* train+eval cycle and return eval_loss."""
+    # ── Config for this trial ────────────────────────────────────────────────
+    cfg = copy.deepcopy(base_cfg)
+    cfg.update(_sample_space(trial, cfg))
+    cfg["num_epochs"]        = 1                     # fast trial
+    cfg["hours_to_complete"] = 0.05                  # 3‑min cap via TimeLimitCallback
+    trial_id                 = f"trial{trial.number}_{uuid.uuid4().hex[:4]}"
+    cfg["output_dir"]        = str(Path(cfg.get("output_root", "./hpo_runs")) / trial_id)
+    cfg["wandb_run"]         = f"{cfg.get('job_id', 'job')}_{trial_id}"
+    os.makedirs(cfg["output_dir"], exist_ok=True)
+
+    # ── Never push to HF during HPO ───────────────────────────────────────────
+    cfg["push_to_hub"]   = False
+    cfg["hub_strategy"]  = "none"
+    cfg.pop("hub_token", None)
+    cfg.pop("hub_model_id", None)
+
+    # ── Ensure WandB logs to <base>-hpo project ──────────────────────────────
+    os.environ["WANDB_PROJECT"] = hpo_project
+
+    # ── Dump temp YAML (Axolotl helpers expect a file) ───────────────────────
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as tmp:
+        yaml.safe_dump(cfg, tmp)
+        tmp_cfg_path = tmp.name
+
+    # ── Build dataset slice & model ───────────────────────────────────────────
+    axo_cfg   = load_cfg(tmp_cfg_path)
+    data_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
+    train_ds  = data_meta.train_dataset.select(range(min(1024, len(data_meta.train_dataset))))
+    eval_ds   = data_meta.eval_dataset.select(range(min(256,  len(data_meta.eval_dataset))))
+    tokenizer = train.load_tokenizer(axo_cfg)
+
+    if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral")):
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "left"
+
+    accelerator = Accelerator()
+    model = train.load_model(cfg["base_model"], cfg)
+    if cfg.get("adapter") == "lora":
+        model = train.apply_lora_adapter(model, cfg)
+    model = accelerator.prepare(model)  # DDP/FSDP wrap
+
+    trainer = train.build_trainer(cfg, model, tokenizer, train_ds, eval_ds, callbacks=[])
+    trainer.accelerator = accelerator
     trainer.train()
     eval_loss = trainer.evaluate().get("eval_loss", float("inf"))
 
-    # ------------------------------------------------------------
-    # 6) Finalise logging and cleanup
-    # ------------------------------------------------------------
-    run.log({"eval_loss": eval_loss})
-    wandb.finish()
+    LOG.info("Trial %d finished – eval_loss %.4f", trial.number, eval_loss)
 
-    # restore env‑var so the main run uses the base project
-    if prev_project is not None:
-        os.environ["WANDB_PROJECT"] = prev_project
-    else:
-        os.environ.pop("WANDB_PROJECT", None)
-
-    del trainer, model
+    # ── GPU cleanup between trials ───────────────────────────────────────────
+    del model, trainer, tokenizer, train_ds, eval_ds
+    gc.collect()
     torch.cuda.empty_cache()
     return eval_loss
+# ╰─────────────────────────────────────────────────────────────────────────────╯
 
+# ╭───────────────────────────── Optuna driver helper ─────────────────────────╮
+def run_optuna(config_path: str, timeout_hours: float = 1.0) -> tuple[dict, str]:
+    """Run Optuna study and return (best_params, hpo_project)."""
+    with open(config_path) as f:
+        base_cfg = yaml.safe_load(f)
 
-# -------------------------------------------------------------------
-# Public entry
-# -------------------------------------------------------------------
-def run_optuna(
-    cfg: dict,
-    dataset_pair: Tuple[Dataset, Dataset],
-    tokenizer,
-    logger,
-    timeout_sec: int,
-    load_model_fn:    Callable,
-    apply_adapter_fn: Callable,
-    build_trainer_fn: Callable,
-) -> dict:
-    """
-    Launch a time‑boxed Optuna sweep and return the best parameter dict.
-    """
-    logger.info("▶️  Optuna sweep started (timeout = %.1f min)…", timeout_sec / 60)
+    base_project = os.environ.get("WANDB_PROJECT", "UnnamedProject")
+    hpo_project  = f"{base_project}-hpo"
+    os.environ["WANDB_PROJECT"] = hpo_project
 
-    study = optuna.create_study(
-        direction = "minimize",
-        sampler   = TPESampler(seed=cfg.get("seed", 42)),
-        pruner    = HyperbandPruner(
-            min_resource=1,
-            max_resource=cfg.get("hpo_max_steps", 300),
-        ),
-    )
+    study = optuna.create_study(direction="minimize",
+                                pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
+    study.optimize(lambda t: _objective(t, base_cfg, hpo_project),
+                   timeout=int(timeout_hours * 3600),
+                   show_progress_bar=True)
 
-    study.optimize(
-        partial(
-            _objective,
-            base_cfg         = cfg,
-            dataset_pair     = dataset_pair,
-            tokenizer        = tokenizer,
-            logger           = logger,
-            load_model_fn    = load_model_fn,
-            apply_adapter_fn = apply_adapter_fn,
-            build_trainer_fn = build_trainer_fn,
-        ),
-        timeout           = timeout_sec,
-        n_jobs            = 1,
-        show_progress_bar = True,
-    )
+    LOG.info("🏆  HPO done – best eval_loss %.5f with params %s",
+             study.best_value, study.best_params)
 
-    logger.info("✅  Optuna done. Best eval_loss = %.4f", study.best_value)
-    logger.info("🏆  Best parameters: %s", study.best_params)
-    return study.best_params
+    # Restore original project for subsequent full training
+    os.environ["WANDB_PROJECT"] = base_project
+    return study.best_params, hpo_project
+# ╰─────────────────────────────────────────────────────────────────────────────╯
+
+# ╭───────────────────── Write optimised YAML & launch full run ───────────────╮
+def _write_optimised_cfg(base_path: str, best: dict) -> str:
+    with open(base_path) as f:
+        cfg = yaml.safe_load(f)
+    cfg.update(best)
+    opt_path = base_path.replace(".yml", "_opt.yml")
+    with open(opt_path, "w") as f:
+        yaml.safe_dump(cfg, f)
+    return opt_path
+
+def _launch_training(acc_yaml: str, cfg_path: str):
+    cmd = [
+        "accelerate", "launch",
+        "--config_file", acc_yaml,
+        "--mixed_precision", "bf16",
+        "/workspace/training/train.py",
+        "--config", cfg_path,
+    ]
+    LOG.info("🚀  Starting full training:\n%s", " ".join(map(str, cmd)))
+    subprocess.run(list(map(str, cmd)), check=True)
+# ╰─────────────────────────────────────────────────────────────────────────────╯
+
+# ╭─────────────────────────────── CLI entry‑point ────────────────────────────╮
+def main():
+    ap = argparse.ArgumentParser(description="1‑hour HPO then full training")
+    ap.add_argument("--config",          required=True, help="Base YAML config file")
+    ap.add_argument("--accelerate_yaml", required=True, help="accelerate.yaml for launch")
+    ap.add_argument("--timeout_hours",   type=float, default=1.0, help="Wall‑clock HPO budget")
+    args = ap.parse_args()
+
+    best_params, _ = run_optuna(args.config, timeout_hours=args.timeout_hours)
+    optimised_cfg  = _write_optimised_cfg(args.config, best_params)
+    _launch_training(args.accelerate_yaml, optimised_cfg)
+
+if __name__ == "__main__":
+    main()
