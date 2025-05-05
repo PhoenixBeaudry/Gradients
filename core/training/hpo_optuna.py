@@ -20,6 +20,9 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("hpo_optuna")
 
+TRIAL_MAX_STEPS = 120
+TIMEOUT_PERCENTAGE_OF_TOTAL = 0.15
+
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     params = {
@@ -35,6 +38,9 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         }
     return params
 # ╰──────────────────────────────────────────────────────────────────────────╯
+
+
+
 
 # ╭────────────────── helpers for eval_loss extraction ───────────────────────╮
 _EVAL_RE = re.compile(r"eval_loss[^0-9]*([0-9]+\.[0-9]+)")
@@ -81,7 +87,7 @@ def objective(trial: optuna.Trial,
         "output_dir":        str(out_dir),
         "wandb_run":         f"{cfg.get('job_id', 'job')}_{trial_id}",
         "wandb_project":     hpo_project,
-        "max_steps":        120,
+        "max_steps":        TRIAL_MAX_STEPS,
         "eval_steps":       20,
         "save_steps": 200
     }
@@ -152,7 +158,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                                 storage=storage,
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
-                   timeout=int(base_cfg['hours_to_complete'] * 3600 * 0.15),
+                   timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    show_progress_bar=True)
 
     LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
@@ -185,7 +191,7 @@ def launch_training(acc_yaml: str, cfg_path: str):
 
 # ╭──────────────────────────── CLI entry‑point ──────────────────────────────╮
 def main():
-    ap = argparse.ArgumentParser(description="1‑hour HPO then full training")
+    ap = argparse.ArgumentParser(description="HPO then full training")
     ap.add_argument("--config",          required=True, help="Base YAML config file")
     ap.add_argument("--accelerate_yaml", required=True, help="accelerate.yaml for launch")
     args = ap.parse_args()
