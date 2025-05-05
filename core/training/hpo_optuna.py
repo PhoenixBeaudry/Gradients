@@ -100,6 +100,7 @@ def objective(trial: optuna.Trial,
     env.pop("WANDB_NAME",    None)
     env["OPTUNA_STORAGE"]  = STORAGE_URL
     env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
+    env["OPTUNA_STUDY_NAME"] = cfg["job_id"]
 
     cmd = [
         "accelerate", "launch",
@@ -140,8 +141,9 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     hpo_project  = f"{base_project}-hpo"
 
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
-
     study = optuna.create_study(direction="minimize",
+                                study_name=base_cfg["job_id"],
+                                load_if_exists=True,
                                 storage=STORAGE_URL,
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project),
