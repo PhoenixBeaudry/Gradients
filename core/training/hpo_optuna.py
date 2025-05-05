@@ -8,16 +8,9 @@ hpo_optuna.py  ·  1‑hour Optuna sweep → full training
 * Disables any Hugging Face Hub push during trials.
 * After HPO, writes <config>_opt.yml with the best params and
   launches the normal multi‑GPU training run via `accelerate`.
-
-Place this file in the same directory as your `train.py` and call:
-
-    python hpo_optuna.py \
-        --config          /workspace/configs/my_job.yml \
-        --accelerate_yaml /workspace/configs/accelerate.yaml \
-        --timeout_hours   1
 """
 from __future__ import annotations
-import argparse, copy, gc, importlib.util, json, os, subprocess, tempfile, uuid, logging
+import argparse, copy, gc, importlib.util, os, subprocess, tempfile, uuid, logging
 from pathlib import Path
 import yaml, optuna, torch
 from optuna.pruners import HyperbandPruner
@@ -26,17 +19,17 @@ from axolotl.common.datasets import load_datasets
 from axolotl.cli.args     import TrainerCliArgs
 from axolotl.cli.config   import load_cfg
 
-# ─────────────────────────────────────────────────────────────── train.py import
+# ── bring in train.py helpers ────────────────────────────────────────────────
 spec = importlib.util.spec_from_file_location("train", Path(__file__).with_name("train.py"))
 train = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(train)
-# ────────────────────────────────────────────────────────────────────────────────
 
+# ── global logger config ─────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("hpo_optuna")
 
-# ╭───────────────────────────── Hyper‑parameter search space ─────────────────╮
+# ╭───────────────────────────── Hyper‑parameter search space ────────────────╮
 def _sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     params = {
         "learning_rate":               trial.suggest_float("learning_rate", 5e-6, 5e-4, log=True),
@@ -51,37 +44,34 @@ def _sample_space(trial: optuna.Trial, cfg: dict) -> dict:
             "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
         }
     return params
-# ╰─────────────────────────────────────────────────────────────────────────────╯
+# ╰────────────────────────────────────────────────────────────────────────────╯
 
-# ╭────────────────────────── Objective (single Optuna trial) ──────────────────╮
+# ╭────────────────────────── Objective (single Optuna trial) ────────────────╮
 def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
     """Run a *short* train+eval cycle and return eval_loss."""
-    # ── Config for this trial ────────────────────────────────────────────────
     cfg = copy.deepcopy(base_cfg)
     cfg.update(_sample_space(trial, cfg))
-    LOG.info("Starting Optuna Trial")
-    cfg["num_epochs"]        = 1                     # fast trial
-    cfg["hours_to_complete"] = 0.05                  # 3‑min cap via TimeLimitCallback
+
+    LOG.info("🔎  Starting trial %d with params: %s", trial.number, {k: cfg[k] for k in _sample_space(trial, cfg)})
+
+    cfg["num_epochs"]        = 1
+    cfg["hours_to_complete"] = 0.05
     trial_id                 = f"trial{trial.number}_{uuid.uuid4().hex[:4]}"
     cfg["output_dir"]        = str(Path(cfg.get("output_root", "./hpo_runs")) / trial_id)
     cfg["wandb_run"]         = f"{cfg.get('job_id', 'job')}_{trial_id}"
     os.makedirs(cfg["output_dir"], exist_ok=True)
 
-    # ── Never push to HF during HPO ───────────────────────────────────────────
-    cfg["push_to_hub"]   = False
-    cfg["hub_strategy"]  = "none"
+    cfg["push_to_hub"]  = False
+    cfg["hub_strategy"] = "none"
     cfg.pop("hub_token", None)
     cfg.pop("hub_model_id", None)
 
-    # ── Ensure WandB logs to <base>-hpo project ──────────────────────────────
     os.environ["WANDB_PROJECT"] = hpo_project
 
-    # ── Dump temp YAML (Axolotl helpers expect a file) ───────────────────────
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as tmp:
         yaml.safe_dump(cfg, tmp)
         tmp_cfg_path = tmp.name
 
-    # ── Build dataset slice & model ───────────────────────────────────────────
     axo_cfg   = load_cfg(tmp_cfg_path)
     data_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     train_ds  = data_meta.train_dataset.select(range(min(1024, len(data_meta.train_dataset))))
@@ -97,26 +87,24 @@ def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
     model = train.load_model(cfg["base_model"], cfg)
     if cfg.get("adapter") == "lora":
         model = train.apply_lora_adapter(model, cfg)
-    model = accelerator.prepare(model)  # DDP/FSDP wrap
+    model = accelerator.prepare(model)
 
     trainer = train.build_trainer(cfg, model, tokenizer, train_ds, eval_ds, callbacks=[])
     trainer.accelerator = accelerator
     trainer.train()
     eval_loss = trainer.evaluate().get("eval_loss", float("inf"))
 
-    LOG.info("Trial %d finished – eval_loss %.4f", trial.number, eval_loss)
+    LOG.info("✅  Trial %d completed – eval_loss: %.4f", trial.number, eval_loss)
 
-    # ── GPU cleanup between trials ───────────────────────────────────────────
     del model, trainer, tokenizer, train_ds, eval_ds
     gc.collect()
     torch.cuda.empty_cache()
     return eval_loss
-# ╰─────────────────────────────────────────────────────────────────────────────╯
+# ╰────────────────────────────────────────────────────────────────────────────╯
 
-# ╭───────────────────────────── Optuna driver helper ─────────────────────────╮
+# ╭────────────────────────────── Optuna driver ───────────────────────────────╮
 def run_optuna(config_path: str, timeout_hours: float = 1.0) -> tuple[dict, str]:
-    """Run Optuna study and return (best_params, hpo_project)."""
-    LOG.info("🚀  Starting Optuna HPO ===")
+    LOG.info("🚀  Starting Optuna Hyperparameter Optimization.....")
     with open(config_path) as f:
         base_cfg = yaml.safe_load(f)
 
@@ -124,21 +112,22 @@ def run_optuna(config_path: str, timeout_hours: float = 1.0) -> tuple[dict, str]
     hpo_project  = f"{base_project}-hpo"
     os.environ["WANDB_PROJECT"] = hpo_project
 
+    LOG.info("🚦  Beginning HPO sweep (project: %s, budget: %.1fh)…", hpo_project, timeout_hours)
+
     study = optuna.create_study(direction="minimize",
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
     study.optimize(lambda t: _objective(t, base_cfg, hpo_project),
                    timeout=int(timeout_hours * 3600),
                    show_progress_bar=True)
 
-    LOG.info("🏆  HPO done – best eval_loss %.5f with params %s",
+    LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
              study.best_value, study.best_params)
 
-    # Restore original project for subsequent full training
     os.environ["WANDB_PROJECT"] = base_project
     return study.best_params, hpo_project
-# ╰─────────────────────────────────────────────────────────────────────────────╯
+# ╰────────────────────────────────────────────────────────────────────────────╯
 
-# ╭───────────────────── Write optimised YAML & launch full run ───────────────╮
+# ╭────────────────────────────── helpers ─────────────────────────────────────╮
 def _write_optimised_cfg(base_path: str, best: dict) -> str:
     with open(base_path) as f:
         cfg = yaml.safe_load(f)
@@ -146,6 +135,7 @@ def _write_optimised_cfg(base_path: str, best: dict) -> str:
     opt_path = base_path.replace(".yml", "_opt.yml")
     with open(opt_path, "w") as f:
         yaml.safe_dump(cfg, f)
+    LOG.info("💾  Wrote optimised config → %s", opt_path)
     return opt_path
 
 def _launch_training(acc_yaml: str, cfg_path: str):
@@ -153,14 +143,14 @@ def _launch_training(acc_yaml: str, cfg_path: str):
         "accelerate", "launch",
         "--config_file", acc_yaml,
         "--mixed_precision", "bf16",
-        "/workspace/training/train.py",
+        Path(__file__).with_name("train.py"),
         "--config", cfg_path,
     ]
-    LOG.info("🚀  Starting full training:\n%s", " ".join(map(str, cmd)))
+    LOG.info("🚀  Starting full training run")
     subprocess.run(list(map(str, cmd)), check=True)
-# ╰─────────────────────────────────────────────────────────────────────────────╯
+# ╰────────────────────────────────────────────────────────────────────────────╯
 
-# ╭─────────────────────────────── CLI entry‑point ────────────────────────────╮
+# ╭──────────────────────────── entry‑point ───────────────────────────────────╮
 def main():
     ap = argparse.ArgumentParser(description="1‑hour HPO then full training")
     ap.add_argument("--config",          required=True, help="Base YAML config file")
