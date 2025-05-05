@@ -53,6 +53,29 @@ class TimeLimitCallback(TrainerCallback):
             print(f"\n⏱️  Reached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
             control.should_training_stop = True
         return control
+    
+class OptunaPruningCallback(TrainerCallback):
+    """
+    Reports ``eval_loss`` back to Optuna at every evaluation and raises
+    ``optuna.TrialPruned`` when the trial should stop early.
+    """
+
+    def __init__(self, trial: optuna.Trial, monitor: str = "eval_loss"):
+        self._trial = trial
+        self._monitor = monitor
+
+    def on_evaluate(self, args, state, control, metrics, **kwargs):
+        if self._monitor not in metrics:
+            return  # nothing to report
+        step = state.global_step
+        value = float(metrics[self._monitor])
+        # Send metric to Optuna
+        self._trial.report(value, step)
+        # Ask Optuna whether the trial should be pruned
+        if self._trial.should_prune():
+            raise optuna.TrialPruned(
+                f"Trial pruned at step {step}: {self._monitor}={value}"
+            )
         
 def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     tid  = os.getenv("OPTUNA_TRIAL_ID")
@@ -60,7 +83,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     if tid and url:
         study = optuna.load_study(study_name="optuna", storage=url)
         trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(tid)))
-        callbacks.append(HuggingFacePruningCallback(trial, monitor="eval_loss"))
+        callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
