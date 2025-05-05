@@ -79,6 +79,8 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         output_dir=cfg['output_dir'],
         bf16=bool(cfg['bf16']),
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
+        per_device_train_batch_size=int(cfg['micro_batch_size']),
+        per_device_eval_batch_size=int(cfg['micro_batch_size']),
         dataloader_num_workers=int(cfg['dataloader_num_workers']),
         num_train_epochs=int(cfg['num_epochs']),
         learning_rate=float(cfg['learning_rate']),
