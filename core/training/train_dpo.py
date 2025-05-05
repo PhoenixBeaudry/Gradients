@@ -5,6 +5,7 @@ import logging
 import yaml
 import torch
 from axolotl.common.datasets import load_preference_datasets
+from trl import DPOConfig, DPOTrainer
 from axolotl.utils.models import load_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
@@ -194,7 +195,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         hf_kwargs = {
             'max_steps': cfg['max_steps'],
         }
-    tf_args = TrainingArguments(
+    tf_args = DPOConfig(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
@@ -226,21 +227,14 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     )
     #####################################
     logger = setup_logger()
-    logger.info("Initializing SFT Trainer")
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer,
-        model=model,                     # passes label_pad_token_id=-100 automatically
-        padding="longest",               # dynamic per mini‑batch
-        pad_to_multiple_of=8,            # keeps TensorCores happy; optional
-    )
-    return Trainer(
+    logger.info("Initializing DPO Trainer")
+    return DPOTrainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
         callbacks=callbacks,
-        data_collator=data_collator
     )
 
 
