@@ -52,11 +52,7 @@ def objective(trial: optuna.Trial,
     cfg["output_dir"]        = str(Path(cfg.get("output_root", "./hpo_runs")) / trial_id)
     cfg["wandb_run"]         = f"{cfg.get('job_id', 'job')}_{trial_id}"
     cfg["num_epochs"]        = 1               # speedy
-    cfg["hours_to_complete"] = 0.1            # ~3 minutes via TimeLimitCallback
-    cfg["push_to_hub"]       = False           # NEVER push during HPO
-    cfg["hub_strategy"]      = "none"
-    cfg.pop("hub_token", None)
-    cfg.pop("hub_model_id", None)
+    cfg["hours_to_complete"] = 0.1            # ~6 minutes via TimeLimitCallback
 
     os.makedirs(cfg["output_dir"], exist_ok=True)
 
