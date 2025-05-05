@@ -101,6 +101,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         hub_token=cfg['hub_token'],
         hub_strategy='every_save',
         report_to="wandb",
+        gradient_checkpointing=True,
         bf16=True,
         push_to_hub=True,
         use_liger_kernel=True,

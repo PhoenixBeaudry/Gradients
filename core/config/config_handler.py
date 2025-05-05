@@ -42,10 +42,7 @@ def create_dataset_entry(
 
 def update_flash_attention(config: dict, model: str):
     # You might want to make this model-dependent
-    if("CodeLlama" in model):
-        config["flash_attention"] = True
-    else:
-        config["flash_attention"] = True
+    config["flash_attention"] = True
     return config
 
 

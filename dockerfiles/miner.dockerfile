@@ -34,6 +34,7 @@ RUN mkdir -p /root/.aws && \
     echo "[default]\nregion=us-east-1" > /root/.aws/config
 
 ENV TOKENIZERS_PARALLELISM="false"
+ENV FLASH_ATTN_FORCE=1
 
 CMD echo 'Preparing data...' && \
     if [ -n "$HUGGINGFACE_TOKEN" ]; then \
