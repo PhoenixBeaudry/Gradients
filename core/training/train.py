@@ -82,7 +82,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     study_name  = os.getenv("OPTUNA_STUDY_NAME")
     # Create the correct storage object (Redis) -----------------------------
     if url.startswith("redis://"):
-        storage = optuna.storages.RedisStorage(url)
+        storage = optuna.storages.RDBStorage(url)
     else:                                # fall back to whatever you passed
         storage = url
 
