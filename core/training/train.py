@@ -21,7 +21,7 @@ import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import bitsandbytes as bnb
 
-
+accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
 
 # Disable parallel tokenizer threads to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -140,7 +140,6 @@ def main():
     torch.backends.cudnn.benchmark = True
 
     logger.info("Loaded config from %s", args.config)
-    accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
     accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     
     # after loading cfg...
