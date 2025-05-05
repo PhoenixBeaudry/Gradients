@@ -97,7 +97,6 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         greater_is_better=bool(cfg['greater_is_better']),
         weight_decay=float(cfg['weight_decay']),
         fp16=bool(cfg['fp16']),
-        logging_dir=cfg['logging_dir'],
         run_name=cfg['wandb_run'],
         hub_model_id=cfg['hub_model_id'],
         hub_token=cfg['hub_token'],
