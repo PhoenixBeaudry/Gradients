@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("hpo_optuna")
 
+MAX_TRIALS_TO_RUN = 12
 TRIAL_MAX_STEPS = 120
 TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.15
@@ -160,6 +161,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                                 pruner=HyperbandPruner(min_resource=1, max_resource=TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS, reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
+                   n_trials=MAX_TRIALS_TO_RUN,
                    show_progress_bar=True)
 
     LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
