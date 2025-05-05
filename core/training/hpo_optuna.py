@@ -1,36 +1,27 @@
 #!/usr/bin/env python3
 """
-hpo_optuna.py  ·  1‑hour Optuna sweep → full training
-────────────────────────────────────────────────────────
-* Runs a 1‑hour hyper‑parameter search on a *slice* of the data.
-* Logs every trial to a **separate WandB project** named
-      "<original‑WANDB_PROJECT>-hpo".
-* Disables any Hugging Face Hub push during trials.
-* After HPO, writes <config>_opt.yml with the best params and
-  launches the normal multi‑GPU training run via `accelerate`.
+hpo_optuna.py  –  1‑hour Optuna sweep → full training (multi‑GPU compatible)
+
+Usage:
+    python hpo_optuna.py \
+        --config          /workspace/configs/my_job.yml \
+        --accelerate_yaml /workspace/configs/accelerate.yaml \
+        --timeout_hours   1
 """
 from __future__ import annotations
-import argparse, copy, gc, importlib.util, os, subprocess, tempfile, uuid, logging
+import argparse, copy, json, logging, os, shutil, subprocess, tempfile, uuid
 from pathlib import Path
-import yaml, optuna, torch
+import yaml, optuna
 from optuna.pruners import HyperbandPruner
-from accelerate import Accelerator
-from axolotl.common.datasets import load_datasets
-from axolotl.cli.args     import TrainerCliArgs
-from axolotl.cli.config   import load_cfg
 
-# ── bring in train.py helpers ────────────────────────────────────────────────
-spec = importlib.util.spec_from_file_location("train", Path(__file__).with_name("train.py"))
-train = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(train)
-
-# ── global logger config ─────────────────────────────────────────────────────
+# ───────────────────────── global logging ──────────────────────────
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("hpo_optuna")
 
-# ╭───────────────────────────── Hyper‑parameter search space ────────────────╮
-def _sample_space(trial: optuna.Trial, cfg: dict) -> dict:
+# ╭──────────────────────── Hyper‑parameter space ───────────────────╮
+def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
+    """Optuna search‑space; tweak as desired."""
     params = {
         "learning_rate":               trial.suggest_float("learning_rate", 5e-6, 5e-4, log=True),
         "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
@@ -44,88 +35,106 @@ def _sample_space(trial: optuna.Trial, cfg: dict) -> dict:
             "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
         }
     return params
-# ╰────────────────────────────────────────────────────────────────────────────╯
+# ╰──────────────────────────────────────────────────────────────────╯
 
-# ╭────────────────────────── Objective (single Optuna trial) ────────────────╮
-def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
-    """Run a *short* train+eval cycle and return eval_loss."""
-    cfg = copy.deepcopy(base_cfg)
-    cfg.update(_sample_space(trial, cfg))
+# ╭──────────────────────── Objective (single trial) ────────────────╮
+def objective(trial: optuna.Trial,
+              base_cfg: dict,
+              acc_yaml: str,
+              hpo_project: str) -> float:
+    """Launch one accelerate‑based training subprocess, return eval_loss."""
+    # 1) Build trial‑specific config -----------------------------------------
+    cfg         = copy.deepcopy(base_cfg)
+    trial_params = sample_space(trial, cfg)
+    cfg.update(trial_params)
 
-    LOG.info("🔎  Starting trial %d with params: %s", trial.number, {k: cfg[k] for k in _sample_space(trial, cfg)})
-
-    cfg["num_epochs"]        = 1
-    cfg["hours_to_complete"] = 0.05
-    trial_id                 = f"trial{trial.number}_{uuid.uuid4().hex[:4]}"
+    trial_id    = f"trial{trial.number}_{uuid.uuid4().hex[:4]}"
     cfg["output_dir"]        = str(Path(cfg.get("output_root", "./hpo_runs")) / trial_id)
     cfg["wandb_run"]         = f"{cfg.get('job_id', 'job')}_{trial_id}"
+    cfg["num_epochs"]        = 1               # speedy
+    cfg["hours_to_complete"] = 0.1            # ~3 minutes via TimeLimitCallback
+    cfg["push_to_hub"]       = False           # NEVER push during HPO
+    cfg["hub_strategy"]      = "none"
+    cfg.pop("hub_token", None)
+    cfg.pop("hub_model_id", None)
+
     os.makedirs(cfg["output_dir"], exist_ok=True)
 
-    cfg["hpo_run"] = True
+    # Write temp YAML ---------------------------------------------------------
+    tmp_cfg = Path(tempfile.mkdtemp()) / f"{trial_id}.yml"
+    with tmp_cfg.open("w") as f:
+        yaml.safe_dump(cfg, f)
 
-    os.environ["WANDB_PROJECT"] = hpo_project
+    LOG.info("🔎  Starting trial %d with params: %s", trial.number, trial_params)
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as tmp:
-        yaml.safe_dump(cfg, tmp)
-        tmp_cfg_path = tmp.name
+    # 2) Launch training ------------------------------------------------------
+    cmd = [
+        "accelerate", "launch",
+        "--config_file", acc_yaml,
+        "--mixed_precision", "bf16",
+        Path(__file__).with_name("train.py"),
+        "--config", str(tmp_cfg),
+    ]
+    env = os.environ.copy()
+    env["WANDB_PROJECT"] = hpo_project     # log to separate project
 
-    axo_cfg   = load_cfg(tmp_cfg_path)
-    data_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
-    train_ds  = data_meta.train_dataset.select(range(min(1024, len(data_meta.train_dataset))))
-    eval_ds   = data_meta.eval_dataset.select(range(min(256,  len(data_meta.eval_dataset))))
-    tokenizer = train.load_tokenizer(axo_cfg)
+    try:
+        subprocess.run(cmd, check=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout.decode("utf‑8", "ignore"))
+        return float("inf")
 
-    if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral", "starcode")):
-        if tokenizer.pad_token_id is None:
-            tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.padding_side = "left"
+    # 3) Parse eval_loss from trainer_state.json ------------------------------
+    state_path = Path(cfg["output_dir"]) / "trainer_state.json"
+    if not state_path.exists():
+        LOG.warning("⚠️  trainer_state.json missing for trial %d", trial.number)
+        return float("inf")
 
-    accelerator = Accelerator()
-    model = train.load_model(cfg["base_model"], cfg)
-    if cfg.get("adapter") == "lora":
-        model = train.apply_lora_adapter(model, cfg)
-    model = accelerator.prepare(model)
-
-    trainer = train.build_trainer(cfg, model, tokenizer, train_ds, eval_ds, callbacks=[])
-    trainer.accelerator = accelerator
-    trainer.train()
-    eval_loss = trainer.evaluate().get("eval_loss", float("inf"))
+    try:
+        with state_path.open() as f:
+            state = json.load(f)
+        # last log_history entry with eval_loss
+        eval_loss = next(
+            x["eval_loss"] for x in reversed(state["log_history"]) if "eval_loss" in x
+        )
+    except Exception as err:  # noqa: BLE001
+        LOG.warning("⚠️  Could not parse eval_loss for trial %d: %s", trial.number, err)
+        return float("inf")
 
     LOG.info("✅  Trial %d completed – eval_loss: %.4f", trial.number, eval_loss)
-
-    del model, trainer, tokenizer, train_ds, eval_ds
-    gc.collect()
-    torch.cuda.empty_cache()
+    # Be a good citizen: tidy up temp config dir
+    shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
     return eval_loss
-# ╰────────────────────────────────────────────────────────────────────────────╯
+# ╰──────────────────────────────────────────────────────────────────╯
 
-# ╭────────────────────────────── Optuna driver ───────────────────────────────╮
-def run_optuna(config_path: str, timeout_hours: float = 1.0) -> tuple[dict, str]:
-    LOG.info("🚀  Starting Optuna Hyperparameter Optimization.....")
-    with open(config_path) as f:
+# ╭──────────────────────── Run Optuna sweep ────────────────────────╮
+def run_optuna(base_cfg_path: str,
+               acc_yaml: str,
+               timeout_hours: float = 1.0) -> dict:
+    with open(base_cfg_path) as f:
         base_cfg = yaml.safe_load(f)
 
     base_project = os.environ.get("WANDB_PROJECT", "UnnamedProject")
     hpo_project  = f"{base_project}-hpo"
-    os.environ["WANDB_PROJECT"] = hpo_project
 
-    LOG.info("🚦  Beginning HPO sweep (project: %s, budget: %.1fh)…", hpo_project, timeout_hours)
+    LOG.info("🚦  HPO sweep starting  (project: %s, budget: %.1fh)…", hpo_project, timeout_hours)
 
     study = optuna.create_study(direction="minimize",
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
-    study.optimize(lambda t: _objective(t, base_cfg, hpo_project),
-                   timeout=int(timeout_hours * 3600),
-                   show_progress_bar=True)
+
+    study.optimize(
+        lambda t: objective(t, base_cfg, acc_yaml, hpo_project),
+        timeout=int(timeout_hours * 3600),
+        show_progress_bar=True,
+    )
 
     LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
              study.best_value, study.best_params)
+    return study.best_params
+# ╰──────────────────────────────────────────────────────────────────╯
 
-    os.environ["WANDB_PROJECT"] = base_project
-    return study.best_params, hpo_project
-# ╰────────────────────────────────────────────────────────────────────────────╯
-
-# ╭────────────────────────────── helpers ─────────────────────────────────────╮
-def _write_optimised_cfg(base_path: str, best: dict) -> str:
+# ╭──────────────────── Write optimised YAML & launch main run ──────╮
+def write_optimised_cfg(base_path: str, best: dict) -> str:
     with open(base_path) as f:
         cfg = yaml.safe_load(f)
     cfg.update(best)
@@ -135,7 +144,7 @@ def _write_optimised_cfg(base_path: str, best: dict) -> str:
     LOG.info("💾  Wrote optimised config → %s", opt_path)
     return opt_path
 
-def _launch_training(acc_yaml: str, cfg_path: str):
+def launch_training(acc_yaml: str, cfg_path: str):
     cmd = [
         "accelerate", "launch",
         "--config_file", acc_yaml,
@@ -144,10 +153,10 @@ def _launch_training(acc_yaml: str, cfg_path: str):
         "--config", cfg_path,
     ]
     LOG.info("🚀  Starting full training run")
-    subprocess.run(list(map(str, cmd)), check=True)
-# ╰────────────────────────────────────────────────────────────────────────────╯
+    subprocess.run(cmd, check=True)
+# ╰──────────────────────────────────────────────────────────────────╯
 
-# ╭──────────────────────────── entry‑point ───────────────────────────────────╮
+# ╭──────────────────────────── CLI entry‑point ─────────────────────╮
 def main():
     ap = argparse.ArgumentParser(description="1‑hour HPO then full training")
     ap.add_argument("--config",          required=True, help="Base YAML config file")
@@ -155,9 +164,9 @@ def main():
     ap.add_argument("--timeout_hours",   type=float, default=1.0, help="Wall‑clock HPO budget")
     args = ap.parse_args()
 
-    best_params, _ = run_optuna(args.config, timeout_hours=args.timeout_hours)
-    optimised_cfg  = _write_optimised_cfg(args.config, best_params)
-    _launch_training(args.accelerate_yaml, optimised_cfg)
+    best_params  = run_optuna(args.config, args.accelerate_yaml, timeout_hours=args.timeout_hours)
+    optimised_cfg = write_optimised_cfg(args.config, best_params)
+    launch_training(args.accelerate_yaml, optimised_cfg)
 
 if __name__ == "__main__":
     main()
