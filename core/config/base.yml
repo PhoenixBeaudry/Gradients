@@ -60,7 +60,7 @@ hub_strategy: checkpoint
 hub_token:
 
 num_epochs: 3
-logging_steps: 1
+logging_steps: 5
 save_total_limit: 5
 early_stopping: true
 early_stopping_patience: 6
@@ -69,8 +69,8 @@ metric_for_best_model: eval_loss
 save_total_limit: 5
 greater_is_better: false
 eval_strategy: steps
-save_steps: 20
-eval_steps: 10
+save_steps: 40
+eval_steps: 20
 warmup_steps: 100
 eval_table_size:
 eval_max_new_tokens: 128
