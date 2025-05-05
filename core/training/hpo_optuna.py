@@ -12,10 +12,8 @@ from __future__ import annotations
 import argparse, copy, json, logging, os, re, shutil, subprocess, tempfile, uuid, time
 from pathlib import Path
 import yaml, optuna
-from dotenv import load_dotenv
 from optuna.pruners import HyperbandPruner
-load_dotenv(".optunaenv") 
-STORAGE_URL = os.getenv("OPTUNA_STORAGE", "sqlite:///hpo.db")
+from optuna.storages import RDBStorage      
 
 # ── logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO,
@@ -70,7 +68,9 @@ def loss_from_state(out_dir: Path) -> float | None:
 def objective(trial: optuna.Trial,
               base_cfg: dict,
               acc_yaml: str,
-              hpo_project: str) -> float:
+              hpo_project: str,
+              study_name: str,
+              storage_path: str) -> float:
     cfg          = copy.deepcopy(base_cfg)
     trial_params = sample_space(trial, cfg)
     cfg.update(trial_params)
@@ -98,9 +98,9 @@ def objective(trial: optuna.Trial,
     env["WANDB_PROJECT"] = hpo_project          # override globally
     env.pop("WANDB_RUN_ID",  None)              # avoid carry‑over
     env.pop("WANDB_NAME",    None)
-    env["OPTUNA_STORAGE"]  = STORAGE_URL
-    env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
-    env["OPTUNA_STUDY_NAME"] = cfg["job_id"]
+    env["OPTUNA_STORAGE"]   = storage_path
+    env["OPTUNA_STUDY_NAME"] = study_name
+    env["OPTUNA_TRIAL_ID"]   = str(trial._trial_id)
 
     cmd = [
         "accelerate", "launch",
@@ -137,17 +137,21 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     with open(base_cfg_path) as f:
         base_cfg = yaml.safe_load(f)
 
+    study_name   = base_cfg.get("job_id", "optuna")
+    hpo_root     = Path(base_cfg.get("output_root", "./hpo_runs")) / study_name
+    hpo_root.mkdir(parents=True, exist_ok=True)
+    storage_path = f"sqlite:///{hpo_root / 'hpo.db'}"
     base_project = os.environ.get("WANDB_PROJECT", "Gradients")
     hpo_project  = f"{base_project}-hpo"
 
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
-    storage = optuna.storages.RDBStorage(STORAGE_URL) 
+    storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True}) 
     study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
-    study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project),
+    study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * 0.15),
                    show_progress_bar=True)
 

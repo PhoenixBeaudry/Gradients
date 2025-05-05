@@ -77,19 +77,15 @@ class OptunaPruningCallback(TrainerCallback):
             )
         
 def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
-    tid  = os.getenv("OPTUNA_TRIAL_ID")
-    url  = os.getenv("OPTUNA_STORAGE")
+    storage_url = os.getenv("OPTUNA_STORAGE")
     study_name  = os.getenv("OPTUNA_STUDY_NAME")
-    # Create the correct storage object (Redis) -----------------------------
-    if url.startswith("redis://"):
-        storage = optuna.storages.RDBStorage(url)
-    else:                                # fall back to whatever you passed
-        storage = url
+    trial_id    = os.getenv("OPTUNA_TRIAL_ID")
+    if not (storage_url and study_name and trial_id):
+        return  # not an HPO child
 
-    if tid and storage:
-        study = optuna.load_study(study_name=study_name, storage=storage)
-        trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(tid)))
-        callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
+    study = optuna.load_study(study_name=study_name, storage=storage_url)
+    trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(trial_id)))
+    callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
