@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
 import os
 import argparse
-from pathlib import Path
 import logging
 from hpo_optuna import run_optuna 
 import yaml
-from ignite.engine import Engine, Events
-from ignite.handlers.lr_finder import FastaiLRFinder
-from torch.utils.data import DataLoader
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.train import setup_model_and_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
 from accelerate import Accelerator
-import wandb
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -28,11 +23,6 @@ import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import bitsandbytes as bnb
 
-# Optional imports for LoRA adapters and DPO
-try:
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-except ImportError:
-    LoraConfig = get_peft_model = prepare_model_for_kbit_training = None
 
 
 # Disable parallel tokenizer threads to avoid warnings
@@ -86,24 +76,6 @@ def setup_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
-    common_kwargs = {
-        'use_auth_token': cfg.get('hub_token'),
-        'load_in_8bit': bool(cfg.get('load_in_8bit', False)),
-        'torch_dtype': torch.bfloat16 if cfg.get('bf16') and torch.cuda.is_bf16_supported() else None,
-    }
-    try:
-        return AutoModelForCausalLM.from_pretrained(
-            model_name,
-            attn_implementation='flash_attention_2',
-            trust_remote_code=True,
-            **common_kwargs
-        )
-    except Exception:
-        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, **common_kwargs)
-
-
-
 def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
@@ -120,7 +92,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         load_best_model_at_end=True,
         max_steps=int(cfg.get('max_steps', -1)),
         logging_steps=int(cfg.get('logging_steps', 100)),
-        eval_strategy='steps' if eval_ds else 'no',
+        eval_strategy='steps',
         save_strategy='best',
         eval_steps=int(cfg.get('eval_steps')) if cfg.get('eval_steps') is not None else None,
         save_steps=int(cfg.get('save_steps')) if cfg.get('save_steps') is not None else None,
@@ -144,7 +116,7 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=DataCollatorForSeq2Seq(tokenizer),
+        data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True),
         processing_class=processor,
         callbacks=callbacks,
     )
