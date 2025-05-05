@@ -72,11 +72,12 @@ def objective(trial: optuna.Trial,
     trial_params = sample_space(trial, cfg)
     cfg.update(trial_params)
 
-    trial_id     = f"trial{trial.number}_{uuid.uuid4().hex[:4]}"
+    trial_id     = f"trial{trial.number}"
     out_dir      = Path(cfg.get("output_root", "./hpo_runs")) / trial_id
     cfg |= {
         "output_dir":        str(out_dir),
         "wandb_run":         f"{cfg.get('job_id', 'job')}_{trial_id}",
+        "wandb_project":     hpo_project,
         "max_steps":        60,
         "eval_steps":       10,
     }
@@ -88,6 +89,11 @@ def objective(trial: optuna.Trial,
         yaml.safe_dump(cfg, f)
 
     LOG.info("🔎  Starting trial %d with params: %s", trial.number, trial_params)
+     # ── prepare environment for subprocess ──────────────────────────────────
+    env = os.environ.copy()
+    env["WANDB_PROJECT"] = hpo_project          # override globally
+    env.pop("WANDB_RUN_ID",  None)              # avoid carry‑over
+    env.pop("WANDB_NAME",    None)
 
     cmd = [
         "accelerate", "launch",
@@ -96,8 +102,6 @@ def objective(trial: optuna.Trial,
         Path(__file__).with_name("train.py"),
         "--config", str(tmp_cfg),
     ]
-    env = os.environ.copy()
-    env["WANDB_PROJECT"] = hpo_project
 
     try:
         cp = subprocess.run(cmd, env=env, stdout=subprocess.PIPE,

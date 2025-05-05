@@ -79,6 +79,7 @@ def _load_and_modify_config(
     with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
         config = yaml.safe_load(file)
 
+    config["job_id"] = task_id
     config["datasets"] = []
 
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
