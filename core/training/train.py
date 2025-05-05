@@ -173,6 +173,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         eval_dataset=eval_ds,
         processing_class=tokenizer,
         callbacks=callbacks,
+        data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True)
     )
 
 
