@@ -151,7 +151,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         run_name=cfg['wandb_run'],
         hub_model_id=cfg['hub_model_id'],
         hub_token=cfg['hub_token'],
-        hub_strategy='every_save',
+        hub_strategy=cfg['hub_strategy'],
         report_to="wandb",
         warmup_ratio=0.08,
         auto_find_batch_size=True,

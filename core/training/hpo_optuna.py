@@ -63,7 +63,6 @@ def _objective(trial: optuna.Trial, base_cfg: dict, hpo_project: str) -> float:
 
     cfg["push_to_hub"]  = False
     cfg["hub_strategy"] = "none"
-    cfg.pop("hub_token", None)
 
     os.environ["WANDB_PROJECT"] = hpo_project
 
