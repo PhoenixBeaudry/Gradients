@@ -202,7 +202,7 @@ def main():
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     tokenizer = load_tokenizer(axo_cfg)
-    if "Qwen" in cfg["base_model"]:
+    if "qwen" in cfg["base_model"].lower():
         print("Qwen detected: setting tokenizer padding to left =============")
         tokenizer.padding_side = "left"
     model = load_model(cfg['base_model'], cfg)
