@@ -84,7 +84,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
         return  # not an HPO child
 
     study = optuna.load_study(study_name=study_name, storage=storage_url)
-    trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(trial_id)))
+    trial  = optuna.trial.Trial(study, trial_id=int(trial_id))
     callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 def parse_args():
