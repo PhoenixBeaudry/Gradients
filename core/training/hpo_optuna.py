@@ -125,14 +125,14 @@ def objective(trial: optuna.Trial,
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
 # ╭──────────────────────── Run Optuna sweep ─────────────────────────────────╮
-def run_optuna(base_cfg_path: str, acc_yaml: str, timeout_hours: float) -> dict:
+def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     with open(base_cfg_path) as f:
         base_cfg = yaml.safe_load(f)
 
     base_project = os.environ.get("WANDB_PROJECT", "UnnamedProject")
     hpo_project  = f"{base_project}-hpo"
 
-    LOG.info("🚦  HPO sweep starting  (project: %s, budget: %.1fh)…", hpo_project, timeout_hours)
+    LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
 
     study = optuna.create_study(direction="minimize",
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
