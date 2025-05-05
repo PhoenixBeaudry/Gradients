@@ -137,6 +137,10 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
             'hub_strategy': cfg['hub_strategy'],
             'push_to_hub': True,
         }
+    else:
+        hf_kwargs = {
+            'max_steps': cfg['max_steps'],
+        }
     tf_args = TrainingArguments(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
@@ -206,7 +210,7 @@ def main():
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     tokenizer = load_tokenizer(axo_cfg)
-    
+
     if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral", "starcode")):
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
