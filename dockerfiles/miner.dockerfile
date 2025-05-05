@@ -17,6 +17,7 @@ RUN pip install bitsandbytes
 RUN pip install optuna
 RUN pip install --no-build-isolation axolotl
 RUN pip install deepspeed
+RUN pip install --upgrade transformers
 
 
 WORKDIR /workspace
