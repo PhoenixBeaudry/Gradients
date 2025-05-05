@@ -123,7 +123,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
         output_dir=cfg['output_dir'],
-        gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
         per_device_eval_batch_size=int(cfg['micro_batch_size']),
         dataloader_num_workers=int(cfg['dataloader_num_workers']),
