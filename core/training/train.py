@@ -82,13 +82,22 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     try:
         return AutoModelForCausalLM.from_pretrained(
             model_name,
-            attn_implementation='flash_attention_2',
+            attn_implementation='flash_attention_3',
             trust_remote_code=True,
             device_map=device_map,
             **common_kwargs
         )
-    except Exception:
-        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
+    except:
+        try:
+            return AutoModelForCausalLM.from_pretrained(
+                model_name,
+                attn_implementation='flash_attention_2',
+                trust_remote_code=True,
+                device_map=device_map,
+                **common_kwargs
+            )
+        except Exception:
+            return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
 
 
 def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
@@ -146,6 +155,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         hub_token=cfg['hub_token'],
         hub_strategy='every_save',
         report_to="wandb",
+        auto_find_batch_size=True,
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         bf16=True,
