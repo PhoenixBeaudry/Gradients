@@ -202,6 +202,8 @@ def main():
     # after loading cfg...
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     tokenizer = load_tokenizer(axo_cfg)
+    if "Qwen" in cfg["base_model"]:
+        tokenizer.padding_side = "right"
     model = load_model(cfg['base_model'], cfg)
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
