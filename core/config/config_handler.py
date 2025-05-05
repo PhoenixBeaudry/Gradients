@@ -55,6 +55,7 @@ def update_model_info(config: dict, model: str, job_id: str = "", expected_repo_
     if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
         config["special_tokens"] = {"pad_token": tokenizer.eos_token}
 
+    config["model_params_count"] = None
     try:
         model_info = hf_api.model_info(model)
         size = model_info.safetensors.total
