@@ -73,6 +73,7 @@ def setup_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
+    device_map = {"": torch.cuda.current_device()} 
     common_kwargs = {
         'use_auth_token': cfg.get('hub_token'),
         'load_in_8bit': bool(cfg.get('load_in_8bit', False)),
@@ -83,10 +84,11 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
             model_name,
             attn_implementation='flash_attention_2',
             trust_remote_code=True,
+            device_map=device_map,
             **common_kwargs
         )
     except Exception:
-        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, **common_kwargs)
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
 
 
 def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
@@ -112,7 +114,8 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
         bias='none',
-        task_type='CAUSAL_LM'
+        task_type='CAUSAL_LM',
+        dtype=torch.bfloat16
     )
     return get_peft_model(model, peft_config)
 
