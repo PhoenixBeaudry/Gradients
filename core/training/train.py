@@ -120,15 +120,14 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
 
 
 
-accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
-device = accelerator.device
-args = parse_args()
-cfg = load_cfg(args.config)
-accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
 
 
 def main():
-
+    accelerator = Accelerator(log_with="wandb", mixed_precision="bf16")
+    device = accelerator.device
+    args = parse_args()
+    cfg = load_cfg(args.config)
+    accelerator.init_trackers(cfg.get('wandb_project'), config=cfg)
     ### Temp Axolotl Config to generate Dataset and Model
     axo_config_alt = load_config(args.config)
     axo_config_alt["save_strategy"] = "steps"
