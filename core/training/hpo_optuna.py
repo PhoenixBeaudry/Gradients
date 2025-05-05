@@ -21,6 +21,7 @@ logging.basicConfig(level=logging.INFO,
 LOG = logging.getLogger("hpo_optuna")
 
 TRIAL_MAX_STEPS = 120
+TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.15
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
@@ -88,7 +89,7 @@ def objective(trial: optuna.Trial,
         "wandb_run":         f"{cfg.get('job_id', 'job')}_{trial_id}",
         "wandb_project":     hpo_project,
         "max_steps":        TRIAL_MAX_STEPS,
-        "eval_steps":       20,
+        "eval_steps":       TRIAL_EVAL_STEPS,
         "save_steps": 200
     }
     cfg["hpo_run"] = True
@@ -156,7 +157,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
-                                pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
+                                pruner=HyperbandPruner(min_resource=1, max_resource=TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS, reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    show_progress_bar=True)
