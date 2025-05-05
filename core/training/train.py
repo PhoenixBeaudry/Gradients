@@ -34,7 +34,7 @@ class TimeLimitCallback(TrainerCallback):
         Args:
             max_hours: training time budget in hours
         """
-        self.max_seconds = max_hours * 3600.0 * 0.95
+        self.max_seconds = max_hours * 3600.0
         self.start_time: float | None = None
 
     def on_train_begin(self, args, state: TrainerState, control: TrainerControl, **kwargs):
@@ -127,8 +127,20 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
     return get_peft_model(model, peft_config)
 
 
-def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
-    # ── SFT Trainer branch ────────────────────────────────────────
+def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
+    # ── SFT Trainer ────────────────────────────────────────
+    #### Callbacks ####
+    callbacks = []
+    if cfg.get('early_stopping', True):
+        callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
+        )
+    max_hours = int(cfg.get('hours_to_complete'))
+    if max_hours is not None:
+        callbacks.append(TimeLimitCallback(max_hours*0.9))
+    ###################
+
+    ##### Training Arguments ####
     hf_kwargs = {}
     if not cfg["hpo_run"]:
         hf_kwargs = {
@@ -171,6 +183,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         load_best_model_at_end=True,
         **hf_kwargs,
     )
+    #####################################
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
     data_collator = DataCollatorForSeq2Seq(
@@ -222,18 +235,8 @@ def main():
 
     train_dataset = dataset_meta.train_dataset
     eval_dataset = dataset_meta.eval_dataset
-    max_hours = int(cfg.get('hours_to_complete')) 
 
-    callbacks = []
-    if cfg.get('early_stopping', True):
-        callbacks.append(
-            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
-        )
-    
-    if max_hours is not None:
-        callbacks.append(TimeLimitCallback(max_hours*0.9))
-
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset, callbacks)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
