@@ -23,7 +23,7 @@ pad_to_sequence_len: true
 trust_remote_code: true
 gpu_memory_limit: 80GiB
 
-adapter: lora
+adapter:
 lora_model_dir:
 lora_r: 32
 lora_alpha: 32

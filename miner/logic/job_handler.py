@@ -133,7 +133,7 @@ def _load_and_modify_config(
 
     config["mlflow_experiment_name"] = dataset
 
-    config = setup_lora_config(config, config["model_params_count"])
+    #config = setup_lora_config(config, config["model_params_count"])
 
     return config
 
