@@ -114,8 +114,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
         bias='none',
-        task_type='CAUSAL_LM',
-        dtype=torch.bfloat16
+        task_type='CAUSAL_LM'
     )
     return get_peft_model(model, peft_config)
 
