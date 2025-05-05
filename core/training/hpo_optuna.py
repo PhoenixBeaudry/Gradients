@@ -137,7 +137,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str, timeout_hours: float) -> dict:
     study = optuna.create_study(direction="minimize",
                                 pruner=HyperbandPruner(min_resource=1, reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project),
-                   timeout=int(timeout_hours * 3600),
+                   timeout=int(base_cfg['hours_to_complete'] * 3600 * 0.15),
                    show_progress_bar=True)
 
     LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
@@ -173,10 +173,9 @@ def main():
     ap = argparse.ArgumentParser(description="1‑hour HPO then full training")
     ap.add_argument("--config",          required=True, help="Base YAML config file")
     ap.add_argument("--accelerate_yaml", required=True, help="accelerate.yaml for launch")
-    ap.add_argument("--timeout_hours",   type=float, default=1.0, help="Wall‑clock HPO budget")
     args = ap.parse_args()
 
-    best_params   = run_optuna(args.config, args.accelerate_yaml, args.timeout_hours)
+    best_params   = run_optuna(args.config, args.accelerate_yaml)
     optimised_cfg = write_opt_cfg(args.config, best_params)
     launch_training(args.accelerate_yaml, optimised_cfg)
 

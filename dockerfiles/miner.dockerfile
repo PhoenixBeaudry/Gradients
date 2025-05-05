@@ -58,7 +58,6 @@ CMD echo 'Preparing data...' && \
     python /workspace/training/hpo_optuna.py \
   --config           ${CONFIG_DIR}/${JOB_ID}.yml \
   --accelerate_yaml  /workspace/configs/accelerate.yaml \
-  --timeout_hours    1 \
 
 
 # save to phoenixbeaudry/gradients-miner:custom-hpo
