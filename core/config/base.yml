@@ -6,7 +6,7 @@ model_params_count: 0
 run_hpo: true
 hpo_max_steps: 50 
 
-load_in_8bit: false
+load_in_8bit: true
 load_in_4bit: false
 strict: false
 
@@ -31,7 +31,7 @@ lora_dropout: 0.0
 lora_target_linear: true
 
 auto_find_batch_size: true
-gradient_accumulation_steps: 8
+gradient_accumulation_steps: 4
 micro_batch_size: 2
 eval_batch_size: 2
 optimizer: lion_8bit
