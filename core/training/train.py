@@ -78,7 +78,6 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
         output_dir=cfg['output_dir'],
-        auto_find_batch_size=True,
         bf16=bool(cfg['bf16']),
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         dataloader_num_workers=int(cfg['dataloader_num_workers']),
@@ -87,7 +86,6 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         optim=cfg['optimizer'],
         warmup_steps=int(cfg['warmup_steps']),
         lr_scheduler_type=SchedulerType.COSINE,
-        load_best_model_at_end=True,
         max_steps=int(cfg['max_steps']),
         logging_steps=int(cfg['logging_steps']),
         eval_strategy='steps',
@@ -100,12 +98,14 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         weight_decay=float(cfg['weight_decay']),
         fp16=bool(cfg['fp16']),
         logging_dir=cfg['logging_dir'],
-        push_to_hub=True,
         run_name=cfg['wandb_run'],
         hub_model_id=cfg['hub_model_id'],
         hub_token=cfg['hub_token'],
         hub_strategy='every_save',
+        push_to_hub=True,
         use_liger_kernel=True,
+        auto_find_batch_size=True,
+        load_best_model_at_end=True,
     )
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
