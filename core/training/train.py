@@ -120,7 +120,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
     return get_peft_model(model, peft_config)
 
 
-def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
+def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
         output_dir=cfg['output_dir'],
@@ -204,7 +204,7 @@ def main():
     if max_hours is not None:
         callbacks.append(TimeLimitCallback(max_hours*0.9))
 
-    trainer = build_trainer(cfg, model, tokenizer, processor, train_dataset, eval_dataset, callbacks)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset, callbacks)
 
     logger.info("Starting Full Model Training...")
 
