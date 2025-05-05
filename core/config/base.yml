@@ -3,8 +3,7 @@ base_model_config:
 model_type: AutoModelForCausalLM
 tokenizer_type: AutoTokenizer
 model_params_count: 0
-run_hpo: true
-hpo_max_steps: 50 
+hpo_run: false
 dataloader_num_workers: 8
 load_in_8bit: false
 load_in_4bit: false

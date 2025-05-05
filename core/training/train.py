@@ -129,6 +129,14 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
 def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
+    hf_kwargs = {}
+    if not cfg["hub_run"]:
+        hf_kwargs = {
+            'hub_model_id': cfg['hub_model_id'],
+            'hub_token': cfg['hub_token'],
+            'hub_strategy': cfg['hub_strategy'],
+            'push_to_hub': True,
+        }
     tf_args = TrainingArguments(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
@@ -149,18 +157,15 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds, callbacks):
         greater_is_better=bool(cfg['greater_is_better']),
         weight_decay=float(cfg['weight_decay']),
         run_name=cfg['wandb_run'],
-        hub_model_id=cfg['hub_model_id'],
-        hub_token=cfg['hub_token'],
-        hub_strategy=cfg['hub_strategy'],
         report_to="wandb",
         warmup_ratio=0.08,
         auto_find_batch_size=True,
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         bf16=True,
-        push_to_hub=True,
         use_liger_kernel=True,
         load_best_model_at_end=True,
+        **hf_kwargs,
     )
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
