@@ -27,7 +27,7 @@ TIMEOUT_PERCENTAGE_OF_TOTAL = 0.15
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     params = {
         "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
-        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
+        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16]),
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
     }
     if cfg.get("adapter") == "lora":
