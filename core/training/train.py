@@ -79,8 +79,9 @@ class OptunaPruningCallback(TrainerCallback):
 def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     tid  = os.getenv("OPTUNA_TRIAL_ID")
     url  = os.getenv("OPTUNA_STORAGE")
+    study_name  = os.getenv("OPTUNA_STUDY_NAME")
     if tid and url:
-        study = optuna.load_study(study_name="optuna", storage=url)
+        study = optuna.load_study(study_name=study_name, storage=url)
         trial = optuna.trial.FrozenTrial(study._storage.get_trial(int(tid)))
         callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
