@@ -19,7 +19,6 @@ postgres_data
 postgres_data*
 postgres_data/*
 
-todo.md
 core/custom_task_config.py
 
 core/config/*.yml
