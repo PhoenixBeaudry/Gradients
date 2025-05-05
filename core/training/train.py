@@ -19,7 +19,6 @@ from transformers import (
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
-from optuna.storages import RedisStorage
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -83,7 +82,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     study_name  = os.getenv("OPTUNA_STUDY_NAME")
     # Create the correct storage object (Redis) -----------------------------
     if url.startswith("redis://"):
-        storage = RedisStorage(url)
+        storage = optuna.storages.RedisStorage(url)
     else:                                # fall back to whatever you passed
         storage = url
 

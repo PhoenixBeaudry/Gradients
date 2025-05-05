@@ -14,7 +14,6 @@ from pathlib import Path
 import yaml, optuna
 from dotenv import load_dotenv
 from optuna.pruners import HyperbandPruner
-from optuna.storages import RedisStorage
 load_dotenv(".optunaenv") 
 STORAGE_URL = os.getenv("OPTUNA_STORAGE", "sqlite:///hpo.db")
 
@@ -142,7 +141,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     hpo_project  = f"{base_project}-hpo"
 
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
-    storage = RedisStorage(STORAGE_URL) 
+    storage = optuna.storages.RedisStorage(STORAGE_URL) 
     study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
