@@ -59,6 +59,7 @@ hub_repo:
 hub_strategy: checkpoint
 hub_token:
 
+num_epochs: 3
 logging_steps: 1
 save_total_limit: 5
 early_stopping: true
