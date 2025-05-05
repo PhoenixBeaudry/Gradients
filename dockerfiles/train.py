@@ -107,7 +107,7 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
 def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, callbacks):
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
-        output_dir=cfg.get('output_dir', './outputs'),
+        output_dir=cfg['output_dir'],
         auto_find_batch_size=True,
         bf16=bool(cfg.get('bf16', False)),
         gradient_accumulation_steps=int(cfg.get('gradient_accumulation_steps', 2)),
@@ -149,18 +149,20 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         callbacks=callbacks,
     )
 
-
-
 def main():
     args = parse_args()
     cfg = load_config(args.config)
+
+    ### Temp Axolotl Config to generate Dataset and Model
     axo_config_alt = load_config(args.config)
     axo_config_alt["save_strategy"] = "steps"
     out_path = os.path.join(f"{args.config}_axo.yml")
     with open(out_path, "w") as f:
         yaml.dump(axo_config_alt, f)
-    ### Patched Axo Config for Model Load ###
     axo_cfg = load_cfg(f"{args.config}_axo.yml")
+    #####################################################
+
+
     logger = setup_logger()
     
     # Performance flags

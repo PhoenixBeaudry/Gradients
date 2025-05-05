@@ -90,7 +90,9 @@ def _load_and_modify_config(
     config = update_model_info(config, model, task_id, expected_repo_name)
 
     # Modify config based on Model Size
-    if config["model_params_count"] < 2_000_000_000:
+    if config["model_params_count"] == None:
+        config["learning_rate"] = 2e-4
+    elif config["model_params_count"] < 2_000_000_000:
         print("Small model detected...updating params...")
         config["learning_rate"] = 2e-4
 
