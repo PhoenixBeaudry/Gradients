@@ -77,7 +77,6 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
     # ── SFT Trainer branch ────────────────────────────────────────
     tf_args = TrainingArguments(
         output_dir=cfg['output_dir'],
-        bf16=bool(cfg['bf16']),
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
         per_device_eval_batch_size=int(cfg['micro_batch_size']),
@@ -97,12 +96,12 @@ def build_trainer(cfg: dict, model, tokenizer, processor, train_ds, eval_ds, cal
         metric_for_best_model=cfg['metric_for_best_model'],
         greater_is_better=bool(cfg['greater_is_better']),
         weight_decay=float(cfg['weight_decay']),
-        fp16=bool(cfg['fp16']),
         run_name=cfg['wandb_run'],
         hub_model_id=cfg['hub_model_id'],
         hub_token=cfg['hub_token'],
         hub_strategy='every_save',
         report_to="wandb",
+        bf16=True,
         push_to_hub=True,
         use_liger_kernel=True,
         auto_find_batch_size=True,
