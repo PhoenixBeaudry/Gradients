@@ -113,11 +113,6 @@ def _load_and_modify_config(
     if isinstance(dataset_type, DPODatasetType):
         config["rl"] = "dpo"
         config["rl_beta"] = 0.1
-        config["learning_rate"] = 3e-5
-        config["val_set_size"] = 0.0
-        config["eval_strategy"] = "no"
-        config["eval_steps"] = None
-        config["early_stopping_patience"] = None
 
     hf_cfg = AutoConfig.from_pretrained(model)
  
