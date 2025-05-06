@@ -30,7 +30,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     if cfg.get("rl", False) == "dpo":
         params = {
             "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 2e-5, log=True),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16]),
+            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
             "beta":                        trial.suggest_float("beta", 0.01, 0.2),
         }
