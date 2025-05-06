@@ -92,7 +92,7 @@ def objective(trial: optuna.Trial,
         "wandb_project":     hpo_project,
         "max_steps":        TRIAL_MAX_STEPS,
         "eval_steps":       TRIAL_EVAL_STEPS,
-        "save_steps": 200
+        "save_steps": 300
     }
     cfg["hpo_run"] = True
     out_dir.mkdir(parents=True, exist_ok=True)
