@@ -273,7 +273,7 @@ def main():
         eval_dataset = dataset_meta.eval_dataset
     else:
         train_dataset    = dataset_meta.train_dataset.select(range(min(1024, len(dataset_meta.train_dataset))))
-        train_dataset     = dataset_meta.eval_dataset.select(range(min(256,  len(dataset_meta.eval_dataset))))
+        eval_dataset     = dataset_meta.eval_dataset.select(range(min(256,  len(dataset_meta.eval_dataset))))
 
     trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
