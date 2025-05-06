@@ -284,7 +284,7 @@ def main():
 
         n_eval = len(dataset_meta.eval_dataset)
         target_eval = min(
-            max(256, ceil(target_train * 0.25)),
+            max(512, ceil(target_train * 0.25)),
             n_eval                                    # never exceed full eval set
         )
 
