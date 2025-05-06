@@ -22,7 +22,7 @@ LOG = logging.getLogger("hpo_optuna")
 
 MAX_TRIALS_TO_RUN = 20
 TRIAL_MAX_STEPS = 120
-TRIAL_EVAL_STEPS = 20
+TRIAL_EVAL_STEPS = 5
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.25
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
@@ -214,13 +214,13 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                                     study_name=base_cfg["job_id"],
                                     load_if_exists=True,
                                     storage=storage,
-                                    pruner=HyperbandPruner(min_resource=1, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+                                    pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
     else:
         study = optuna.create_study(direction="maximize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
-                                pruner=HyperbandPruner(min_resource=1, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+                                pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
     
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
