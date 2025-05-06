@@ -9,6 +9,7 @@ dataloader_num_workers: 8
 load_in_8bit: false
 load_in_4bit: false
 strict: false
+rl:
 
 chat_template: llama3
 datasets:
