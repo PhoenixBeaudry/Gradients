@@ -34,7 +34,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     }
     if cfg.get("adapter") == "lora":
         params |= {
-            "lora_r":       trial.suggest_int("lora_r", 32, 256),
+            "lora_r":       trial.suggest_int("lora_r", 32, 512),
             "lora_alpha":   trial.suggest_int("lora_alpha", 64, 512),
             "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
         }
