@@ -69,8 +69,8 @@ metric_for_best_model: eval_loss
 save_total_limit: 5
 greater_is_better: false
 eval_strategy: steps
-save_steps: 40
-eval_steps: 20
+save_steps: 100
+eval_steps: 50
 warmup_steps: 120
 eval_table_size:
 eval_max_new_tokens: 128
