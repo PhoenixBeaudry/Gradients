@@ -3,6 +3,7 @@ import os
 import argparse
 import logging
 import yaml
+from math import ceil
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.utils.models import load_tokenizer
@@ -274,8 +275,31 @@ def main():
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
-    train_dataset = dataset_meta.train_dataset
-    eval_dataset = dataset_meta.eval_dataset
+    if not cfg["hpo_run"]:
+        train_dataset = dataset_meta.train_dataset
+        eval_dataset = dataset_meta.eval_dataset
+    else:
+        # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
+        # 1. compute target subset sizes
+        n_train = len(dataset_meta.train_dataset)
+        target_train = min(
+            50_000,
+            max(1_024, ceil(n_train * 0.02))
+        )
+
+        n_eval = len(dataset_meta.eval_dataset)
+        target_eval = min(
+            max(256, ceil(target_train * 0.25)),
+            n_eval                                    # never exceed full eval set
+        )
+
+        # 2. deterministic shuffle so every trial sees identical data
+        train_subset = dataset_meta.train_dataset.shuffle(seed=42)
+        eval_subset  = dataset_meta.eval_dataset.shuffle(seed=42)
+
+        # 3. slice
+        train_dataset = train_subset.select(range(target_train))
+        eval_dataset  = eval_subset.select(range(target_eval))
 
     trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
