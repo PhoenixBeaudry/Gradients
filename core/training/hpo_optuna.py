@@ -23,7 +23,7 @@ LOG = logging.getLogger("hpo_optuna")
 MAX_TRIALS_TO_RUN = 50
 TRIAL_MAX_STEPS = 180
 TRIAL_EVAL_STEPS = 30
-TIMEOUT_PERCENTAGE_OF_TOTAL = 0.25
+TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
