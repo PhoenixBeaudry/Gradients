@@ -158,7 +158,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
-                                pruner=HyperbandPruner(min_resource=1, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+                                pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    n_trials=MAX_TRIALS_TO_RUN,
