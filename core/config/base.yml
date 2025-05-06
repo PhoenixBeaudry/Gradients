@@ -10,6 +10,7 @@ load_in_8bit: false
 load_in_4bit: false
 strict: false
 rl:
+beta: 0.1
 
 chat_template: llama3
 datasets:

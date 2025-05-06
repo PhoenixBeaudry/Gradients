@@ -27,17 +27,32 @@ TIMEOUT_PERCENTAGE_OF_TOTAL = 0.25
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
-    params = {
-        "learning_rate":               trial.suggest_float("learning_rate", 6e-6, 4e-4, log=True),
-        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16]),
-        "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
-    }
-    if cfg.get("adapter") == "lora":
-        params |= {
-            "lora_r":       trial.suggest_int("lora_r", 32, 256),
-            "lora_alpha":   trial.suggest_int("lora_alpha", 64, 512),
-            "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
+    if cfg.get("rl", False) == "dpo":
+        params = {
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 2e-5, log=True),
+            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16]),
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
+            "beta":                        trial.suggest_float("beta", 0.01, 0.2),
         }
+        if cfg.get("adapter") == "lora":
+            params |= {
+                "lora_r":       trial.suggest_int("lora_r", 8, 32),
+                "lora_alpha":   trial.suggest_int("lora_alpha", 16, 64),
+                "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.1),
+            }
+    else:
+        params = {
+            "learning_rate":               trial.suggest_float("learning_rate", 6e-6, 4e-4, log=True),
+            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16]),
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.1),
+        }
+        if cfg.get("adapter") == "lora":
+            params |= {
+                "lora_r":       trial.suggest_int("lora_r", 32, 256),
+                "lora_alpha":   trial.suggest_int("lora_alpha", 64, 512),
+                "lora_dropout": trial.suggest_float("lora_dropout", 0.0, 0.15),
+            }
+
     return params
 # ╰──────────────────────────────────────────────────────────────────────────╯
 

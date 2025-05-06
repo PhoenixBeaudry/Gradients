@@ -204,6 +204,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         dataloader_num_workers=int(cfg['dataloader_num_workers']),
         num_train_epochs=int(cfg['num_epochs']),
         learning_rate=float(cfg['learning_rate']),
+        beta=float(cfg['beta']),
         optim=cfg['optimizer'],
         lr_scheduler_type=SchedulerType.COSINE,
         logging_steps=int(cfg['logging_steps']),
