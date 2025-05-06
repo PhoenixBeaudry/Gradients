@@ -176,11 +176,7 @@ async def task_offer(
         if request.task_type == TaskType.INSTRUCTTEXTTASK:
             logger.info("Task Type: Instruct")
         if request.task_type == TaskType.DPOTASK:
-            return MinerTaskResponse(
-                message=f"This endpoint only accepts instruct tasks: "
-                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
-                accepted=False
-            )
+            logger.info("Task Type: DPO")
 
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
             return MinerTaskResponse(
