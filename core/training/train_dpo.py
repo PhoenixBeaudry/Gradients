@@ -3,6 +3,7 @@ import os
 import argparse
 import logging
 import yaml
+from math import ceil
 import torch
 from axolotl.common.datasets import load_preference_datasets
 from trl import DPOConfig, DPOTrainer
@@ -272,8 +273,27 @@ def main():
         train_dataset = dataset_meta.train_dataset
         eval_dataset = dataset_meta.eval_dataset
     else:
-        train_dataset    = dataset_meta.train_dataset.select(range(min(1024, len(dataset_meta.train_dataset))))
-        eval_dataset     = dataset_meta.eval_dataset.select(range(min(256,  len(dataset_meta.eval_dataset))))
+        # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
+        # 1. compute target subset sizes
+        n_train = len(dataset_meta.train_dataset)
+        target_train = min(
+            50_000,
+            max(1_024, ceil(n_train * 0.02))
+        )
+
+        n_eval = len(dataset_meta.eval_dataset)
+        target_eval = min(
+            max(256, ceil(target_train * 0.25)),
+            n_eval                                    # never exceed full eval set
+        )
+
+        # 2. deterministic shuffle so every trial sees identical data
+        train_subset = dataset_meta.train_dataset.shuffle(seed=42)
+        eval_subset  = dataset_meta.eval_dataset.shuffle(seed=42)
+
+        # 3. slice
+        train_dataset = train_subset.select(range(target_train))
+        eval_dataset  = eval_subset.select(range(target_eval))
 
     trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
