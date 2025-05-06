@@ -268,8 +268,12 @@ def main():
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
-    train_dataset = dataset_meta.train_dataset
-    eval_dataset = dataset_meta.eval_dataset
+    if not cfg["hpo_run"]:
+        train_dataset = dataset_meta.train_dataset
+        eval_dataset = dataset_meta.eval_dataset
+    else:
+        train_dataset    = dataset_meta.train_dataset.select(range(min(1024, len(dataset_meta.train_dataset))))
+        train_dataset     = dataset_meta.eval_dataset.select(range(min(256,  len(dataset_meta.eval_dataset))))
 
     trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
