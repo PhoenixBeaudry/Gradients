@@ -124,8 +124,8 @@ def objective(trial: optuna.Trial,
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
         LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout)
-        LOG.info("⚠️  Waiting 10s before starting next trial for cleanup...")
-        time.sleep(10)
+        LOG.info("⚠️  Waiting 3s before starting next trial for cleanup...")
+        time.sleep(3)
         return float("inf")
 
     # ── extract eval_loss (3 fallback methods) ──────────────────────────────
