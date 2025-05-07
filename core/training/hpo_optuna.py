@@ -124,7 +124,7 @@ def objective(trial: optuna.Trial,
     except subprocess.CalledProcessError as e:
         LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout)
         LOG.info("⚠️  Waiting 3s before starting next trial for cleanup...")
-        time.sleep(3)
+        time.sleep(10)
         return float("inf")
 
     # ── extract eval_loss (3 fallback methods) ──────────────────────────────
@@ -206,7 +206,7 @@ def main():
     
     best_params   = run_optuna(args.config, args.accelerate_yaml)
     optimised_cfg = write_opt_cfg(args.config, best_params)
-    time.sleep(5)
+    time.sleep(10)
     launch_training(args.accelerate_yaml, optimised_cfg)
 
 if __name__ == "__main__":
