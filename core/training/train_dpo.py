@@ -62,7 +62,7 @@ class OptunaPruningCallback(TrainerCallback):
     ``optuna.TrialPruned`` when the trial should stop early.
     """
 
-    def __init__(self, trial: optuna.Trial, monitor: str = "eval_rewards/margins"):
+    def __init__(self, trial: optuna.Trial, monitor: str = "eval_loss"):
         self._trial = trial
         self._monitor = monitor
 
@@ -88,7 +88,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
 
     study = optuna.load_study(study_name=study_name, storage=storage_url)
     trial  = optuna.trial.Trial(study, trial_id=int(trial_id))
-    callbacks.append(OptunaPruningCallback(trial, monitor="eval_rewards/margins"))
+    callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 #######################################################
 
