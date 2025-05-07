@@ -21,8 +21,8 @@ logging.basicConfig(level=logging.INFO,
 LOG = logging.getLogger("hpo_optuna")
 
 MAX_TRIALS_TO_RUN = 20
-TRIAL_MAX_STEPS = 180
-TRIAL_EVAL_STEPS = 30
+TRIAL_MAX_STEPS = 200
+TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
