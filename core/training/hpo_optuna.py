@@ -200,7 +200,13 @@ def main():
     ap.add_argument("--config",          required=True, help="Base YAML config file")
     ap.add_argument("--accelerate_yaml", required=True, help="accelerate.yaml for launch")
     args = ap.parse_args()
-
+    with open(args.config) as f:
+        base_cfg = yaml.safe_load(f)
+        
+    if base_cfg["do_hpo"] == False:
+        launch_training(args.accelerate_yaml, args.config)
+        return
+    
     best_params   = run_optuna(args.config, args.accelerate_yaml)
     optimised_cfg = write_opt_cfg(args.config, best_params)
     time.sleep(5)

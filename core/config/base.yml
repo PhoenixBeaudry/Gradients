@@ -4,6 +4,7 @@ model_type: AutoModelForCausalLM
 tokenizer_type: AutoTokenizer
 model_params_count: 0
 job_id:
+do_hpo: true
 hpo_run: false
 dataloader_num_workers: 8
 load_in_8bit: false
