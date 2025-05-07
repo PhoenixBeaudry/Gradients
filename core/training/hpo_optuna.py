@@ -200,7 +200,7 @@ def write_opt_cfg(base_cfg: str, best: dict) -> str:
     LOG.info("💾  Wrote optimised config → %s", opt_path)
     return opt_path
 
-def launch_training(acc_yaml: str, cfg_path: str, dpo: bool):
+def launch_training(acc_yaml: str, cfg_path: str):
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)
 
