@@ -61,7 +61,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
 
 # ╭────────────────── helpers for eval_loss extraction ───────────────────────╮
 _EVAL_RE = re.compile(r"eval_loss[^0-9]*([0-9]+\.[0-9]+)")
-_REWARD_RE = re.compile(r"eval_rewards/margins[^0-9]*([0-9]+\.[0-9]+)")
 
 def loss_from_wandb(out_dir: Path) -> float | None:
     p = out_dir / "wandb" / "latest-run" / "files" / "wandb-summary.json"
@@ -85,30 +84,6 @@ def loss_from_state(out_dir: Path) -> float | None:
     for rec in reversed(js.get("log_history", [])):
         if "eval_loss" in rec:
             return float(rec["eval_loss"])
-    return None
-
-def reward_margins_from_wandb(out_dir: Path) -> float | None:
-    p = out_dir / "wandb" / "latest-run" / "files" / "wandb-summary.json"
-    if p.exists():
-        with p.open() as f:
-            js = json.load(f)
-        if "eval_rewards/margins" in js:
-            return float(js["eval_rewards/margins"])
-    return None
-
-def reward_margins_from_stdout(stdout: str) -> float | None:
-    matches = _REWARD_RE.findall(stdout)
-    return float(matches[-1]) if matches else None
-
-def reward_margins_from_state(out_dir: Path) -> float | None:
-    p = out_dir / "trainer_state.json"
-    if not p.exists():
-        return None
-    with p.open() as f:
-        js = json.load(f)
-    for rec in reversed(js.get("log_history", [])):
-        if "eval_rewards/margins" in rec:
-            return float(rec["eval_rewards/margins"])
     return None
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
@@ -173,22 +148,13 @@ def objective(trial: optuna.Trial,
         time.sleep(10)
         return float("inf")
 
-    if cfg["rl"] == "dpo":
-        # ── extract eval_loss (3 fallback methods) ──────────────────────────────
-        for extractor in (reward_margins_from_wandb, lambda _: reward_margins_from_stdout(stdout), reward_margins_from_state):
-            val = extractor(out_dir) if extractor is reward_margins_from_wandb or extractor is reward_margins_from_state else extractor(None)
-            if val is not None:
-                LOG.info("✅  Trial %d completed – eval_rewards/margins: %.4f", trial.number, val)
-                shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
-                return val
-    else:
-        # ── extract eval_loss (3 fallback methods) ──────────────────────────────
-        for extractor in (loss_from_wandb, lambda _: loss_from_stdout(stdout), loss_from_state):
-            val = extractor(out_dir) if extractor is loss_from_wandb or extractor is loss_from_state else extractor(None)
-            if val is not None:
-                LOG.info("✅  Trial %d completed – eval_loss: %.4f", trial.number, val)
-                shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
-                return val
+    # ── extract eval_loss (3 fallback methods) ──────────────────────────────
+    for extractor in (loss_from_wandb, lambda _: loss_from_stdout(stdout), loss_from_state):
+        val = extractor(out_dir) if extractor is loss_from_wandb or extractor is loss_from_state else extractor(None)
+        if val is not None:
+            LOG.info("✅  Trial %d completed – eval_loss: %.4f", trial.number, val)
+            shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
+            return val
 
     LOG.warning("⚠️  eval_loss not found for trial %d – penalising.", trial.number)
     return float("inf")
@@ -209,14 +175,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True}) 
     
-    if base_cfg["rl"] == "dpo":
-        study = optuna.create_study(direction="minimize",
-                                    study_name=base_cfg["job_id"],
-                                    load_if_exists=True,
-                                    storage=storage,
-                                    pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
-    else:
-        study = optuna.create_study(direction="maximize",
+    study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
@@ -226,12 +185,9 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    n_trials=MAX_TRIALS_TO_RUN,
                    show_progress_bar=True)
-    if base_cfg["rl"] == "dpo":
-        LOG.info("🏆  HPO finished – best reward margin %.5f with params %s",
-                study.best_value, study.best_params)
-    else:
-        LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
-                study.best_value, study.best_params)
+
+    LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
+            study.best_value, study.best_params)
         
     return study.best_params
 # ╰──────────────────────────────────────────────────────────────────────────╯
