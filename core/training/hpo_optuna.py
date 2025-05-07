@@ -202,6 +202,7 @@ def main():
 
     best_params   = run_optuna(args.config, args.accelerate_yaml)
     optimised_cfg = write_opt_cfg(args.config, best_params)
+    time.sleep(5)
     launch_training(args.accelerate_yaml, optimised_cfg)
 
 if __name__ == "__main__":
