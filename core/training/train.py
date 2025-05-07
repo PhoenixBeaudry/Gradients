@@ -177,7 +177,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         )
     
     # calculate time left for job
-    time_remaining = datetime(cfg['required_finish_time']) - datetime.now()
+    time_remaining = datetime.fromisoformat(cfg['required_finish_time']) - datetime.now()
     seconds_remaining = max(0.0, time_remaining.total_seconds())
 
     if seconds_remaining is not None:

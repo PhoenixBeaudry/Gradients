@@ -178,7 +178,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
             EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
         )
     # calculate time left for job
-    time_remaining = datetime(cfg['required_finish_time']) - datetime.now()
+    time_remaining = datetime.fromisoformat(cfg['required_finish_time']) - datetime.now()
     seconds_remaining = max(0.0, time_remaining.total_seconds())
 
     if seconds_remaining is not None:

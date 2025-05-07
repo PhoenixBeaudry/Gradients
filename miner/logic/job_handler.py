@@ -66,7 +66,7 @@ class DockerEnvironment:
 
 def calculate_seconds_remaining(required_finish_time: datetime) -> float:
     """
-    Calculate the hours remaining until the required finish time.
+    Calculate the seconds remaining until the required finish time.
     """
     time_remaining = required_finish_time - datetime.now()
     return max(0.0, time_remaining.total_seconds())
@@ -95,7 +95,7 @@ def _load_and_modify_config(
     config["datasets"].append(dataset_entry)
     
 
-    config["required_finish_time"] = datetime(required_finish_time)
+    config["required_finish_time"] = required_finish_time
 
     config = update_model_info(config, model, task_id, expected_repo_name)
 
@@ -152,7 +152,7 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     if job.model_type == ImageModelType.SDXL:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_SDXL, "r") as file:
             config = toml.load(file)
-        config["required_finish_time"] = datetime(job.required_finish_time)
+        config["required_finish_time"] = job.required_finish_time.isoformat()
         config["pretrained_model_name_or_path"] = job.model
         config["train_data_dir"] = f"/dataset/images/{job.job_id}/img/"
         config["huggingface_token"] = cst.HUGGINGFACE_TOKEN
@@ -160,7 +160,7 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     elif job.model_type == ImageModelType.FLUX:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_FLUX, "r") as file:
             config = toml.load(file)
-        config["required_finish_time"] = datetime(job.required_finish_time)
+        config["required_finish_time"] = job.required_finish_time.isoformat()
         config["pretrained_model_name_or_path"] = f"{cst.CONTAINER_FLUX_PATH}/flux_unet_{job.model.replace('/', '_')}.safetensors"
         config["train_data_dir"] = f"/dataset/images/{job.job_id}/img/"
         config["huggingface_token"] = cst.HUGGINGFACE_TOKEN
