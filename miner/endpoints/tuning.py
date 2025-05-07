@@ -60,7 +60,7 @@ async def tune_model_text(
     # global current_job_finish_time # Removed
     logger.info("Starting model tuning.")
 
-    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete)).isoformat()
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
 
     try:
@@ -106,7 +106,7 @@ async def tune_model_diffusion(
     # global current_job_finish_time # Removed
     logger.info("Starting model tuning.")
 
-    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete)).isoformat()
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
     # try: # Remove pre-download
     #     train_request.dataset_zip = await download_s3_file(

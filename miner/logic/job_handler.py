@@ -94,8 +94,8 @@ def _load_and_modify_config(
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
     
-
-    config["required_finish_time"] = required_finish_time
+    
+    config["required_finish_time"] = required_finish_time.isoformat()
 
     config = update_model_info(config, model, task_id, expected_repo_name)
 
