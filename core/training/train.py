@@ -157,7 +157,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
     peft_config = LoraConfig(
         r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_alpha', 16)),
+        lora_alpha=int(cfg.get('lora_r', 16))*2,
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
         bias='none',
