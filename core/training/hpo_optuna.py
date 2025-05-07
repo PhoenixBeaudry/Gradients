@@ -175,6 +175,7 @@ def write_opt_cfg(base_cfg: str, best: dict) -> str:
     with open(base_cfg) as f:
         cfg = yaml.safe_load(f)
     cfg.update(best)
+    cfg["hours_to_complete"] = int(cfg['hours_to_complete'] * TIMEOUT_PERCENTAGE_OF_TOTAL)
     opt_path = base_cfg.replace(".yml", "_opt.yml")
     with open(opt_path, "w") as f:
         yaml.safe_dump(cfg, f)
