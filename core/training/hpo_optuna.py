@@ -31,7 +31,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         "learning_rate":               trial.suggest_float("learning_rate", 4e-6, 1e-3, log=True),
         "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16]),
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
-        "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch_fused"]),
     }
     if cfg.get("adapter") == "lora":
         params |= {
