@@ -197,17 +197,13 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
             'hub_strategy': cfg['hub_strategy'],
             'push_to_hub': True,
         }
-    else:
-        hf_kwargs = {
-            'max_steps': cfg['max_steps'],
-        }
     tf_args = DPOConfig(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
         per_device_eval_batch_size=int(cfg['micro_batch_size']),
         dataloader_num_workers=int(cfg['dataloader_num_workers']),
-        num_train_epochs=int(cfg['num_epochs']),
+        max_steps=int(cfg['max_steps']),
         learning_rate=float(cfg['learning_rate']),
         beta=float(cfg['beta']),
         optim=cfg['optimizer'],
