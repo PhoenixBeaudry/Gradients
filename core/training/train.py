@@ -284,7 +284,7 @@ def main():
         n_train = len(dataset_meta.train_dataset)
         target_train = min(
             50_000,
-            max(1_024, ceil(n_train * 0.02))
+            max(1_024, ceil(n_train * 0.1))
         )
 
         n_eval = len(dataset_meta.eval_dataset)
