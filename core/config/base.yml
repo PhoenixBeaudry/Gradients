@@ -41,7 +41,7 @@ group_by_length: true
 
 train_on_inputs: false
 bf16: true
-tf32: true
+tf32: false
 fp16: false
 
 gradient_checkpointing: true
