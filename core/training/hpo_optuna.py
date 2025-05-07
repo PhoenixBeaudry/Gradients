@@ -111,7 +111,7 @@ def objective(trial: optuna.Trial,
         "save_steps": 300
     }
     cfg["hpo_run"] = True
-    cfg["required_finish_time"] = datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)
+    cfg["required_finish_time"] = (datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)).isoformat()
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
