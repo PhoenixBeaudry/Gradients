@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
@@ -93,7 +94,7 @@ class Job(BaseModel):
     status: JobStatus = JobStatus.QUEUED
     error_message: str | None = None
     expected_repo_name: str | None = None
-    hours_to_complete: int | None = None
+    required_finish_time: datetime | None = None
 
 
 class TextJob(Job):

@@ -4,6 +4,7 @@ import argparse
 import logging
 import yaml
 from math import ceil
+from datetime import datetime
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.utils.models import load_tokenizer
@@ -31,12 +32,12 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 class TimeLimitCallback(TrainerCallback):
     """Stop training after a fixed number of hours."""
 
-    def __init__(self, max_hours: float):
+    def __init__(self, max_seconds: float):
         """
         Args:
             max_hours: training time budget in hours
         """
-        self.max_seconds = max_hours * 3600.0
+        self.max_seconds = max_seconds
         self.start_time: float | None = None
 
     def on_train_begin(self, args, state: TrainerState, control: TrainerControl, **kwargs):
@@ -174,9 +175,13 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         callbacks.append(
             EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
         )
-    max_hours = int(cfg.get('hours_to_complete'))
-    if max_hours is not None:
-        callbacks.append(TimeLimitCallback(max_hours*0.9))
+    
+    # calculate time left for job
+    time_remaining = datetime(cfg['required_finish_time']) - datetime.now()
+    seconds_remaining = max(0.0, time_remaining.total_seconds())
+
+    if seconds_remaining is not None:
+        callbacks.append(TimeLimitCallback(seconds_remaining*0.9))
 
     if cfg["hpo_run"]:
         add_optuna_callback_if_needed(callbacks)
