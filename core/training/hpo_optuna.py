@@ -177,7 +177,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     # calculate how much time we have left for job:
     time_remaining = datetime.fromisoformat(base_cfg['required_finish_time']) - datetime.now()
     seconds_remaining = max(0.0, time_remaining.total_seconds())
-    LOG.info(f"Time allocated to HPO Search {seconds_remaining/3600}")
+    LOG.info(f"Time allocated to HPO Search {seconds_remaining/3600*TIMEOUT_PERCENTAGE_OF_TOTAL}")
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(seconds_remaining * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    n_trials=MAX_TRIALS_TO_RUN,
