@@ -38,7 +38,6 @@ optimizer: adamw_8bit
 lr_scheduler: cosine
 learning_rate: 2e-4
 group_by_length: true
-weight_decay: 0.05
 train_on_inputs: false
 bf16: true
 tf32: false
