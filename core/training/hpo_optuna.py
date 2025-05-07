@@ -24,6 +24,10 @@ MAX_TRIALS_TO_RUN = 20
 TRIAL_MAX_STEPS = 120
 TRIAL_EVAL_STEPS = 5
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.25
+MAX_TRIALS_TO_RUN = 10
+TRIAL_MAX_STEPS = 100
+TRIAL_EVAL_STEPS = 20
+TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
@@ -106,7 +110,7 @@ def objective(trial: optuna.Trial,
         "wandb_project":     hpo_project,
         "max_steps":        TRIAL_MAX_STEPS,
         "eval_steps":       TRIAL_EVAL_STEPS,
-        "save_steps": 200
+        "save_steps": 300
     }
     cfg["hpo_run"] = True
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -144,7 +148,7 @@ def objective(trial: optuna.Trial,
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
         LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout)
-        LOG.info("⚠️  Waiting 10s before starting next trial for cleanup...")
+        LOG.info("⚠️  Waiting 3s before starting next trial for cleanup...")
         time.sleep(10)
         return float("inf")
 
@@ -180,7 +184,6 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
                                 load_if_exists=True,
                                 storage=storage,
                                 pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
-    
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    n_trials=MAX_TRIALS_TO_RUN,
@@ -230,9 +233,16 @@ def main():
     ap.add_argument("--config",          required=True, help="Base YAML config file")
     ap.add_argument("--accelerate_yaml", required=True, help="accelerate.yaml for launch")
     args = ap.parse_args()
-
+    with open(args.config) as f:
+        base_cfg = yaml.safe_load(f)
+        
+    if base_cfg["do_hpo"] == False:
+        launch_training(args.accelerate_yaml, args.config)
+        return
+    
     best_params   = run_optuna(args.config, args.accelerate_yaml)
     optimised_cfg = write_opt_cfg(args.config, best_params)
+    time.sleep(10)
     launch_training(args.accelerate_yaml, optimised_cfg)
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import argparse
 import logging
 import yaml
 from math import ceil
+from math import ceil
 import torch
 from axolotl.common.datasets import load_datasets
 from axolotl.utils.models import load_tokenizer
@@ -157,7 +158,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
     peft_config = LoraConfig(
         r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_alpha', 16)),
+        lora_alpha=int(cfg.get('lora_r', 16))*2,
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
         bias='none',
@@ -172,7 +173,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
-            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
+            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
         )
     max_hours = int(cfg.get('hours_to_complete'))
     if max_hours is not None:
