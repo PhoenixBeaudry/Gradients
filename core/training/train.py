@@ -181,7 +181,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     seconds_remaining = max(0.0, time_remaining.total_seconds())
 
     if seconds_remaining is not None:
-        callbacks.append(TimeLimitCallback(seconds_remaining*0.9))
+        callbacks.append(TimeLimitCallback(seconds_remaining*0.95))
 
     if cfg["hpo_run"]:
         add_optuna_callback_if_needed(callbacks)
