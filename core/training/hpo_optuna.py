@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse, copy, json, logging, os, re, shutil, subprocess, tempfile, uuid, time
 from pathlib import Path
 import yaml, optuna
-from datetime import datetime
+from datetime import datetime, timedelta
 from optuna.pruners import HyperbandPruner
 from optuna.storages import RDBStorage      
 
@@ -25,6 +25,7 @@ MAX_TRIALS_TO_RUN = 10
 TRIAL_MAX_STEPS = 100
 TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
+MAX_MINUTES_PER_TRIAL = 15
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
@@ -94,6 +95,8 @@ def objective(trial: optuna.Trial,
         "save_steps": 300
     }
     cfg["hpo_run"] = True
+    cfg["required_finish_time"] = datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     tmp_cfg = Path(tempfile.mkdtemp()) / f"{trial_id}.yml"
