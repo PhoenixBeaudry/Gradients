@@ -175,7 +175,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
-            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
+            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
         )
     # calculate time left for job
     time_remaining = datetime(cfg['required_finish_time']) - datetime.now()
