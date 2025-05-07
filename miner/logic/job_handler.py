@@ -4,6 +4,7 @@ import os
 import shutil
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from transformers import AutoConfig
 import docker
 import pandas as pd
@@ -63,6 +64,14 @@ class DockerEnvironment:
         }
 
 
+def calculate_seconds_remaining(required_finish_time: datetime) -> float:
+    """
+    Calculate the hours remaining until the required finish time.
+    """
+    time_remaining = required_finish_time - datetime.now()
+    return max(0.0, time_remaining.total_seconds())
+
+
 def _load_and_modify_config(
     dataset: str,
     model: str,
@@ -70,7 +79,7 @@ def _load_and_modify_config(
     file_format: FileFormat,
     task_id: str,
     expected_repo_name: str | None,
-    hours_to_complete: int
+    required_finish_time: datetime
 ) -> dict:
     """
     Loads the config template and modifies it to create a new job config.
@@ -86,7 +95,7 @@ def _load_and_modify_config(
     config["datasets"].append(dataset_entry)
     
 
-    config["hours_to_complete"] = hours_to_complete
+    config["required_finish_time"] = datetime(required_finish_time)
 
     config = update_model_info(config, model, task_id, expected_repo_name)
 
@@ -143,7 +152,7 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     if job.model_type == ImageModelType.SDXL:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_SDXL, "r") as file:
             config = toml.load(file)
-        config["hours_to_complete"] = job.hours_to_complete
+        config["required_finish_time"] = datetime(job.required_finish_time)
         config["pretrained_model_name_or_path"] = job.model
         config["train_data_dir"] = f"/dataset/images/{job.job_id}/img/"
         config["huggingface_token"] = cst.HUGGINGFACE_TOKEN
@@ -151,7 +160,7 @@ def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
     elif job.model_type == ImageModelType.FLUX:
         with open(cst.CONFIG_TEMPLATE_PATH_DIFFUSION_FLUX, "r") as file:
             config = toml.load(file)
-        config["hours_to_complete"] = job.hours_to_complete
+        config["required_finish_time"] = datetime(job.required_finish_time)
         config["pretrained_model_name_or_path"] = f"{cst.CONTAINER_FLUX_PATH}/flux_unet_{job.model.replace('/', '_')}.safetensors"
         config["train_data_dir"] = f"/dataset/images/{job.job_id}/img/"
         config["huggingface_token"] = cst.HUGGINGFACE_TOKEN
@@ -174,9 +183,9 @@ def create_job_diffusion(
     dataset_zip: str,
     model_type: ImageModelType,
     expected_repo_name: str | None,
-    hours_to_complete: int
+    required_finish_time: datetime
 ):
-    return DiffusionJob(job_id=job_id, model=model, dataset_zip=dataset_zip, model_type=model_type, expected_repo_name=expected_repo_name, hours_to_complete=hours_to_complete)
+    return DiffusionJob(job_id=job_id, model=model, dataset_zip=dataset_zip, model_type=model_type, expected_repo_name=expected_repo_name, required_finish_time=required_finish_time)
 
 
 def create_job_text(
@@ -186,7 +195,7 @@ def create_job_text(
     dataset_type: InstructDatasetType,
     file_format: FileFormat,
     expected_repo_name: str | None,
-    hours_to_complete: int
+    required_finish_time: datetime
 ):
     return TextJob(
         job_id=job_id,
@@ -195,7 +204,7 @@ def create_job_text(
         dataset_type=dataset_type,
         file_format=file_format,
         expected_repo_name=expected_repo_name,
-        hours_to_complete=hours_to_complete
+        required_finish_time=required_finish_time
     )
 
 
@@ -213,7 +222,6 @@ def start_tuning_container_diffusion(job: DiffusionJob):
     if job.model_type == ImageModelType.FLUX:
         logger.info(f"Downloading flux unet from {job.model}")
         flux_unet_path = download_flux_unet(job.model)
-    hours_to_complete = job.hours_to_complete
     # Download the dataset zip file using the URI stored in the job object
     logger.info(f"Downloading dataset zip from URI: {job.dataset_zip}")
     try:
@@ -306,22 +314,20 @@ def start_tuning_container_diffusion(job: DiffusionJob):
             tty=True,
         )
         stream_logs(container)
-        timeout_seconds = hours_to_complete * 3600 * 0.95
-        logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
         try:
-            result = container.wait(timeout=timeout_seconds)
+            result = container.wait()
             logger.info(f"Container {container.id} finished with result: {result}")
             if result["StatusCode"] != 0:
                 raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
         except ReadTimeout: # Catch the correct exception from requests
-            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit of {hours_to_complete} hours. Attempting graceful stop...")
+            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit. Attempting graceful stop...")
             try:
                 container.stop(timeout=60) # 60 second grace period
                 logger.info(f"Container {container.id} stopped gracefully.")
             except Exception as stop_err:
                 logger.error(f"Failed to gracefully stop container {container.id}: {stop_err}. It might be forcefully killed.")
             # Raise a specific error to indicate timeout
-            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit of {hours_to_complete} hours.")
+            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit.")
         except Exception as e:
             logger.error(f"Error waiting for or processing container {container.id}: {str(e)}")
             raise # Re-raise other exceptions
@@ -433,14 +439,13 @@ def start_tuning_container(job: TextJob):
         job.file_format,
         job.job_id,
         job.expected_repo_name,
-        job.hours_to_complete
+        job.required_finish_time
     )
     save_config(config, config_path)
 
     logger.info(config)
 
     logger.info(os.path.basename(job.dataset) if job.file_format != FileFormat.HF else "")
-    hours_to_complete = job.hours_to_complete
 
     docker_env = DockerEnvironment(
         huggingface_token=cst.HUGGINGFACE_TOKEN,
@@ -520,23 +525,20 @@ def start_tuning_container(job: TextJob):
             tty=True,
         )
         stream_logs(container)
-        timeout_seconds = hours_to_complete * 3600 * 0.95
-        logger.info(f"Waiting for container {container.id} to complete with a timeout of {timeout_seconds} seconds ({hours_to_complete} hours)...")
-
         try:
-            result = container.wait(timeout=timeout_seconds)
+            result = container.wait()
             logger.info(f"Container {container.id} finished with result: {result}")
             if result["StatusCode"] != 0:
                 raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
         except ReadTimeout: # Catch the correct exception from requests
-            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit of {hours_to_complete} hours. Attempting graceful stop...")
+            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit. Attempting graceful stop...")
             try:
                 container.stop(timeout=60) # 60 second grace period
                 logger.info(f"Container {container.id} stopped gracefully.")
             except Exception as stop_err:
                 logger.error(f"Failed to gracefully stop container {container.id}: {stop_err}. It might be forcefully killed.")
             # Raise a specific error to indicate timeout
-            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit of {hours_to_complete} hours.")
+            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit.")
         except Exception as e:
             logger.error(f"Error waiting for or processing container {container.id}: {str(e)}")
             raise # Re-raise other exceptions

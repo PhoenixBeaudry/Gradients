@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse, copy, json, logging, os, re, shutil, subprocess, tempfile, uuid, time
 from pathlib import Path
 import yaml, optuna
+from datetime import datetime, timedelta
 from optuna.pruners import HyperbandPruner
 from optuna.storages import RDBStorage      
 
@@ -20,10 +21,11 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("hpo_optuna")
 
-MAX_TRIALS_TO_RUN = 10
+MAX_TRIALS_TO_RUN = 20
 TRIAL_MAX_STEPS = 100
 TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
+MAX_MINUTES_PER_TRIAL = 15
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
@@ -109,6 +111,8 @@ def objective(trial: optuna.Trial,
         "save_steps": 300
     }
     cfg["hpo_run"] = True
+    cfg["required_finish_time"] = datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     tmp_cfg = Path(tempfile.mkdtemp()) / f"{trial_id}.yml"
@@ -173,15 +177,20 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     hpo_project  = f"{base_project}-hpo"
 
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
-    storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True}) 
-    
+    storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
+
     study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
                                 pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+    
+    # calculate how much time we have left for job:
+    time_remaining = datetime(base_cfg['required_finish_time']) - datetime.now()
+    seconds_remaining = max(0.0, time_remaining.total_seconds())
+
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
-                   timeout=int(base_cfg['hours_to_complete'] * 3600 * TIMEOUT_PERCENTAGE_OF_TOTAL),
+                   timeout=int(seconds_remaining * TIMEOUT_PERCENTAGE_OF_TOTAL),
                    n_trials=MAX_TRIALS_TO_RUN,
                    show_progress_bar=True)
 
