@@ -101,9 +101,7 @@ async def tune_model_text(
 
 async def tune_model_grpo(
     train_request: TrainRequestGrpo,
-    worker_config: WorkerConfig = Depends(get_worker_config),
 ):
-    # global current_job_finish_time # Removed
     logger.info("Starting model tuning.")
 
     required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
@@ -130,8 +128,6 @@ async def tune_model_grpo(
         required_finish_time=required_finish_time
     )
     logger.info(f"Created job {job}")
-    # worker_config.trainer.enqueue_job(job) # Replaced with RQ
-    # Calculate timeout based on time remaining
     rq_job = rq_queue.enqueue(
         start_tuning_container,
         job,
@@ -141,41 +137,6 @@ async def tune_model_grpo(
         job_id=job.job_id
     )
     logger.info(f"Enqueued job {rq_job.id} to RQ")
-
-    return {"message": "Training job enqueued.", "task_id": job.job_id}
-
-
-async def tune_model_grpo(
-    train_request: TrainRequestGrpo,
-    worker_config: WorkerConfig = Depends(get_worker_config),
-):
-    global current_job_finish_time
-    logger.info("Starting model tuning.")
-
-    current_job_finish_time = datetime.now() + timedelta(hours=train_request.hours_to_complete)
-    logger.info(f"Job received is {train_request}")
-
-    try:
-        logger.info(train_request.file_format)
-        if train_request.file_format != FileFormat.HF:
-            if train_request.file_format == FileFormat.S3:
-                train_request.dataset = await download_s3_file(train_request.dataset)
-                logger.info(train_request.dataset)
-                train_request.file_format = FileFormat.JSON
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    job = create_job_text(
-        job_id=str(train_request.task_id),
-        dataset=train_request.dataset,
-        model=train_request.model,
-        dataset_type=train_request.dataset_type,
-        file_format=train_request.file_format,
-        expected_repo_name=train_request.expected_repo_name,
-    )
-    logger.info(f"Created job {job}")
-    worker_config.trainer.enqueue_job(job)
 
     return {"message": "Training job enqueued.", "task_id": job.job_id}
 
@@ -262,6 +223,8 @@ async def task_offer(
             logger.info("Task Type: Instruct")
         if request.task_type == TaskType.DPOTASK:
             logger.info("Task Type: DPO")
+        if request.task_type == TaskType.GRPOTASK:
+            logger.info("Task Type: GRPO")
 
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
             return MinerTaskResponse(
@@ -269,12 +232,6 @@ async def task_offer(
                         f"{TaskType.INSTRUCTTEXTTASK}, {TaskType.DPOTASK} and {TaskType.GRPOTASK}",
                 accepted=False
             )
-        if request.task_type == TaskType.INSTRUCTTEXTTASK:
-            logger.info("Task Type: Instruct")
-            
-        if request.task_type == TaskType.DPOTASK:
-            logger.info("Task Type: DPO")
-
         
         if "qwen3" in request.model.lower():
             return MinerTaskResponse(
@@ -473,14 +430,6 @@ def factory_router() -> APIRouter:
         methods=["POST"],
         response_model=TrainResponse,
         dependencies=[Depends(blacklist_low_stake)],
-    )
-    router.add_api_route(
-        "/start_training_grpo/",
-        tune_model_grpo,
-        tags=["Subnet"],
-        methods=["POST"],
-        response_model=TrainResponse,
-        dependencies=[Depends(blacklist_low_stake), Depends(verify_request)],
     )
     router.add_api_route(
         "/start_training_image/",

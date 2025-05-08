@@ -136,6 +136,7 @@ def _load_and_modify_config(
         filename, reward_funcs_names = create_reward_funcs_file(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
+        config["rl"] = "grpo"
         config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
         config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
         config["rl_beta"] = 0.1
