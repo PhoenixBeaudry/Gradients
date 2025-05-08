@@ -15,6 +15,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
     DataCollatorForSeq2Seq,
+    DataCollatorForLanguageModeling,
     EarlyStoppingCallback,
     SchedulerType,
     AutoModelForCausalLM
@@ -231,12 +232,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing DPO Trainer")
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer,
-        model=model,                     # passes label_pad_token_id=-100 automatically
-        padding="longest",               # dynamic per mini‑batch
-        pad_to_multiple_of=8,            # keeps TensorCores happy; optional
-    )
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False, pad_to_multiple_of=8)
     return DPOTrainer(
         model=model,
         args=tf_args,

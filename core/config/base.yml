@@ -57,7 +57,7 @@ dataset_prepared_path:
 output_dir: miner_id_24
 sample_packing: false
 eval_sample_packing: false
-pad_to_sequence_len: true
+pad_to_sequence_len: false
 trust_remote_code: true
 gpu_memory_limit: 80GiB
 lora_model_dir:
