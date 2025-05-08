@@ -121,6 +121,8 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
         'load_in_8bit': bool(cfg.get('load_in_8bit', False)),
         'torch_dtype': torch.bfloat16,
     }
+    if any(k in cfg["base_model"].lower() for k in ("qwen2", "mistral")):
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
     try:
         return AutoModelForCausalLM.from_pretrained(
             model_name,
@@ -232,14 +234,12 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing DPO Trainer")
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False, pad_to_multiple_of=8)
     return DPOTrainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
-        data_collator=data_collator,
         callbacks=callbacks,
     )
 
