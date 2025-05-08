@@ -188,9 +188,9 @@ async def task_offer(
                         f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
                 accepted=False
             )
-        if "qwen3" in request.model.lower():
+        if "qwen3" in request.model.lower() or "neo" in request.model.lower():
             return MinerTaskResponse(
-                message=f"This endpoint does not currently support Qwen3."
+                message=f"This endpoint does not currently support Qwen3 or GPT-neo."
                         f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
                 accepted=False
             )
