@@ -10,16 +10,15 @@ import validator.core.constants as cts
 from core.models.payload_models import DiffusionLosses
 from core.models.payload_models import EvaluationResultImage
 from core.models.payload_models import EvaluationResultText
-from core.models.utility_models import DPODatasetType
+from core.models.utility_models import DpoDatasetType
 from core.models.utility_models import FileFormat
-from core.models.utility_models import InstructDatasetType
+from core.models.utility_models import GrpoDatasetType
+from core.models.utility_models import InstructTextDatasetType
 from core.models.utility_models import TaskStatus
 from core.models.utility_models import TaskType
 from core.utils import download_s3_file
 from validator.core.config import Config
-from validator.core.models import DpoRawTask
-from validator.core.models import ImageRawTask
-from validator.core.models import InstructTextRawTask
+from validator.core.models import AnyTypeRawTask
 from validator.core.models import MinerResults
 from validator.core.models import MinerResultsImage
 from validator.core.models import MinerResultsText
@@ -29,6 +28,7 @@ from validator.core.models import PeriodScore
 from validator.core.models import Submission
 from validator.core.models import TaskNode
 from validator.core.models import TaskResults
+from validator.db.sql.nodes import _blacklist_nodes
 from validator.db.sql.submissions_and_scoring import add_submission
 from validator.db.sql.submissions_and_scoring import set_task_node_quality_score
 from validator.db.sql.tasks import get_expected_repo_name
@@ -168,7 +168,7 @@ def calculate_weighted_loss(test_loss: float, synth_loss: float) -> float:
     return cts.TEST_SCORE_WEIGHTING * test_loss + (1 - cts.TEST_SCORE_WEIGHTING) * synth_loss
 
 
-def _is_synth_loss_valid_for_group(valid_results: list[MinerResults], max_ratio: float = 2.0, threshold: float = 0.75) -> bool:
+def _is_synth_loss_valid_for_group(valid_results: list[MinerResults], max_ratio: float = 1.5, threshold: float = 0.4) -> bool:
     if all(np.isnan(result.synth_loss) for result in valid_results):
         logger.info("All synth losses are NaN, using test_loss only for ranking")
         return False
@@ -189,11 +189,27 @@ def _is_synth_loss_valid_for_group(valid_results: list[MinerResults], max_ratio:
     valid_miners = len(real_synth_miners)
     valid_ratios = 0
 
-    for result in real_synth_miners:
-        if result.test_loss > 0 and (result.synth_loss / result.test_loss) <= max_ratio:
-            logger.info(f"ratio between is {result.synth_loss / result.test_loss}")
-            valid_ratios += 1
+    miners_with_ratios = [
+        (result, result.synth_loss / result.test_loss)
+        for result in real_synth_miners
+        if result.test_loss > 0
+    ]
 
+    blacklisted_miners = [
+        (result, ratio)
+        for result, ratio in miners_with_ratios
+        if ratio > cts.BLACKLIST_THRESHOLD and result.synth_loss < 999.0
+    ]
+
+    # Only blacklist if not all the group is above the threshold
+    if blacklisted_miners and len(blacklisted_miners) < len(miners_with_ratios):
+        for result, ratio in blacklisted_miners:
+            result.score_reason = cts.BLACKLIST_REASON
+            result.test_loss = 1000.0
+            result.synth_loss = 1000.0
+            logger.info(f"Blacklisted node {result.hotkey} with ratio {ratio}")
+
+    valid_ratios = sum(1 for _, ratio in miners_with_ratios if ratio <= max_ratio)
     ratio = valid_ratios / valid_miners if valid_miners > 0 else 0
     logger.info(f"Valid ratios: {valid_ratios}/{valid_miners} = {ratio:.3f}, threshold is {threshold}")
     return ratio >= threshold
@@ -253,6 +269,8 @@ def calculate_miner_ranking_and_scores(
         penalty_start_idx = total_valid_miners - penalty_count
 
         for result, metric in ranked_results[1:penalty_start_idx]:
+            if result.score_reason == cts.BLACKLIST_REASON:
+                continue
             with LogContext(miner_hotkey=result.hotkey):
                 result.score_reason = f"Ranked below top 1 by {ranking_type}"
                 logger.info(
@@ -265,6 +283,8 @@ def calculate_miner_ranking_and_scores(
                 )
 
         for result, metric in ranked_results[penalty_start_idx:]:
+            if result.score_reason == cts.BLACKLIST_REASON:
+                continue
             with LogContext(miner_hotkey=result.hotkey):
                 result.score = cts.SCORE_PENALTY
                 result.score_reason = f"Bottom 25% ranked by {ranking_type}"
@@ -278,6 +298,8 @@ def calculate_miner_ranking_and_scores(
                 )
     else:
         for result, metric in ranked_results[1:]:
+            if result.score_reason == cts.BLACKLIST_REASON:
+                continue
             with LogContext(miner_hotkey=result.hotkey):
                 result.score_reason = f"Ranked below top 1 by {ranking_type}"
                 logger.info(
@@ -292,9 +314,9 @@ def calculate_miner_ranking_and_scores(
     return miner_results
 
 
-def _get_dataset_type(task: InstructTextRawTask | DpoRawTask) -> InstructDatasetType | DPODatasetType:
+def _get_dataset_type(task: AnyTypeRawTask) -> InstructTextDatasetType | DpoDatasetType | GrpoDatasetType | None:
     if task.task_type == TaskType.INSTRUCTTEXTTASK:
-        return InstructDatasetType(
+        return InstructTextDatasetType(
             field_system=task.field_system,
             field_instruction=task.field_instruction,
             field_input=task.field_input,
@@ -302,8 +324,10 @@ def _get_dataset_type(task: InstructTextRawTask | DpoRawTask) -> InstructDataset
             format=task.format,
             no_input_format=task.no_input_format,
         )
+    elif task.task_type == TaskType.IMAGETASK:
+        return None
     elif task.task_type == TaskType.DPOTASK:
-        return DPODatasetType(
+        return DpoDatasetType(
             field_prompt=task.field_prompt,
             field_system=task.field_system,
             field_chosen=task.field_chosen,
@@ -312,12 +336,17 @@ def _get_dataset_type(task: InstructTextRawTask | DpoRawTask) -> InstructDataset
             chosen_format=task.chosen_format,
             rejected_format=task.rejected_format,
         )
+    elif task.task_type == TaskType.GRPOTASK:
+        return GrpoDatasetType(
+            field_prompt=task.field_prompt,
+            reward_functions=task.reward_functions,
+        )
     else:
-        raise ValueError(f"Invalid task type: {task.task_type}")
+        raise ValueError(f"Unknown task type: {task.task_type}")
 
 
 def _create_failed_miner_result(hotkey: str, reason: str, task_type: TaskType) -> MinerResults:
-    if task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
+    if task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
         return MinerResultsText(
             hotkey=hotkey,
             test_loss=np.nan,
@@ -366,16 +395,16 @@ async def _get_submission_repo(miner: Node, task_id: str, config: Config) -> str
 
 
 async def _evaluate_submissions(
-    task: InstructTextRawTask | ImageRawTask | DpoRawTask,
+    task: AnyTypeRawTask,
     submission_repos: list[str],
     gpu_ids: list[int],
-    dataset_type: InstructDatasetType | DPODatasetType | None = None,
+    dataset_type: InstructTextDatasetType | DpoDatasetType | GrpoDatasetType | None = None,
 ) -> dict[str, tuple[EvaluationResultText, EvaluationResultText] | EvaluationResultImage | Exception]:
     unique_repos = list(set(submission_repos))
     if len(unique_repos) != len(submission_repos):
         logger.warning(f"Found duplicate repos. Deduplicating {len(submission_repos)} repos to {len(unique_repos)} unique repos")
 
-    if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
+    if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
         results: dict[str, tuple[EvaluationResultText, EvaluationResultText] | Exception] = {}
         repos_to_evaluate = []
         for repo in unique_repos:
@@ -510,7 +539,7 @@ async def _clear_up_s3(file_paths: list[str]) -> None:
 
 
 async def _update_scores(
-    task: InstructTextRawTask | DpoRawTask | ImageRawTask, task_results: list[MinerResultsText | MinerResultsImage], psql_db
+    task: AnyTypeRawTask, task_results: list[MinerResultsText | MinerResultsImage], psql_db
 ) -> None:
     assert task.task_id is not None, "task id needs to be set to update scores"
     for result in task_results:
@@ -599,10 +628,10 @@ def zero_duplicate_scores(
 
 async def process_miners_pool(
     miners: list[Node],
-    task: ImageRawTask | InstructTextRawTask | DpoRawTask,
+    task: AnyTypeRawTask,
     config: Config,
     gpu_ids: list[int],
-    dataset_type: InstructDatasetType | DPODatasetType | None = None,
+    dataset_type: InstructTextDatasetType | DpoDatasetType | GrpoDatasetType | None = None,
 ) -> list[MinerResultsText | MinerResultsImage]:
     assert task.task_id is not None, "We should have a task id when processing miners"
 
@@ -624,7 +653,7 @@ async def process_miners_pool(
                         )
                         continue
 
-                miner_repos[miner.hotkey] = repo
+                    miner_repos[miner.hotkey] = repo
             logger.info(f"Found repo {repo} for miner {miner.hotkey}")
 
     results = [
@@ -653,7 +682,7 @@ async def process_miners_pool(
                             _create_failed_miner_result(miner.hotkey, reason="Evaluation failed", task_type=task.task_type)
                         )
                         continue
-                    elif task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
+                    elif task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
                         synth_result, test_result = eval_result
                     elif task.task_type == TaskType.IMAGETASK:
                         test_result = eval_result
@@ -670,7 +699,7 @@ async def process_miners_pool(
                         updated_on=datetime.now(),
                     )
 
-                if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
+                if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
                     results.append(
                         MinerResultsText(
                             hotkey=miner.hotkey,
@@ -707,19 +736,24 @@ async def process_miners_pool(
     return results
 
 
-async def evaluate_and_score(
-    task: InstructTextRawTask | DpoRawTask | ImageRawTask, gpu_ids: list[int], config: Config
-) -> InstructTextRawTask | DpoRawTask | ImageRawTask:
+async def blacklist_nodes(task_results: list[MinerResultsText | MinerResultsImage], psql_db) -> None:
+    """Blacklist nodes with suspicious performance metrics"""
+    logger.info('In blacklist nodes')
+    hotkeys_to_blacklist = [
+        result.hotkey
+        for result in task_results
+        if result.score_reason == cts.BLACKLIST_REASON
+    ]
+    logger.info(f"WE ARE BLACKLISTING {hotkeys_to_blacklist}")
+    await _blacklist_nodes(hotkeys_to_blacklist, psql_db)
+
+
+async def evaluate_and_score(task: AnyTypeRawTask, gpu_ids: list[int], config: Config) -> AnyTypeRawTask:
     assert task.task_id is not None, "Task ID must be present"
     assert task.test_data is not None, "Test data must be present"
 
     miner_pool = await get_nodes_assigned_to_task(str(task.task_id), config.psql_db)
-    if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
-        dataset_type = _get_dataset_type(task)
-    elif task.task_type == TaskType.IMAGETASK:
-        dataset_type = None
-    else:
-        raise ValueError(f"Unknown task type: {task.task_type}")
+    dataset_type = _get_dataset_type(task)
 
     logger.info(f"Beginning evaluation for task {task.task_id} with {len(miner_pool)} miners")
     task_results = await process_miners_pool(miner_pool, task, config, gpu_ids, dataset_type)
@@ -730,11 +764,13 @@ async def evaluate_and_score(
 
     logger.info("Calculating final scores...")
     task_results = calculate_miner_ranking_and_scores(task_results)
+    logger.info("attempting to blacklist")
+    await blacklist_nodes(task_results, config.psql_db)
     await _update_scores(task, task_results, config.psql_db)
     all_scores_zero = all(result.score == 0.0 for result in task_results)
 
     if cts.DELETE_S3_AFTER_COMPLETE:
-        if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
+        if task.task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
             files_to_delete = [task.training_data, task.test_data, task.synthetic_data]
         elif task.task_type == TaskType.IMAGETASK:
             files_to_delete = [task.training_data, task.test_data]

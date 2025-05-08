@@ -1,6 +1,4 @@
 import datetime
-from typing import List
-from typing import Optional
 
 from asyncpg.connection import Connection
 from fiber import SubstrateInterface
@@ -15,13 +13,29 @@ from validator.utils.query_substrate import query_substrate
 
 logger = get_logger(__name__)
 
-async def get_eligible_nodes(psql_db: PSQLDB) -> List[Node]:
+async def _blacklist_nodes(hotkeys: list[str], psql_db: PSQLDB) -> None:
+    """Add nodes to the blacklisted_nodes table"""
+    if not hotkeys:
+        return
+        
+    logger.info(f"NODES ARE BEING BLACKLISTED {hotkeys}")
+    async with await psql_db.connection() as connection:
+        connection: Connection
+        query = f"""
+            INSERT INTO blacklisted_nodes ({dcst.HOTKEY}, {dcst.NETUID})
+            SELECT UNNEST($1::text[]), $2
+            ON CONFLICT ({dcst.HOTKEY}, {dcst.NETUID}) DO NOTHING
+        """
+        await connection.execute(query, hotkeys, NETUID)
+
+async def get_eligible_nodes(psql_db: PSQLDB) -> list[Node]:
     """
-    Get all nodes that either:
+    Get all nodes eligible for tasks, excluding blacklisted nodes.
+    
+    Includes nodes that either:
     a) Do not have any entries in the task_nodes table (new nodes with no scores)
-    b) Have at least one entry in the task_nodes table with a task_node_quality_score > 0
-    c) Have entries in task_nodes but all scores are NULL (not yet evaluated nodes)
-    This only excludes nodes that have been scored but ALL their non-NULL scores are ≤ 0
+    b) Have at least one entry with quality_score > 0
+    c) Have entries but all scores are NULL (not yet evaluated)
     """
     logger.info("Getting eligible nodes (new nodes, nodes with NULL scores, or nodes with positive scores)")
     async with await psql_db.connection() as connection:
@@ -62,7 +76,7 @@ async def get_eligible_nodes(psql_db: PSQLDB) -> List[Node]:
         logger.info(f"Found {len(eligible_nodes)} eligible nodes")
         return eligible_nodes
 
-async def get_all_nodes(psql_db: PSQLDB) -> List[Node]:
+async def get_all_nodes(psql_db: PSQLDB) -> list[Node]:
     """Get all nodes for the current NETUID"""
     logger.info("Attempting to get all nodes")
     async with await psql_db.connection() as connection:
@@ -123,7 +137,7 @@ async def insert_nodes(connection: Connection, nodes: list[Node]) -> None:
     )
 
 
-async def get_node_by_hotkey(hotkey: str, psql_db: PSQLDB) -> Optional[Node]:
+async def get_node_by_hotkey(hotkey: str, psql_db: PSQLDB) -> Node | None:
     """Get node by hotkey for the current NETUID"""
     async with await psql_db.connection() as connection:
         connection: Connection
@@ -242,3 +256,16 @@ async def get_node_id_by_hotkey(hotkey: str, psql_db: PSQLDB) -> int | None:
             WHERE {dcst.HOTKEY} = $1 AND {dcst.NETUID} = $2
         """
         return await connection.fetchval(query, hotkey, NETUID)
+        
+        
+async def is_node_blacklisted(hotkey: str, psql_db: PSQLDB, netuid: int = NETUID) -> bool:
+    """Check if a node is blacklisted"""
+    async with await psql_db.connection() as connection:
+        connection: Connection
+        query = """
+            SELECT 1 FROM blacklisted_nodes
+            WHERE hotkey = $1 AND netuid = $2
+            LIMIT 1
+        """
+        result = await connection.fetchval(query, hotkey, netuid)
+        return result is not None

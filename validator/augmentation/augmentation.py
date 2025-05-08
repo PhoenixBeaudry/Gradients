@@ -1,26 +1,23 @@
 import asyncio
 import json
-from typing import List
 
-from PIL.Image import new
-from attr import field
-from click import prompt
 import yaml
-from core.constants import DPO_DEFAULT_DATASET_TYPE
-from core.models.payload_models import DpoDatasetColumnsResponse
 from datasets import load_dataset
 from fiber import Keypair
 
+from core.models.payload_models import DpoDatasetColumnsResponse
+from core.models.payload_models import TaskType
 from core.models.utility_models import Message
 from core.models.utility_models import Prompts
 from core.models.utility_models import Role
-from validator.core.constants import END_OF_REASONING_TAG, TEXT_SYNTH_WEAKER_MODEL
+from validator.core.constants import END_OF_REASONING_TAG
 from validator.core.constants import MAX_SYNTH_DATA_POINTS
 from validator.core.constants import PROMPT_PATH
 from validator.core.constants import SYNTH_GEN_BATCH_SIZE
 from validator.core.constants import TEXT_SYNTH_MODEL
 from validator.core.constants import TEXT_SYNTH_MODEL_MAX_TOKENS
 from validator.core.constants import TEXT_SYNTH_MODEL_TEMPERATURE
+from validator.core.constants import TEXT_SYNTH_WEAKER_MODEL
 from validator.evaluation.utils import get_default_dataset_config
 from validator.utils.call_endpoint import post_to_nineteen_chat
 from validator.utils.llm import convert_to_nineteen_payload
@@ -38,7 +35,7 @@ def load_prompts() -> Prompts:
     return Prompts(**prompts_dict)
 
 
-def load_and_sample_dataset(dataset_name: str, columns_to_sample: List[str]) -> List[dict]:
+def load_and_sample_dataset(dataset_name: str, columns_to_sample: list[str]) -> list[dict]:
     try:
         config_name = get_default_dataset_config(dataset_name)
         dataset = load_dataset(dataset_name, config_name, trust_remote_code=True, streaming=True)
@@ -62,7 +59,7 @@ def load_and_sample_dataset(dataset_name: str, columns_to_sample: List[str]) -> 
 
 def create_messages_for_input_generation(
     reformulated_output: str, description: str, output_field: str, schema: dict, prompts: Prompts
-) -> List[Message]:
+) -> list[Message]:
     messages = []
     system_message = Message(role=Role.SYSTEM, content=prompts.input_field_generation_sys)
     messages.append(system_message)
@@ -76,7 +73,7 @@ def create_messages_for_input_generation(
     return messages
 
 
-def create_messages_for_input_output_reformulation(row: dict, prompts: Prompts) -> List[Message]:
+def create_messages_for_input_output_reformulation(row: dict, prompts: Prompts) -> list[Message]:
     messages = []
     system_message = Message(role=Role.SYSTEM, content=prompts.input_output_reformulation_sys)
     messages.append(system_message)
@@ -89,9 +86,6 @@ def create_messages_for_input_output_reformulation(row: dict, prompts: Prompts) 
 
 
 def create_messages_for_input_reformulation(ds_prompt: dict, prompts: Prompts) -> list[Message]:
-    logger.info(f"This is the ds {ds_prompt}")
-    logger.info(f"This is the input reform  {prompts.input_reformulation_user}")
-
     prompt_text = next(iter(ds_prompt.values()))
 
     messages = []
@@ -105,7 +99,7 @@ def create_messages_for_input_reformulation(ds_prompt: dict, prompts: Prompts) -
 
 
 
-def check_the_synthetic_data(synthetic_data_point: dict, original_data_columns: List[str]) -> bool:
+def check_the_synthetic_data(synthetic_data_point: dict, original_data_columns: list[str]) -> bool:
     return set(synthetic_data_point.keys()) == set(original_data_columns)
 
 
@@ -117,47 +111,45 @@ async def generate_paraphrased_version(row: dict, prompts: Prompts, keypair: Key
     return paraphrased_data
 
 async def generate_dpo_reformulation(prompt: str, prompts: Prompts, keypair: Keypair) -> DpoDatasetColumnsResponse:
-    logger.info('in generate dpo reformulated')
     messages = create_messages_for_input_reformulation(prompt, prompts)
-    logger.info(messages)
     payload = convert_to_nineteen_payload(messages, TEXT_SYNTH_MODEL, TEXT_SYNTH_MODEL_TEMPERATURE, TEXT_SYNTH_MODEL_MAX_TOKENS)
-    logger.info(f"Here is the payload {payload}")
     new_prompt = await post_to_nineteen_chat_with_reasoning(payload, keypair, END_OF_REASONING_TAG)
-    logger.info(f"Here is the new prompt {new_prompt}")
     assert new_prompt, "new prompt should not be None"
     prompt_message = [Message(
         role=Role.USER,
         content=new_prompt)]
     weak_model_payload = convert_to_nineteen_payload(prompt_message, TEXT_SYNTH_WEAKER_MODEL, TEXT_SYNTH_MODEL_TEMPERATURE, TEXT_SYNTH_MODEL_MAX_TOKENS)
     weak_model_result = await post_to_nineteen_chat(weak_model_payload, keypair)
-    logger.info(f"Weak model result {weak_model_result}")
     strong_model_payload = convert_to_nineteen_payload(prompt_message, TEXT_SYNTH_MODEL, TEXT_SYNTH_MODEL_TEMPERATURE, TEXT_SYNTH_MODEL_MAX_TOKENS)
     strong_model_result = await post_to_nineteen_chat_with_reasoning(strong_model_payload, keypair, END_OF_REASONING_TAG)
 
-    logger.info(f"Strong model result {strong_model_result}")
     return DpoDatasetColumnsResponse(field_prompt = new_prompt, field_chosen=strong_model_result, field_rejected=weak_model_result)
 
 
-async def process_row(row, prompts, keypair, is_dpo=False):
-    if is_dpo:
-        logger.info('REFORMAULATION')
+async def process_row(row, prompts, keypair, task_type: TaskType) -> dict | DpoDatasetColumnsResponse:
+    if task_type in [TaskType.INSTRUCTTEXTTASK, TaskType.GRPOTASK]:
+        json_synthetic_data_point = await generate_paraphrased_version(row, prompts, keypair)
+
+        if check_the_synthetic_data(json_synthetic_data_point, row.keys()):
+            return json_synthetic_data_point
+        else:
+            error_message = (
+                f"Generated data point has incorrect schema. Expected keys: {set(row.keys())}, "
+                f"got: {set(json_synthetic_data_point.keys())}"
+            )
+            logger.error(error_message)
+            raise ValueError(error_message)
+    elif task_type == TaskType.DPOTASK:
         return await generate_dpo_reformulation(row, prompts, keypair)
-    json_synthetic_data_point = await generate_paraphrased_version(row, prompts, keypair)
-
-    if check_the_synthetic_data(json_synthetic_data_point, row.keys()):
-        return json_synthetic_data_point
-    else:
-        error_message = (
-            f"Generated data point has incorrect schema. Expected keys: {set(row.keys())}, "
-            f"got: {set(json_synthetic_data_point.keys())}"
-        )
-        logger.error(error_message)
-        raise ValueError(error_message)
 
 
-async def generate_augmented_text_dataset(sampled_data: List[dict], keypair: Keypair, is_dpo: bool = False) -> List[dict]:
+async def generate_augmented_text_dataset(
+    sampled_data: list[dict], keypair: Keypair, task_type: TaskType
+    ) -> list[dict] | list[DpoDatasetColumnsResponse]:
     prompts = load_prompts()
     logger.info(f"Creating an augmented dataset with {len(sampled_data)} samples...")
+    logger.info(f"Prompts: {prompts}")
+    logger.info(f"\nTask type: {task_type}")
     synthetic_dataset = []
     json_errors = 0
     generic_errors = 0
@@ -170,11 +162,11 @@ async def generate_augmented_text_dataset(sampled_data: List[dict], keypair: Key
         current_batch = (batch_idx // SYNTH_GEN_BATCH_SIZE) + 1
         logger.info(f"Processing batch {current_batch}/{total_batches} ({len(batch)} samples)")
 
-        tasks = [process_row(row, prompts, keypair, is_dpo) for row in batch]
+        tasks = [process_row(row, prompts, keypair, task_type) for row in batch]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         batch_results = []
-        for result in results:
+        for idx, result in enumerate(results):
             if isinstance(result, Exception):
                 if isinstance(result, json.JSONDecodeError):
                     json_errors += 1
@@ -185,6 +177,9 @@ async def generate_augmented_text_dataset(sampled_data: List[dict], keypair: Key
                     logger.error(f"Maximum consecutive errors reached when generating the augmented dataset. Here is one result {result}")
                     return None
             else:
+                if batch_idx == 0 and idx<5:
+                    logger.info(f"Sample input: {batch[idx]}")
+                    logger.info(f"Sample output: {result}")
                 consecutive_errors = 0  # Reset on success
                 batch_results.append(result)
 
