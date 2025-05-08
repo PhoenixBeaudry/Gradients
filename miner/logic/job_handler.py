@@ -629,7 +629,6 @@ def start_tuning_container(job: TextJob):
             device_requests=device_requests, # Use specific GPUs if assigned
             detach=True,
             tty=True,
-            command=["/bin/bash", "-c", docker_entrypoint]
         )
 
         last_logs = stream_logs(container)
