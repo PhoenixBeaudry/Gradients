@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from datetime import timedelta
+from math import ceil
 
 import toml
 import yaml
@@ -29,6 +30,7 @@ from core.models.payload_models import TrainResponse
 from core.models.utility_models import FileFormat
 from core.models.utility_models import TaskType
 from core.utils import download_s3_file
+from miner.logic.job_handler import calculate_seconds_remaining
 # from miner.config import WorkerConfig # Removed
 # from miner.dependencies import get_worker_config # Removed
 from miner.logic.job_handler import create_job_diffusion
@@ -58,7 +60,7 @@ async def tune_model_text(
     # global current_job_finish_time # Removed
     logger.info("Starting model tuning.")
 
-    # current_job_finish_time = datetime.now() + timedelta(hours=train_request.hours_to_complete) # Removed
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
 
     try:
@@ -79,14 +81,15 @@ async def tune_model_text(
         dataset_type=train_request.dataset_type,
         file_format=train_request.file_format,
         expected_repo_name=train_request.expected_repo_name,
-        hours_to_complete=train_request.hours_to_complete
+        required_finish_time=required_finish_time
     )
     logger.info(f"Created job {job}")
     # worker_config.trainer.enqueue_job(job) # Replaced with RQ
+    # Calculate timeout based on time remaining
     rq_job = rq_queue.enqueue(
         start_tuning_container,
         job,
-        job_timeout=int(train_request.hours_to_complete * 3600 * 1.1), # Add timeout buffer
+        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
         failure_ttl=86400,  # Keep failure info for 1 day
         job_id=job.job_id
@@ -103,7 +106,7 @@ async def tune_model_diffusion(
     # global current_job_finish_time # Removed
     logger.info("Starting model tuning.")
 
-    # current_job_finish_time = datetime.now() + timedelta(hours=train_request.hours_to_complete) # Removed
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
     # try: # Remove pre-download
     #     train_request.dataset_zip = await download_s3_file(
@@ -120,14 +123,15 @@ async def tune_model_diffusion(
         model=train_request.model,
         model_type=train_request.model_type,
         expected_repo_name=train_request.expected_repo_name,
-        hours_to_complete=train_request.hours_to_complete
+        required_finish_time=required_finish_time
     )
     logger.info(f"Created job {job}")
     # worker_config.trainer.enqueue_job(job) # Replaced with RQ
+    # Calculate timeout based on time remaining
     rq_job = rq_queue.enqueue(
         start_tuning_container_diffusion,
         job,
-        job_timeout=int(train_request.hours_to_complete * 3600 * 1.1), # Add timeout buffer
+        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
         failure_ttl=86400,  # Keep failure info for 1 day
         job_id=job.job_id
@@ -176,15 +180,17 @@ async def task_offer(
         if request.task_type == TaskType.INSTRUCTTEXTTASK:
             logger.info("Task Type: Instruct")
         if request.task_type == TaskType.DPOTASK:
-            return MinerTaskResponse(
-                message=f"This endpoint only accepts instruct tasks: "
-                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
-                accepted=False
-            )
+            logger.info("Task Type: DPO")
 
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
             return MinerTaskResponse(
                 message=f"This endpoint only accepts text tasks: "
+                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
+                accepted=False
+            )
+        if "qwen3" in request.model.lower():
+            return MinerTaskResponse(
+                message=f"This endpoint does not currently support Qwen3."
                         f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
                 accepted=False
             )

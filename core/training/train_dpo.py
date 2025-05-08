@@ -4,9 +4,10 @@ import argparse
 import logging
 import yaml
 from math import ceil
-from datetime import datetime
 import torch
-from axolotl.common.datasets import load_datasets
+from datetime import datetime
+from axolotl.common.datasets import load_preference_datasets
+from trl import DPOConfig, DPOTrainer
 from axolotl.utils.models import load_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
@@ -29,6 +30,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 ###### Custom Callbacks ########################
+
 class TimeLimitCallback(TrainerCallback):
     """Stop training after a fixed number of hours."""
 
@@ -175,7 +177,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         callbacks.append(
             EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
         )
-    
     # calculate time left for job
     time_remaining = datetime.fromisoformat(cfg['required_finish_time']) - datetime.now()
     seconds_remaining = max(0.0, time_remaining.total_seconds())
@@ -196,7 +197,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
             'hub_strategy': cfg['hub_strategy'],
             'push_to_hub': True,
         }
-    tf_args = TrainingArguments(
+    tf_args = DPOConfig(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
@@ -204,6 +205,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         dataloader_num_workers=int(cfg['dataloader_num_workers']),
         max_steps=int(cfg['max_steps']),
         learning_rate=float(cfg['learning_rate']),
+        beta=float(cfg['beta']),
         optim=cfg['optimizer'],
         lr_scheduler_type=SchedulerType.COSINE,
         logging_steps=int(cfg['logging_steps']),
@@ -228,21 +230,14 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     )
     #####################################
     logger = setup_logger()
-    logger.info("Initializing SFT Trainer")
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer,
-        model=model,                     # passes label_pad_token_id=-100 automatically
-        padding="longest",               # dynamic per mini‑batch
-        pad_to_multiple_of=8,            # keeps TensorCores happy; optional
-    )
-    return Trainer(
+    logger.info("Initializing DPO Trainer")
+    return DPOTrainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
         callbacks=callbacks,
-        data_collator=data_collator
     )
 
 
@@ -264,7 +259,7 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
+    dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     tokenizer = load_tokenizer(axo_cfg)
 
     if any(k in cfg["base_model"].lower() for k in ("qwen", "mistral", "starcode")):
@@ -291,7 +286,7 @@ def main():
 
         n_eval = len(dataset_meta.eval_dataset)
         target_eval = min(
-            max(256, ceil(target_train * 0.25)),
+            max(512, ceil(target_train * 0.25)),
             n_eval                                    # never exceed full eval set
         )
 
