@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from datetime import timedelta
 from math import ceil
+import uuid
 from core.config.config_handler import update_model_info, save_config
 import toml
 import yaml
@@ -75,7 +76,7 @@ async def tune_model_text(
 
     with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
         config = yaml.safe_load(file)
-    config = update_model_info(config, job.model, job.job_id, job.expected_repo_name)
+    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{job.expected_repo_name or str(uuid.uuid4())}"
     config_filename = f"{job.job_id}.yml"
     config_path = os.path.join(cst.CONFIG_DIR, config_filename)
     save_config(config, config_path)
