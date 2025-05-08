@@ -33,7 +33,7 @@ save_total_limit: 5
 
 do_hpo: true
 dataloader_num_workers: 8
-val_set_size: 0.1
+val_set_size: 0.05
 sequence_len: 8192
 
 
