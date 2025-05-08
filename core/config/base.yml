@@ -49,22 +49,16 @@ chat_template: llama3
 base_model: NousResearch/Meta-Llama-3-8B-Instruct
 base_model_config:
 model_type: AutoModelForCausalLM
-tokenload_in_8bit: false
+load_in_8bit: false
 load_in_4bit: false
 strict: false
-
-chat_template: llama3
 datasets:
 dataset_prepared_path:
-val_set_size: 0.1
 output_dir: miner_id_24
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: true
 trust_remote_code: true
-datasets:
-dataset_prepared_path:
-output_dir: miner_id_24
 gpu_memory_limit: 80GiB
 lora_model_dir:
 bf16: true
