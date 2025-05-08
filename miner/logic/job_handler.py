@@ -541,8 +541,6 @@ def start_tuning_container(job: TextJob):
     config_filename = f"{job.job_id}.yml"
     config_path = os.path.join(cst.CONFIG_DIR, config_filename)
 
-    docker_entrypoint = _create_docker_entrypoint(job)
-
     config = _load_and_modify_config(
         job.dataset,
         job.model,
