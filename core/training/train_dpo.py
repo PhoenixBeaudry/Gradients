@@ -224,7 +224,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         warmup_steps=cfg['warmup_steps'],
         report_to="wandb",
         auto_find_batch_size=True,
-        gradient_checkpointing=True,
+        gradient_checkpointing=cfg['gradient_checkpointing'],
         gradient_checkpointing_kwargs={"use_reentrant": False},
         bf16=True,
         use_liger_kernel=True,
