@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from datetime import timedelta
 from math import ceil
-
+from core.config.config_handler import update_model_info, save_config
 import toml
 import yaml
 import redis
@@ -72,6 +72,14 @@ async def tune_model_text(
         expected_repo_name=train_request.expected_repo_name,
         required_finish_time=required_finish_time
     )
+
+    with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
+        config = yaml.safe_load(file)
+    config = update_model_info(config, job.model, job.job_id, job.expected_repo_name)
+    config_filename = f"{job.job_id}.yml"
+    config_path = os.path.join(cst.CONFIG_DIR, config_filename)
+    save_config(config, config_path)
+
     logger.info(f"Created job {job}")
     # worker_config.trainer.enqueue_job(job) # Replaced with RQ
     # Calculate timeout based on time remaining
