@@ -90,10 +90,8 @@ def _load_and_modify_config(
     """
     Loads the config template and modifies it to create a new job config.
     """
-    if isinstance(dataset_type, InstructTextDatasetType | DpoDatasetType):
+    if isinstance(dataset_type, InstructTextDatasetType | DpoDatasetType | GrpoDatasetType):
         config_path = cst.CONFIG_TEMPLATE_PATH
-    elif isinstance(dataset_type, GrpoDatasetType):
-        config_path = cst.CONFIG_TEMPLATE_PATH_GRPO
 
     logger.info("Loading config template")
     with open(config_path, "r") as file:
@@ -137,6 +135,10 @@ def _load_and_modify_config(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
         config["rl"] = "grpo"
+        config["trl"]["beta"] = 0.04
+        config["trl"]["max_completion_length"] = 256
+        config["trl"]["use_vllm"] = False
+        config["trl"]["num_generations"] = 4
         config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
         config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
         config["rl_beta"] = 0.1
