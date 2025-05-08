@@ -121,6 +121,8 @@ def objective(trial: optuna.Trial,
 
     if cfg["rl"] == "dpo":
         path_to_train_file = "/workspace/training/train_dpo.py"
+    elif cfg["rl"] == "grpo":
+        path_to_train_file = "/workspace/training/train_grpo.py"
     else:
         path_to_train_file = "/workspace/training/train.py"
 
@@ -207,6 +209,8 @@ def launch_training(acc_yaml: str, cfg_path: str):
 
     if cfg["rl"] == "dpo":
         path_to_train_file = "/workspace/training/train_dpo.py"
+    elif cfg["rl"] == "grpo":
+        path_to_train_file = "/workspace/training/train_grpo.py"
     else:
         path_to_train_file = "/workspace/training/train.py"
 
