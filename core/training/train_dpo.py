@@ -221,6 +221,7 @@ def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
         bf16=True,
         use_liger_kernel=True,
         load_best_model_at_end=True,
+        force_use_ref_model=True,
         **hf_kwargs,
     )
     #####################################
