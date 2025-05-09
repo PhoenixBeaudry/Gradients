@@ -144,6 +144,7 @@ def _load_and_modify_config(
         config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
         config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
         config["rl_beta"] = 0.1
+        config["beta"] = 0.04
 
     hf_cfg = AutoConfig.from_pretrained(model)
  
