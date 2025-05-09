@@ -32,7 +32,7 @@ from miner.logic.job_handler import create_job_text
 from miner.logic.job_handler import start_tuning_container
 
 
-NUM_WORKERS = 4
+NUM_WORKERS = 2
 
 logger = get_logger(__name__)
 
