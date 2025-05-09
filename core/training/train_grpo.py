@@ -96,7 +96,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 #######################################################
-CONFIG_DIR = os.path.abspath("core/config/")
+CONFIG_DIR = os.path.abspath("/workspace/core/config/")
 
 ##### Custom Funcs for getting GRPO reward functions #####
 def reward_functions(cfg):
@@ -116,7 +116,7 @@ def get_reward_func(reward_func_fqn: str) -> RewardFunc | str:
     """
     module_name, func_name = reward_func_fqn.rsplit(".", 1)
     module_path = os.path.join(CONFIG_DIR, f"{module_name}.py")
-
+    print(f"→ looking for {module_name!r} at {module_path!r}, exists? {os.path.isfile(module_path)}")
     # 1) if we have an on-disk file, dynamically import it
     if os.path.isfile(module_path):
         # drop any cached module so we always load the newest version
