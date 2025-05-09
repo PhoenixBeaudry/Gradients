@@ -122,6 +122,7 @@ def objective(trial: optuna.Trial,
     if cfg["rl"] == "dpo":
         path_to_train_file = "/workspace/training/train_dpo.py"
     elif cfg["rl"] == "grpo":
+        cfg["max_completion_length"] = 64
         path_to_train_file = "/workspace/training/train_grpo.py"
     else:
         path_to_train_file = "/workspace/training/train.py"
