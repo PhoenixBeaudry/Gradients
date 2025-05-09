@@ -3,6 +3,7 @@ import os
 import argparse
 import logging
 import yaml
+import copy
 from math import ceil
 import torch
 from datetime import datetime
@@ -163,8 +164,8 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
     return get_peft_model(model, peft_config)
 
 
-def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
-    # ── SFT Trainer ────────────────────────────────────────
+def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
+    # ── DPO Trainer ────────────────────────────────────────
     #### Callbacks ####
     callbacks = []
     if cfg.get('early_stopping', True):
@@ -227,6 +228,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     logger.info("Initializing DPO Trainer")
     return DPOTrainer(
         model=model,
+        ref_model=ref_model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
@@ -262,6 +264,11 @@ def main():
         tokenizer.padding_side = "left"
 
     model = load_model(cfg['base_model'], cfg)
+    # Clone the base model to use as your frozen reference
+    ref_model = copy.deepcopy(model)
+    # Make sure the ref_model is indeed in eval mode and on the same device
+    ref_model.eval()
+
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
@@ -292,7 +299,7 @@ def main():
         train_dataset = train_subset.select(range(target_train))
         eval_dataset  = eval_subset.select(range(target_eval))
 
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, model, ref_model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
