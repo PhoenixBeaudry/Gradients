@@ -331,7 +331,7 @@ def main():
         # 1. compute target subset sizes
         n_train = len(dataset_meta.train_dataset)
         target_train = min(
-            25_000,
+            20000,
             n_train
         )
 
