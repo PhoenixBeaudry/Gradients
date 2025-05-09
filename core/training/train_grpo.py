@@ -4,6 +4,7 @@ import argparse
 import logging
 import yaml
 import importlib
+import sys
 import inspect
 from math import ceil
 import torch
@@ -100,35 +101,40 @@ CONFIG_DIR = os.path.abspath("core/config/")
 ##### Custom Funcs for getting GRPO reward functions #####
 def reward_functions(cfg):
     """
-    Collects and returns a list of reward-func lists for GRPOTrainer.
+    Collects and returns a list of functions for GRPOTrainer.
     """
-    funcs_grouped = []
-    single_trial_funcs = []
+    funcs = []
     for fqn in cfg['trl']['reward_funcs']:
-        single_trial_funcs.append(get_reward_func(fqn))
-    funcs_grouped.append(single_trial_funcs)
-    return funcs_grouped
+        funcs.append(get_reward_func(fqn))
+    return funcs
 
 
-def get_reward_func(reward_func_fqn: str) -> RewardFunc:
+def get_reward_func(reward_func_fqn: str) -> RewardFunc | str:
     """
-    Load a Python function by FQN from ../config/<module>.py.
-    If the file isn’t found, treat fqn as an HF model path string.
+    Try to load <module>.py from CONFIG_DIR and return its <func>.
+    If the file doesn’t exist, just return the original string (HF model path).
     """
     module_name, func_name = reward_func_fqn.rsplit(".", 1)
     module_path = os.path.join(CONFIG_DIR, f"{module_name}.py")
 
+    # 1) if we have an on-disk file, dynamically import it
     if os.path.isfile(module_path):
+        # drop any cached module so we always load the newest version
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
         spec = importlib.util.spec_from_file_location(module_name, module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        reward_func = getattr(module, func_name, None)
-        if reward_func is None:
+        # get the function
+        if not hasattr(module, func_name):
             raise AttributeError(
                 f"Module {module_name!r} has no attribute {func_name!r}"
             )
+        reward_func = getattr(module, func_name)
 
+        # sanity check signature
         sig = inspect.signature(reward_func)
         if len(sig.parameters) < 2:
             raise ValueError(
@@ -138,12 +144,8 @@ def get_reward_func(reward_func_fqn: str) -> RewardFunc:
 
         return reward_func
 
-    # fallback: assume the string is a pretrained reward‐model path
-    print(
-        f"Reward function {reward_func_fqn!r} not found in {module_path!r}; "
-        "treating as a HF model path."
-    )
-    return reward_func_fqn  # GRPOTrainer will interpret a string as a model path
+    # 2) otherwise fall back to treating the FQN string as a model-path
+    return reward_func_fqn
 
 
 def parse_args():
