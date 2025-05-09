@@ -332,12 +332,12 @@ def main():
         n_train = len(dataset_meta.train_dataset)
         target_train = min(
             25_000,
-            max(1_024, ceil(n_train * 0.02))
+            n_train
         )
 
         n_eval = len(dataset_meta.eval_dataset)
         target_eval = min(
-            max(256, ceil(target_train * 0.25)),
+            256,
             n_eval                                    # never exceed full eval set
         )
 
