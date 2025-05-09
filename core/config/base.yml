@@ -42,6 +42,7 @@ model_params_count: 0
 job_id:
 hpo_run: false
 rl:
+trl:
 
 
 ##### AXOLOTL REQUIRED - NO TOUCHING NECESSARY #####
