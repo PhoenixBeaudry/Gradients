@@ -5,7 +5,6 @@ import logging
 import yaml
 import importlib
 import inspect
-from core import constants as cst
 from math import ceil
 import torch
 from datetime import datetime
@@ -96,7 +95,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 #######################################################
-CONFIG_DIR = os.path.abspath(cst.CONFIG_DIR)
+CONFIG_DIR = os.path.abspath("core/config/")
 
 ##### Custom Funcs for getting GRPO reward functions #####
 def reward_functions(cfg):
