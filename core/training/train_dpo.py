@@ -121,8 +121,6 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
         'load_in_8bit': bool(cfg.get('load_in_8bit', False)),
         'torch_dtype': torch.bfloat16,
     }
-    if any(k in cfg["base_model"].lower() for k in ("qwen2", "mistral")):
-        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
     try:
         return AutoModelForCausalLM.from_pretrained(
             model_name,
