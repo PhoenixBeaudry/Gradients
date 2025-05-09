@@ -18,13 +18,13 @@ lora_target_linear: true
 beta: 0.1
 
 early_stopping: true
-early_stopping_patience: 3
+early_stopping_patience: 5
 greater_is_better: false
 metric_for_best_model: eval_loss
 eval_steps: 50
 eval_strategy: steps
 
-max_steps: 2000
+max_steps: 10000
 save_steps: 100
 warmup_steps: 100
 save_strategy: steps
@@ -57,7 +57,7 @@ dataset_prepared_path:
 output_dir: miner_id_24
 sample_packing: false
 eval_sample_packing: false
-pad_to_sequence_len: true
+pad_to_sequence_len: false
 trust_remote_code: true
 gpu_memory_limit: 80GiB
 lora_model_dir:

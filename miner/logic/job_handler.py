@@ -9,6 +9,7 @@ from transformers import AutoConfig
 import docker
 import pandas as pd
 import toml
+from fastapi import HTTPException
 import yaml
 from docker.errors import DockerException
 from requests.exceptions import ReadTimeout # Import ReadTimeout from requests
@@ -542,6 +543,17 @@ def start_tuning_container(job: TextJob):
 
     config_filename = f"{job.job_id}.yml"
     config_path = os.path.join(cst.CONFIG_DIR, config_filename)
+
+    try:
+        logger.info(job.file_format)
+        if job.file_format != FileFormat.HF:
+            if job.file_format == FileFormat.S3:
+                job.dataset = asyncio.run(download_s3_file(job.dataset))
+                logger.info(job.dataset)
+                job.file_format = FileFormat.JSON
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     config = _load_and_modify_config(
         job.dataset,
