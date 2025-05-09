@@ -18,24 +18,18 @@ from fiber.miner.dependencies import verify_request
 from pydantic import ValidationError
 from rq import Queue
 from rq.job import Job # Correct import for Job class
-from rq.registry import StartedJobRegistry, FailedJobRegistry
+from rq.registry import StartedJobRegistry
 from rq.exceptions import NoSuchJobError
 
 import core.constants as cst
 from core.models.payload_models import MinerTaskOffer
 from core.models.payload_models import MinerTaskResponse
-from core.models.payload_models import TrainRequestImage
 from core.models.payload_models import TrainRequestText
 from core.models.payload_models import TrainResponse
-from core.models.utility_models import FileFormat
 from core.models.utility_models import TaskType
-from core.utils import download_s3_file
-from miner.logic.job_handler import calculate_seconds_remaining
-# from miner.config import WorkerConfig # Removed
-# from miner.dependencies import get_worker_config # Removed
-from miner.logic.job_handler import create_job_diffusion
+
 from miner.logic.job_handler import create_job_text
-from miner.logic.job_handler import start_tuning_container, start_tuning_container_diffusion # Import job functions
+from miner.logic.job_handler import start_tuning_container
 
 
 NUM_WORKERS = 2
@@ -48,16 +42,13 @@ redis_conn = redis.Redis(
     port=cst.REDIS_PORT,
     password=cst.REDIS_PASSWORD, # Add password from constants
     db=0
-    # decode_responses=True # REMOVED - RQ expects raw bytes for pickled job data
 )
 rq_queue = Queue(connection=redis_conn)
 
 
 async def tune_model_text(
     train_request: TrainRequestText,
-    # worker_config: WorkerConfig = Depends(get_worker_config), # Removed
 ):
-    # global current_job_finish_time # Removed
     logger.info("Starting model tuning.")
 
     required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
@@ -77,48 +68,6 @@ async def tune_model_text(
     # Calculate timeout based on time remaining
     rq_job = rq_queue.enqueue(
         start_tuning_container,
-        job,
-        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
-        result_ttl=86400, # Keep result for 1 day
-        failure_ttl=86400,  # Keep failure info for 1 day
-        job_id=job.job_id
-    )
-    logger.info(f"Enqueued job {rq_job.id} to RQ")
-
-    return {"message": "Training job enqueued.", "task_id": job.job_id}
-
-
-async def tune_model_diffusion(
-    train_request: TrainRequestImage,
-    # worker_config: WorkerConfig = Depends(get_worker_config), # Removed
-):
-    # global current_job_finish_time # Removed
-    logger.info("Starting model tuning.")
-
-    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
-    logger.info(f"Job received is {train_request}")
-    # try: # Remove pre-download
-    #     train_request.dataset_zip = await download_s3_file(
-    #         train_request.dataset_zip, f"{cst.DIFFUSION_DATASET_DIR}/{train_request.task_id}.zip"
-    #     )
-    #     logger.info(train_request.dataset_zip)
-    # except ValueError as e:
-    #     raise HTTPException(status_code=400, detail=str(e))
-
-    # Pass the original dataset_zip URI (S3 path) to the job object
-    job = create_job_diffusion(
-        job_id=str(train_request.task_id),
-        dataset_zip=train_request.dataset_zip, # Pass URI directly
-        model=train_request.model,
-        model_type=train_request.model_type,
-        expected_repo_name=train_request.expected_repo_name,
-        required_finish_time=required_finish_time
-    )
-    logger.info(f"Created job {job}")
-    # worker_config.trainer.enqueue_job(job) # Replaced with RQ
-    # Calculate timeout based on time remaining
-    rq_job = rq_queue.enqueue(
-        start_tuning_container_diffusion,
         job,
         job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
@@ -161,7 +110,6 @@ async def get_latest_model_submission(task_id: str) -> str:
 async def task_offer(
     request: MinerTaskOffer,
     config: Config = Depends(get_config),
-    # worker_config: WorkerConfig = Depends(get_worker_config), # Removed
 ) -> MinerTaskResponse:
     try:
         logger.info("An offer has come through")
@@ -228,28 +176,6 @@ async def task_offer_image(
     try:
         logger.info("An image offer has come through")
         return MinerTaskResponse(message=f"No images :(", accepted=False)
-        if request.task_type != TaskType.IMAGETASK:
-            return MinerTaskResponse(message="This endpoint only accepts image tasks", accepted=False)
-
-        # Check RQ queue length and running jobs
-        queued_count = rq_queue.count
-        started_registry = StartedJobRegistry(queue=rq_queue)
-        running_count = started_registry.count
-        total_active = queued_count + running_count
-        capacity = NUM_WORKERS
-
-        if total_active >= capacity: # Keep existing buffer logic
-            logger.info(f"Rejecting offer: Queue full (queued={queued_count}, running={running_count}, total={total_active})")
-            return MinerTaskResponse(message=f"Queue full ({total_active})", accepted=False)
-
-        # optional: still reject absurdly long jobs if you want
-        if request.hours_to_complete >= 8:
-            logger.info(f"Rejecting offer: too long ({request.hours_to_complete}h)")
-            return MinerTaskResponse(message="Job too long", accepted=False)
-
-        # otherwise accept
-        logger.info(f"Accepting offer ({total_active+1}/{capacity}): {request.model} ({request.hours_to_complete}h)")
-        return MinerTaskResponse(message="-----:)-----", accepted=True)
 
     except ValidationError as e:
         logger.error(f"Validation error: {str(e)}")
@@ -362,14 +288,6 @@ def factory_router() -> APIRouter:
     router.add_api_route(
         "/start_training/",  # TODO: change to /start_training_text or similar
         tune_model_text,
-        tags=["Subnet"],
-        methods=["POST"],
-        response_model=TrainResponse,
-        dependencies=[Depends(blacklist_low_stake)],
-    )
-    router.add_api_route(
-        "/start_training_image/",
-        tune_model_diffusion,
         tags=["Subnet"],
         methods=["POST"],
         response_model=TrainResponse,
