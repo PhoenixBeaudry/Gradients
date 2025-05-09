@@ -96,7 +96,7 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 #######################################################
-CONFIG_DIR = os.path.abspath("/workspace/core/config/")
+CONFIG_DIR = os.path.abspath("/workspace/configs/")
 
 ##### Custom Funcs for getting GRPO reward functions #####
 def reward_functions(cfg):
