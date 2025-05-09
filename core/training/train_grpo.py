@@ -103,9 +103,9 @@ def reward_functions(cfg):
     Collects and returns a list of reward-func lists for GRPOTrainer.
     """
     funcs_grouped = []
-    if cfg.trl and cfg.trl.reward_funcs:
+    if cfg['trl'] and cfg['trl']['reward_funcs']:
         single_trial_funcs = []
-        for fqn in cfg.trl.reward_funcs:
+        for fqn in cfg['trl']['reward_funcs']:
             single_trial_funcs.append(get_reward_func(fqn))
         funcs_grouped.append(single_trial_funcs)
     return funcs_grouped
