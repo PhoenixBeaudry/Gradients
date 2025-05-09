@@ -42,13 +42,6 @@ model_params_count: 0
 job_id:
 hpo_run: false
 rl:
-trl:
-  beta: 0.04
-  max_completion_length: 128
-  use_vllm: false
-  num_generations: 2
-  reward_funcs:
-  reward_weights:
 
 ##### AXOLOTL REQUIRED - NO TOUCHING NECESSARY #####
 chat_template: llama3
