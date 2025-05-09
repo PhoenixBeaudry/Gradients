@@ -176,22 +176,13 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     try:
         return AutoModelForCausalLM.from_pretrained(
             model_name,
-            attn_implementation='flash_attention_3',
+            attn_implementation='flash_attention_2',
             trust_remote_code=True,
             device_map=device_map,
             **common_kwargs
         )
-    except:
-        try:
-            return AutoModelForCausalLM.from_pretrained(
-                model_name,
-                attn_implementation='flash_attention_2',
-                trust_remote_code=True,
-                device_map=device_map,
-                **common_kwargs
-            )
-        except Exception:
-            return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
+    except Exception:
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
 
 
 def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
