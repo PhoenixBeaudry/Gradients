@@ -331,13 +331,13 @@ def main():
         # 1. compute target subset sizes
         n_train = len(dataset_meta.train_dataset)
         target_train = min(
-            50_000,
+            25_000,
             max(1_024, ceil(n_train * 0.02))
         )
 
         n_eval = len(dataset_meta.eval_dataset)
         target_eval = min(
-            max(512, ceil(target_train * 0.25)),
+            max(256, ceil(target_train * 0.25)),
             n_eval                                    # never exceed full eval set
         )
 
