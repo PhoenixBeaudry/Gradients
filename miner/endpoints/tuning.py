@@ -89,17 +89,6 @@ async def tune_model_grpo(
     required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
 
-    try:
-        logger.info(train_request.file_format)
-        if train_request.file_format != FileFormat.HF:
-            if train_request.file_format == FileFormat.S3:
-                train_request.dataset = await download_s3_file(train_request.dataset)
-                logger.info(train_request.dataset)
-                train_request.file_format = FileFormat.JSON
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
     job = create_job_text(
         job_id=str(train_request.task_id),
         dataset=train_request.dataset,
@@ -113,48 +102,6 @@ async def tune_model_grpo(
     logger.info(f"Created job {job}")
     rq_job = rq_queue.enqueue(
         start_tuning_container,
-        job,
-        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
-        result_ttl=86400, # Keep result for 1 day
-        failure_ttl=86400,  # Keep failure info for 1 day
-        job_id=job.job_id
-    )
-    logger.info(f"Enqueued job {rq_job.id} to RQ")
-
-    return {"message": "Training job enqueued.", "task_id": job.job_id}
-
-
-async def tune_model_diffusion(
-    train_request: TrainRequestImage,
-    # worker_config: WorkerConfig = Depends(get_worker_config), # Removed
-):
-    # global current_job_finish_time # Removed
-    logger.info("Starting model tuning.")
-
-    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
-    logger.info(f"Job received is {train_request}")
-    # try: # Remove pre-download
-    #     train_request.dataset_zip = await download_s3_file(
-    #         train_request.dataset_zip, f"{cst.DIFFUSION_DATASET_DIR}/{train_request.task_id}.zip"
-    #     )
-    #     logger.info(train_request.dataset_zip)
-    # except ValueError as e:
-    #     raise HTTPException(status_code=400, detail=str(e))
-
-    # Pass the original dataset_zip URI (S3 path) to the job object
-    job = create_job_diffusion(
-        job_id=str(train_request.task_id),
-        dataset_zip=train_request.dataset_zip, # Pass URI directly
-        model=train_request.model,
-        model_type=train_request.model_type,
-        expected_repo_name=train_request.expected_repo_name,
-        required_finish_time=required_finish_time
-    )
-    logger.info(f"Created job {job}")
-    # worker_config.trainer.enqueue_job(job) # Replaced with RQ
-    # Calculate timeout based on time remaining
-    rq_job = rq_queue.enqueue(
-        start_tuning_container_diffusion,
         job,
         job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
         result_ttl=86400, # Keep result for 1 day
@@ -385,14 +332,6 @@ def factory_router() -> APIRouter:
     router.add_api_route(
         "/start_training_grpo/",
         tune_model_grpo,
-        tags=["Subnet"],
-        methods=["POST"],
-        response_model=TrainResponse,
-        dependencies=[Depends(blacklist_low_stake)],
-    )
-    router.add_api_route(
-        "/start_training_image/",
-        tune_model_diffusion,
         tags=["Subnet"],
         methods=["POST"],
         response_model=TrainResponse,
