@@ -62,7 +62,7 @@ async def tune_model_text(
 
     required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
-    
+
     job = create_job_text(
         job_id=str(train_request.task_id),
         dataset=train_request.dataset,
@@ -177,10 +177,10 @@ async def task_offer(
                         f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
                 accepted=False
             )
-        if "qwen3" in request.model.lower() or "neo" in request.model.lower():
+        
+        if any(k in request.model.lower() for k in ("qwen3", "neo", "stella")):
             return MinerTaskResponse(
-                message=f"This endpoint does not currently support Qwen3 or GPT-neo."
-                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
+                message=f"This endpoint does not currently support that model.",
                 accepted=False
             )
 
