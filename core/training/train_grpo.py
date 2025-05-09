@@ -5,6 +5,7 @@ import logging
 import yaml
 import importlib
 import inspect
+from core import constants as cst
 from math import ceil
 import torch
 from datetime import datetime
@@ -95,51 +96,56 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
     callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
 
 #######################################################
+CONFIG_DIR = os.path.abspath(cst.CONFIG_DIR)
 
 ##### Custom Funcs for getting GRPO reward functions #####
 def reward_functions(cfg):
-        reward_functions = []
-        if cfg.trl and cfg.trl.reward_funcs:
-            reward_funcs = []
-            for reward_func_fqn in cfg.trl.reward_funcs:
-                reward_funcs.append(get_reward_func(reward_func_fqn))
-            reward_functions.append(reward_funcs)
-        return reward_functions
+    """
+    Collects and returns a list of reward-func lists for GRPOTrainer.
+    """
+    funcs_grouped = []
+    if cfg.trl and cfg.trl.reward_funcs:
+        single_trial_funcs = []
+        for fqn in cfg.trl.reward_funcs:
+            single_trial_funcs.append(get_reward_func(fqn))
+        funcs_grouped.append(single_trial_funcs)
+    return funcs_grouped
+
 
 def get_reward_func(reward_func_fqn: str) -> RewardFunc:
-        """
-        Returns the reward function from the given fully qualified name, or the path to the reward function model.
+    """
+    Load a Python function by FQN from ../config/<module>.py.
+    If the file isn’t found, treat fqn as an HF model path string.
+    """
+    module_name, func_name = reward_func_fqn.rsplit(".", 1)
+    module_path = os.path.join(CONFIG_DIR, f"{module_name}.py")
 
-        Args:
-            reward_func_fqn (str): Fully qualified name of the reward function (e.g. r1_grpo.gsm8k_transform),
-                or a HF hub path to the reward model.
-        Raises:
-            ValueError: If the reward function does not accept at least two arguments.
+    if os.path.isfile(module_path):
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
 
-        Returns:
-            RewardFunc: A callable that accepts prompts and completions and returns rewards,
-                or a path to a reward model.
-
-        """
-        try:
-            # use importlib to dynamically load the reward function from the module
-            reward_func_module_name = reward_func_fqn.split(".")[-1]
-            reward_func_module = importlib.import_module(
-                ".".join(reward_func_fqn.split(".")[:-1])
+        reward_func = getattr(module, func_name, None)
+        if reward_func is None:
+            raise AttributeError(
+                f"Module {module_name!r} has no attribute {func_name!r}"
             )
-            reward_func = getattr(reward_func_module, reward_func_module_name)
-            if not len(inspect.signature(reward_func).parameters) >= 2:
-                raise ValueError(
-                    "Reward function must accept at least two arguments: prompts: list and completions: list"
-                )
-            return reward_func
-        except ModuleNotFoundError:
-            # the user has passed a string (ideally indicating the path of a reward model)
-            print(
-                f"Reward function {reward_func_fqn} is a pre-trained model path - if this is unexpected, please check the reward function path."
-            )
-            return reward_func
 
+        sig = inspect.signature(reward_func)
+        if len(sig.parameters) < 2:
+            raise ValueError(
+                "Reward function must accept at least two arguments: "
+                "prompts: list and completions: list"
+            )
+
+        return reward_func
+
+    # fallback: assume the string is a pretrained reward‐model path
+    print(
+        f"Reward function {reward_func_fqn!r} not found in {module_path!r}; "
+        "treating as a HF model path."
+    )
+    return reward_func_fqn  # GRPOTrainer will interpret a string as a model path
 
 
 def parse_args():
