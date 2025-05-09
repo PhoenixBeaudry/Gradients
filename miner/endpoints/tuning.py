@@ -62,18 +62,7 @@ async def tune_model_text(
 
     required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
-
-    try:
-        logger.info(train_request.file_format)
-        if train_request.file_format != FileFormat.HF:
-            if train_request.file_format == FileFormat.S3:
-                train_request.dataset = await download_s3_file(train_request.dataset)
-                logger.info(train_request.dataset)
-                train_request.file_format = FileFormat.JSON
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+    
     job = create_job_text(
         job_id=str(train_request.task_id),
         dataset=train_request.dataset,
