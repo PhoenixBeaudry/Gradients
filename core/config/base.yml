@@ -43,7 +43,12 @@ job_id:
 hpo_run: false
 rl:
 trl:
-
+  beta:
+  max_completion_length:
+  use_vllm:
+  num_generations:
+  reward_funcs:
+  reward_weights:
 
 ##### AXOLOTL REQUIRED - NO TOUCHING NECESSARY #####
 chat_template: llama3
