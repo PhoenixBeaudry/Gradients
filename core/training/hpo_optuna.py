@@ -94,7 +94,7 @@ def objective(trial: optuna.Trial,
     out_dir      = Path(cfg.get("output_root", "./hpo_runs")) / trial_id
     cfg |= {
         "output_dir":        str(out_dir),
-        "wandb_run":         f"{cfg.get('job_id', 'job')}_{trial_id}",
+        "wandb_run":         f"{cfg['job_id'][:5]}_{cfg['rl']}_{trial_id}",
         "wandb_project":     hpo_project,
         "max_steps":        TRIAL_MAX_STEPS,
         "eval_steps":       TRIAL_EVAL_STEPS,
