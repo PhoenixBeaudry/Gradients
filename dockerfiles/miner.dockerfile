@@ -18,7 +18,7 @@ RUN pip install optuna
 RUN pip install --no-build-isolation axolotl
 RUN pip install deepspeed
 RUN pip install --upgrade transformers
-
+RUN pip install vllm
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data
@@ -61,4 +61,4 @@ CMD echo 'Preparing data...' && \
   --accelerate_yaml  /workspace/configs/accelerate.yaml \
 
 
-# save to phoenixbeaudry/gradients-miner:custom-hpo
+# save to phoenixbeaudry/gradients-miner:custom
