@@ -153,8 +153,13 @@ async def task_offer(
         if request.task_type == TaskType.DPOTASK:
             logger.info("Task Type: DPO")
         if request.task_type == TaskType.GRPOTASK:
+            ########### NO GRPO TASKS YET ###########
             logger.info("Task Type: GRPO")
-
+            return MinerTaskResponse(
+                message=f"This endpoint does not accept GRPO tasks yet.... ",
+                accepted=False
+            )
+        
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
             return MinerTaskResponse(
                 message=f"This endpoint only accepts text tasks: "
