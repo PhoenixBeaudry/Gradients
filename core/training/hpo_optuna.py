@@ -250,6 +250,11 @@ def main():
         launch_training(args.accelerate_yaml, args.config)
         return
     
+    # Skip HPO for GRPO tasks
+    if base_cfg["rl"] == "grpo":
+        launch_training(args.accelerate_yaml, args.config)
+        return
+    
     best_params   = run_optuna(args.config, args.accelerate_yaml)
     optimised_cfg = write_opt_cfg(args.config, best_params)
     time.sleep(10)
