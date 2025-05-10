@@ -25,7 +25,7 @@ MAX_TRIALS_TO_RUN = 20
 TRIAL_MAX_STEPS = 100
 TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
-MAX_MINUTES_PER_TRIAL = 15
+MAX_MINUTES_PER_TRIAL = 20
                    
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
@@ -121,6 +121,9 @@ def objective(trial: optuna.Trial,
 
     if cfg["rl"] == "dpo":
         path_to_train_file = "/workspace/training/train_dpo.py"
+    elif cfg["rl"] == "grpo":
+        cfg["trl"]["max_completion_length"] = 16
+        path_to_train_file = "/workspace/training/train_grpo.py"
     else:
         path_to_train_file = "/workspace/training/train.py"
 
@@ -169,6 +172,12 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
 
+    ### Modify HPO params for long GRPO runs
+    if base_cfg["rl"] == "grpo":
+        TRIAL_MAX_STEPS = 20
+        TRIAL_EVAL_STEPS = 20
+        MAX_TRIALS_TO_RUN = 4
+
     study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
@@ -207,6 +216,8 @@ def launch_training(acc_yaml: str, cfg_path: str):
 
     if cfg["rl"] == "dpo":
         path_to_train_file = "/workspace/training/train_dpo.py"
+    elif cfg["rl"] == "grpo":
+        path_to_train_file = "/workspace/training/train_grpo.py"
     else:
         path_to_train_file = "/workspace/training/train.py"
 

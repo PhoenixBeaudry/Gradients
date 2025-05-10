@@ -24,6 +24,8 @@ from rq.exceptions import NoSuchJobError
 import core.constants as cst
 from core.models.payload_models import MinerTaskOffer
 from core.models.payload_models import MinerTaskResponse
+from core.models.payload_models import TrainRequestGrpo
+from core.models.payload_models import TrainRequestImage
 from core.models.payload_models import TrainRequestText
 from core.models.payload_models import TrainResponse
 from core.models.utility_models import TaskType
@@ -79,6 +81,38 @@ async def tune_model_text(
     return {"message": "Training job enqueued.", "task_id": job.job_id}
 
 
+async def tune_model_grpo(
+    train_request: TrainRequestGrpo,
+):
+    logger.info("Starting model tuning.")
+
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
+    logger.info(f"Job received is {train_request}")
+
+    job = create_job_text(
+        job_id=str(train_request.task_id),
+        dataset=train_request.dataset,
+        model=train_request.model,
+        dataset_type=train_request.dataset_type,
+        file_format=train_request.file_format,
+        expected_repo_name=train_request.expected_repo_name,
+        required_finish_time=required_finish_time
+    )
+    
+    logger.info(f"Created job {job}")
+    rq_job = rq_queue.enqueue(
+        start_tuning_container,
+        job,
+        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
+        result_ttl=86400, # Keep result for 1 day
+        failure_ttl=86400,  # Keep failure info for 1 day
+        job_id=job.job_id
+    )
+    logger.info(f"Enqueued job {rq_job.id} to RQ")
+
+    return {"message": "Training job enqueued.", "task_id": job.job_id}
+
+
 async def get_latest_model_submission(task_id: str) -> str:
     try:
         # Temporary work around in order to not change the vali a lot
@@ -118,11 +152,13 @@ async def task_offer(
             logger.info("Task Type: Instruct")
         if request.task_type == TaskType.DPOTASK:
             logger.info("Task Type: DPO")
+        if request.task_type == TaskType.GRPOTASK:
+            logger.info("Task Type: GRPO")
 
-        if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK]:
+        if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
             return MinerTaskResponse(
                 message=f"This endpoint only accepts text tasks: "
-                        f"{TaskType.INSTRUCTTEXTTASK} and {TaskType.DPOTASK}",
+                        f"{TaskType.INSTRUCTTEXTTASK}, {TaskType.DPOTASK} and {TaskType.GRPOTASK}",
                 accepted=False
             )
         
@@ -288,6 +324,14 @@ def factory_router() -> APIRouter:
     router.add_api_route(
         "/start_training/",  # TODO: change to /start_training_text or similar
         tune_model_text,
+        tags=["Subnet"],
+        methods=["POST"],
+        response_model=TrainResponse,
+        dependencies=[Depends(blacklist_low_stake)],
+    )
+    router.add_api_route(
+        "/start_training_grpo/",
+        tune_model_grpo,
         tags=["Subnet"],
         methods=["POST"],
         response_model=TrainResponse,

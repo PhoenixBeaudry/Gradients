@@ -43,7 +43,6 @@ job_id:
 hpo_run: false
 rl:
 
-
 ##### AXOLOTL REQUIRED - NO TOUCHING NECESSARY #####
 chat_template: llama3
 base_model: NousResearch/Meta-Llama-3-8B-Instruct

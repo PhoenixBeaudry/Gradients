@@ -25,11 +25,12 @@ from core.dataset.prepare_diffusion_dataset import prepare_dataset
 from core.docker_utils import stream_logs
 from core.utils import download_s3_file # Import the download utility
 from core.models.utility_models import DiffusionJob
-from core.models.utility_models import DPODatasetType
+from core.models.utility_models import DpoDatasetType
 from core.models.utility_models import FileFormat
-from core.models.utility_models import InstructDatasetType
-from core.models.utility_models import TextJob
+from core.models.utility_models import GrpoDatasetType
 from core.models.utility_models import ImageModelType
+from core.models.utility_models import InstructTextDatasetType
+from core.models.utility_models import TextJob
 from miner.utils import download_flux_unet
 
 
@@ -44,7 +45,12 @@ class DockerEnvironmentDiffusion:
     base_model: str
 
     def to_dict(self) -> dict[str, str]:
-        return {"HUGGINGFACE_TOKEN": self.huggingface_token, "WANDB_TOKEN": self.wandb_token, "JOB_ID": self.job_id, "BASE_MODEL": self.base_model}
+        return {
+            "HUGGINGFACE_TOKEN": self.huggingface_token,
+            "WANDB_TOKEN": self.wandb_token,
+            "JOB_ID": self.job_id,
+            "BASE_MODEL": self.base_model,
+        }
 
 
 @dataclass
@@ -76,7 +82,7 @@ def calculate_seconds_remaining(required_finish_time: datetime) -> float:
 def _load_and_modify_config(
     dataset: str,
     model: str,
-    dataset_type: InstructDatasetType | DPODatasetType,
+    dataset_type: InstructTextDatasetType | DpoDatasetType | GrpoDatasetType,
     file_format: FileFormat,
     task_id: str,
     expected_repo_name: str | None,
@@ -85,8 +91,11 @@ def _load_and_modify_config(
     """
     Loads the config template and modifies it to create a new job config.
     """
+    if isinstance(dataset_type, InstructTextDatasetType | DpoDatasetType | GrpoDatasetType):
+        config_path = cst.CONFIG_TEMPLATE_PATH
+
     logger.info("Loading config template")
-    with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
+    with open(config_path, "r") as file:
         config = yaml.safe_load(file)
 
     config["job_id"] = task_id
@@ -120,9 +129,22 @@ def _load_and_modify_config(
 
 
     # RL specific params
-    if isinstance(dataset_type, DPODatasetType):
+    if isinstance(dataset_type, DpoDatasetType):
         config["rl"] = "dpo"
+    elif isinstance(dataset_type, GrpoDatasetType):
+        filename, reward_funcs_names = create_reward_funcs_file(
+            [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
+            )
+        config["rl"] = "grpo"
+        config["trl"] = {}
+        config["trl"]["beta"] = 0.04
+        config["trl"]["max_completion_length"] = 128
+        config["trl"]["use_vllm"] = False
+        config["trl"]["num_generations"] = 2
+        config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
+        config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
         config["rl_beta"] = 0.1
+        config["beta"] = 0.04
 
     hf_cfg = AutoConfig.from_pretrained(model)
  
@@ -142,6 +164,31 @@ def _load_and_modify_config(
     config = setup_lora_config(config, config["model_params_count"])
 
     return config
+
+
+def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]:
+    """
+    Create a Python file with reward functions for GRPO training.
+
+    Args:
+        reward_funcs: List of strings containing Python reward function implementations
+        task_id: Unique task identifier
+    """
+    filename = f"rewards_{task_id}"
+    filepath = os.path.join(cst.CONFIG_DIR, f"{filename}.py")
+
+    func_names = []
+    for reward_func in reward_funcs:
+        if "def " in reward_func:
+            func_name = reward_func.split("def ")[1].split("(")[0].strip()
+            func_names.append(func_name)
+
+    with open(filepath, "w") as f:
+        f.write("# Auto-generated reward functions file\n\n")
+        for reward_func in reward_funcs:
+            f.write(f"{reward_func}\n\n")
+
+    return filename, func_names
 
 
 def _load_and_modify_config_diffusion(job: DiffusionJob) -> dict:
@@ -193,7 +240,7 @@ def create_job_text(
     job_id: str,
     dataset: str,
     model: str,
-    dataset_type: InstructDatasetType,
+    dataset_type: InstructTextDatasetType | DpoDatasetType | GrpoDatasetType,
     file_format: FileFormat,
     expected_repo_name: str | None,
     required_finish_time: datetime
@@ -245,8 +292,11 @@ def start_tuning_container_diffusion(job: DiffusionJob):
         raise # Re-raise the exception to fail the job
 
     prepare_dataset(
-        training_images_zip_path=downloaded_local_zip_path, # Use the downloaded path
-        training_images_repeat=cst.DIFFUSION_SDXL_REPEATS if job.model_type == ImageModelType.SDXL else cst.DIFFUSION_FLUX_REPEATS,
+        training_images_zip_path=job.dataset_zip,
+        training_images_repeat=(
+            cst.DIFFUSION_SDXL_REPEATS if job.model_type == ImageModelType.SDXL
+            else cst.DIFFUSION_FLUX_REPEATS
+        ),
         instance_prompt=cst.DIFFUSION_DEFAULT_INSTANCE_PROMPT,
         class_prompt=cst.DIFFUSION_DEFAULT_CLASS_PROMPT,
         job_id=job.job_id,
@@ -388,13 +438,13 @@ def _dpo_format_rejected(row, format_str):
     return result
 
 
-def _adapt_columns_for_dpo_dataset(dataset_path: str, dataset_type: DPODatasetType, apply_formatting: bool = False):
+def _adapt_columns_for_dpo_dataset(dataset_path: str, dataset_type: DpoDatasetType, apply_formatting: bool = False):
     """
     Transform a DPO JSON dataset file to match axolotl's `chatml.argilla` expected column names.
 
     Args:
         dataset_path: Path to the JSON dataset file
-        dataset_type: DPODatasetType with field mappings
+        dataset_type: DpoDatasetType with field mappings
         apply_formatting: If True, apply formatting templates to the content
     """
     with open(dataset_path, 'r') as f:
@@ -423,6 +473,69 @@ def _adapt_columns_for_dpo_dataset(dataset_path: str, dataset_type: DPODatasetTy
     output_data = df.to_dict(orient='records')
     with open(dataset_path, 'w') as f:
         json.dump(output_data, f, indent=2)
+
+
+def _adapt_columns_for_grpo_dataset(dataset_path: str, dataset_type: GrpoDatasetType):
+    """
+    Transform a GRPO JSON dataset file to match axolotl's `prompt` expected column name.
+
+    Args:
+        dataset_path: Path to the JSON dataset file
+        dataset_type: GrpoDatasetType with field mappings
+    """
+    with open(dataset_path, 'r') as f:
+        data = json.load(f)
+    df = pd.DataFrame(data)
+    df = df.rename(columns={dataset_type.field_prompt: cst.GRPO_DEFAULT_FIELD_PROMPT})
+    output_data = df.to_dict(orient='records')
+    with open(dataset_path, 'w') as f:
+        json.dump(output_data, f, indent=2)
+
+def _create_docker_entrypoint(job):
+    setup_commands = """
+    echo 'Preparing data...' && \\
+    if [ -n "$HUGGINGFACE_TOKEN" ]; then \\
+    echo "Attempting to log in to Hugging Face" && \\
+    huggingface-cli login --token "$HUGGINGFACE_TOKEN" --add-to-git-credential; \\
+    else \\
+    echo "HUGGINGFACE_TOKEN is not set. Skipping Hugging Face login."; \\
+    fi && \\
+    if [ -n "$WANDB_TOKEN" ]; then \\
+    echo "Attempting to log in to W&B" && \\
+    wandb login "$WANDB_TOKEN"; \\
+    else \\
+    echo "WANDB_TOKEN is not set. Skipping W&B login."; \\
+    fi && \\
+    if [ "$DATASET_TYPE" != "hf" ] && [ -f "/workspace/input_data/${DATASET_FILENAME}" ]; then \\
+    cp /workspace/input_data/${DATASET_FILENAME} /workspace/axolotl/${DATASET_FILENAME}; \\
+    fi"""
+
+    if isinstance(job.dataset_type, GrpoDatasetType):
+        reward_file = f"rewards_{job.job_id}.py"
+        grpo_command = f"""
+    echo "Moving specific reward function file to src directory..." && \\
+    cp ${{CONFIG_DIR}}/{reward_file} /workspace/axolotl/src/"""
+        setup_commands += " && \\" + grpo_command
+
+    training_command = """
+    echo 'Starting training command' && \\
+    accelerate launch -m axolotl.cli.train ${CONFIG_DIR}/${JOB_ID}.yml
+    """
+
+    return setup_commands + " && \\" + training_command
+
+def _adapt_columns_for_dataset(job: TextJob):
+    """
+    Adapt column names in the dataset based on job type.
+    Only processes JSON files that require column name adaptation.
+    """
+    if job.file_format != FileFormat.JSON:
+        return
+
+    if isinstance(job.dataset_type, DpoDatasetType):
+        _adapt_columns_for_dpo_dataset(job.dataset, job.dataset_type, True)
+    elif isinstance(job.dataset_type, GrpoDatasetType):
+        _adapt_columns_for_grpo_dataset(job.dataset, job.dataset_type)
 
 
 def start_tuning_container(job: TextJob):
@@ -516,10 +629,7 @@ def start_tuning_container(job: TextJob):
                 "mode": "ro",
             }
 
-        if isinstance(job.dataset_type, DPODatasetType):
-            if job.file_format == FileFormat.JSON:
-                _adapt_columns_for_dpo_dataset(job.dataset, job.dataset_type, True)
-
+        _adapt_columns_for_dataset(job)
 
         container = docker_client.containers.run(
             image=cst.MINER_DOCKER_IMAGE,
@@ -536,24 +646,21 @@ def start_tuning_container(job: TextJob):
             detach=True,
             tty=True,
         )
-        stream_logs(container)
-        try:
-            result = container.wait()
-            logger.info(f"Container {container.id} finished with result: {result}")
-            if result["StatusCode"] != 0:
-                raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
-        except ReadTimeout: # Catch the correct exception from requests
-            logger.warning(f"Container {container.id} for job {job.job_id} exceeded the time limit. Attempting graceful stop...")
-            try:
-                container.stop(timeout=60) # 60 second grace period
-                logger.info(f"Container {container.id} stopped gracefully.")
-            except Exception as stop_err:
-                logger.error(f"Failed to gracefully stop container {container.id}: {stop_err}. It might be forcefully killed.")
-            # Raise a specific error to indicate timeout
-            raise TimeoutError(f"Container for job {job.job_id} exceeded the time limit.")
-        except Exception as e:
-            logger.error(f"Error waiting for or processing container {container.id}: {str(e)}")
-            raise # Re-raise other exceptions
+
+        last_logs = stream_logs(container)
+
+        result = container.wait()
+
+        if result["StatusCode"] != 0:
+            raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
+
+    except Exception as e:
+        # Waiting for axolotl to fix the issue
+        if "TypeError: DPOTrainer.create_model_card() got an unexpected keyword argument 'dataset_tags'" in last_logs:
+            logger.warning("This is probably just an axolotl issue only affecting HF repo model card, continuing...")
+        else:
+            logger.error(f"Error processing job: {str(e)}")
+            raise
 
     finally:
         repo = config.get("hub_model_id", None)
