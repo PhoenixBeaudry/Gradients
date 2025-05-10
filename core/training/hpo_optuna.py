@@ -174,15 +174,19 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
 
     ### Modify HPO params for long GRPO runs
     if base_cfg["rl"] == "grpo":
-        TRIAL_MAX_STEPS = 20
-        TRIAL_EVAL_STEPS = 20
-        MAX_TRIALS_TO_RUN = 4
+        TRIAL_MAX_STEPS_param = 20
+        TRIAL_EVAL_STEPS_param = 20
+        MAX_TRIALS_TO_RUN_param = 4
+    else:
+        TRIAL_MAX_STEPS_param = TRIAL_MAX_STEPS
+        TRIAL_EVAL_STEPS_param = TRIAL_EVAL_STEPS
+        MAX_TRIALS_TO_RUN_param = MAX_TRIALS_TO_RUN
 
     study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,
                                 storage=storage,
-                                pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+                                pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS_param/TRIAL_EVAL_STEPS_param), reduction_factor=3))
     
     # calculate how much time we have left for job:
     time_remaining = datetime.fromisoformat(base_cfg['required_finish_time']) - datetime.now()
@@ -190,7 +194,7 @@ def run_optuna(base_cfg_path: str, acc_yaml: str) -> dict:
     LOG.info(f"Time allocated to HPO Search {seconds_remaining/3600*TIMEOUT_PERCENTAGE_OF_TOTAL}")
     study.optimize(lambda t: objective(t, base_cfg, acc_yaml, hpo_project, study_name, storage_path),
                    timeout=int(seconds_remaining * TIMEOUT_PERCENTAGE_OF_TOTAL),
-                   n_trials=MAX_TRIALS_TO_RUN,
+                   n_trials=MAX_TRIALS_TO_RUN_param,
                    show_progress_bar=True)
 
     LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
