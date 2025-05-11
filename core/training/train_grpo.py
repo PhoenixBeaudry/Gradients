@@ -329,10 +329,10 @@ def main():
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
         n_train = len(dataset_meta.train_dataset)
-        target_train = n_train*0.5
+        target_train = int(n_train*0.5)
 
         n_eval = len(dataset_meta.eval_dataset)
-        target_eval = n_eval*0.5
+        target_eval = int(n_eval*0.5)
 
         # 2. deterministic shuffle so every trial sees identical data
         train_subset = dataset_meta.train_dataset.shuffle(seed=42)
