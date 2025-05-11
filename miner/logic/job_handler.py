@@ -136,7 +136,7 @@ def _load_and_modify_config(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
         config["rl"] = "grpo"
-        config["max_steps"] = 100
+        config["max_steps"] = 1000
         config["eval_steps"] = 100
         config["save_steps"] = 100
         config["trl"] = {}
