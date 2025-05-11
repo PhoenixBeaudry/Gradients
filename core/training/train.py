@@ -237,22 +237,15 @@ def main():
 
     if not cfg["hpo_run"]:
         train_dataset = dataset_meta.train_dataset
-        eval_frac = min(0.05, 20_000 / len(train_dataset))   # 3 % or 10 k, whichever smaller
-        eval_dataset   = train_dataset.shuffle(seed=42).select(range(int(eval_frac * len(train_dataset))))
+        eval_dataset   = dataset_meta.eval_dataset
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
         n_train = len(dataset_meta.train_dataset)
-        target_train = min(
-            50_000,
-            max(1_024, ceil(n_train * 0.02))
-        )
+        target_train = n_train*0.5
 
         n_eval = len(dataset_meta.eval_dataset)
-        target_eval = min(
-            max(512, ceil(target_train * 0.25)),
-            n_eval                                    # never exceed full eval set
-        )
+        target_eval = n_eval*0.5
 
         # 2. deterministic shuffle so every trial sees identical data
         train_subset = dataset_meta.train_dataset.shuffle(seed=42)
