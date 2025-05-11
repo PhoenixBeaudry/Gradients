@@ -265,7 +265,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         save_steps=int(cfg['save_steps']),
         save_total_limit=int(cfg['save_total_limit']),
         metric_for_best_model=cfg['metric_for_best_model'],
-        greater_is_better=bool(cfg['greater_is_better']),
+        greater_is_better=True,
         weight_decay=float(cfg['weight_decay']),
         run_name=cfg['wandb_run'],
         warmup_steps=cfg['warmup_steps'],
