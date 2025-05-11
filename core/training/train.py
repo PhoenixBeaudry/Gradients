@@ -114,7 +114,7 @@ def load_model_and_tokenizer(model_name: str, cfg: dict):
         model_name = model_name,
         max_seq_length = cfg["sequence_len"],
         dtype = None,
-        load_in_4bit = True,
+        load_in_4bit = False,
     )
 
     return model, tokenizer
