@@ -19,6 +19,7 @@ from transformers import (
     AutoModelForCausalLM
 )
 import time
+from trl import SFTConfig, SFTTrainer
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
 from unsloth import FastLanguageModel
@@ -113,6 +114,7 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
+
 def load_model_and_tokenizer(model_name: str, cfg: dict):
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = model_name,
@@ -171,7 +173,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
             'hub_strategy': cfg['hub_strategy'],
             'push_to_hub': True,
         }
-    tf_args = TrainingArguments(
+    tf_args = SFTConfig(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
@@ -210,7 +212,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         padding="longest",               # dynamic per mini‑batch
         pad_to_multiple_of=8,            # keeps TensorCores happy; optional
     )
-    return Trainer(
+    return SFTTrainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
@@ -242,6 +244,7 @@ def main():
     dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
 
     model, tokenizer = load_model_and_tokenizer(cfg['base_model'], cfg)
+
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
