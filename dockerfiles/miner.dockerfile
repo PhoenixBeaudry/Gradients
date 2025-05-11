@@ -14,10 +14,10 @@ RUN pip install mlflow protobuf huggingface_hub wandb transformers accelerate pe
 RUN pip install pytorch-ignite
 RUN pip install bitsandbytes
 RUN pip install optuna
-RUN pip install --no-build-isolation axolotl
-RUN pip install --no-build-isolation trl
-RUN pip install --upgrade transformers
 RUN pip install unsloth
+RUN pip install trl
+RUN pip install --upgrade transformers
+RUN pip install --no-build-isolation axolotl
 
 
 WORKDIR /workspace
