@@ -9,25 +9,17 @@ import torch
 from datetime import datetime
 from axolotl.common.datasets import load_preference_datasets
 from trl import DPOConfig, DPOTrainer
-from axolotl.utils.models import load_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
 from transformers import (
-    TrainingArguments,
-    Trainer,
-    DataCollatorForSeq2Seq,
-    DataCollatorForLanguageModeling,
     EarlyStoppingCallback,
     SchedulerType,
-    AutoModelForCausalLM
 )
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
 import bitsandbytes as bnb
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from unsloth import FastLanguageModel, PatchDPOTrainer
-from unsloth import is_bfloat16_supported
 PatchDPOTrainer()
 
 # Disable parallel tokenizer threads to avoid warnings
@@ -147,7 +139,7 @@ def apply_lora_adapter(model, cfg: dict):
     return model
 
 
-def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
+def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     # ── DPO Trainer ────────────────────────────────────────
     #### Callbacks ####
     callbacks = []
@@ -204,7 +196,6 @@ def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
         bf16=True,
         use_liger_kernel=True,
         load_best_model_at_end=True,
-        force_use_ref_model=True,
         **hf_kwargs,
     )
     #####################################
@@ -212,7 +203,7 @@ def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
     logger.info("Initializing DPO Trainer")
     return DPOTrainer(
         model=model,
-        ref_model=ref_model,
+        ref_model=None,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
@@ -241,10 +232,6 @@ def main():
     # after loading cfg...
     dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     model, tokenizer = load_model_and_tokenizer(cfg['base_model'], cfg)
-    # Clone the base model to use as your frozen reference
-    ref_model = copy.deepcopy(model)
-    # Make sure the ref_model is indeed in eval mode and on the same device
-    ref_model.eval()
 
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
@@ -276,7 +263,7 @@ def main():
         train_dataset = train_subset.select(range(target_train))
         eval_dataset  = eval_subset.select(range(target_eval))
 
-    trainer = build_trainer(cfg, model, ref_model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
