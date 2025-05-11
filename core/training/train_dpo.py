@@ -265,13 +265,14 @@ def main():
         tokenizer.padding_side = "left"
 
     model = load_model(cfg['base_model'], cfg)
-    # Clone the base model to use as your frozen reference
+
+    if cfg.get('adapter') == 'lora':
+        model = apply_lora_adapter(model, cfg)
+
     ref_model = copy.deepcopy(model)
     # Make sure the ref_model is indeed in eval mode and on the same device
     ref_model.eval()
 
-    if cfg.get('adapter') == 'lora':
-        model = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"]:
         train_dataset = dataset_meta.train_dataset
