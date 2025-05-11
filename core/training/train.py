@@ -237,7 +237,7 @@ def main():
 
     if not cfg["hpo_run"]:
         train_dataset = dataset_meta.train_dataset
-        eval_frac = min(0.03, 10_000 / len(train_dataset))   # 3 % or 10 k, whichever smaller
+        eval_frac = min(0.05, 20_000 / len(train_dataset))   # 3 % or 10 k, whichever smaller
         eval_dataset   = train_dataset.shuffle(seed=42).select(range(int(eval_frac * len(train_dataset))))
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
