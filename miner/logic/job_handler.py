@@ -103,7 +103,27 @@ def _load_and_modify_config(
 
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
-    
+
+    # RL specific params
+    if isinstance(dataset_type, DpoDatasetType):
+        config["rl"] = "dpo"
+    elif isinstance(dataset_type, GrpoDatasetType):
+        filename, reward_funcs_names = create_reward_funcs_file(
+            [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
+            )
+        config["rl"] = "grpo"
+        config["max_steps"] = 1000
+        config["eval_steps"] = 100
+        config["save_steps"] = 100
+        config["trl"] = {}
+        config["trl"]["beta"] = 0.04
+        config["trl"]["max_completion_length"] = 32
+        config["trl"]["use_vllm"] = False 
+        config["trl"]["num_generations"] = 2
+        config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
+        config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
+        config["rl_beta"] = 0.1
+        config["beta"] = 0.04
     
     config["required_finish_time"] = required_finish_time.isoformat()
 
@@ -128,26 +148,7 @@ def _load_and_modify_config(
         config["learning_rate"] = 1e-5
 
 
-    # RL specific params
-    if isinstance(dataset_type, DpoDatasetType):
-        config["rl"] = "dpo"
-    elif isinstance(dataset_type, GrpoDatasetType):
-        filename, reward_funcs_names = create_reward_funcs_file(
-            [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
-            )
-        config["rl"] = "grpo"
-        config["max_steps"] = 1000
-        config["eval_steps"] = 100
-        config["save_steps"] = 100
-        config["trl"] = {}
-        config["trl"]["beta"] = 0.04
-        config["trl"]["max_completion_length"] = 32
-        config["trl"]["use_vllm"] = False 
-        config["trl"]["num_generations"] = 2
-        config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
-        config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
-        config["rl_beta"] = 0.1
-        config["beta"] = 0.04
+    
 
     hf_cfg = AutoConfig.from_pretrained(model)
  
