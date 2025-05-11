@@ -139,7 +139,7 @@ def apply_lora_adapter(model, cfg: dict):
     return model
 
 
-def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
+def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
     # ── DPO Trainer ────────────────────────────────────────
     #### Callbacks ####
     callbacks = []
@@ -203,7 +203,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     logger.info("Initializing DPO Trainer")
     return DPOTrainer(
         model=model,
-        ref_model=None,
+        ref_model=ref_model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
@@ -233,8 +233,10 @@ def main():
     dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     model, tokenizer = load_model_and_tokenizer(cfg['base_model'], cfg)
 
+    ref_model  = copy.deepcopy(model).eval().requires_grad_(False)
+
     if cfg.get('adapter') == 'lora':
-        model = apply_lora_adapter(model, cfg)
+        policy_model = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"]:
         train_dataset = dataset_meta.train_dataset
@@ -256,7 +258,7 @@ def main():
         train_dataset = train_subset.select(range(target_train))
         eval_dataset  = eval_subset.select(range(target_eval))
 
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, policy_model, ref_model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
