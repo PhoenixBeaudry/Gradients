@@ -73,9 +73,9 @@ def update_model_info(config: dict, model: str, job_id: str = "", expected_repo_
 
     config["base_model"] = model
     config["base_model_config"] = model
-    config["wandb_runid"] = f"{job_id[:5]}_{config['rl']}_{config["required_finish_time"]}"
-    config["wandb_run"] = f"{job_id[:5]}_{config['rl']}_{config["required_finish_time"]}"
-    config["wandb_name"] = f"{job_id[:5]}_{config['rl']}_{config["required_finish_time"]}"
+    config["wandb_runid"] = f"{job_id[:5]}_{config['rl']}_{config['required_finish_time']}"
+    config["wandb_run"] = f"{job_id[:5]}_{config['rl']}_{config['required_finish_time']}"
+    config["wandb_name"] = f"{job_id[:5]}_{config['rl']}_{config['required_finish_time']}"
     config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{expected_repo_name or str(uuid.uuid4())}"
 
     return config
