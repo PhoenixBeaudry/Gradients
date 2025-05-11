@@ -22,8 +22,8 @@ logging.basicConfig(level=logging.INFO,
 LOG = logging.getLogger("hpo_optuna")
 
 MAX_TRIALS_TO_RUN = 20
-TRIAL_MAX_STEPS = 100
-TRIAL_EVAL_STEPS = 20
+TRIAL_MAX_STEPS = 150
+TRIAL_EVAL_STEPS = 30
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
 MAX_MINUTES_PER_TRIAL = 20
                    
@@ -31,7 +31,7 @@ MAX_MINUTES_PER_TRIAL = 20
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     params = {
-        "learning_rate":               trial.suggest_float("learning_rate", 6e-6, 6e-4, log=True),
+        "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 6e-4, log=True),
         "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
         "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
