@@ -17,7 +17,6 @@ RUN pip install optuna
 RUN pip install --no-build-isolation axolotl
 RUN pip install --upgrade transformers
 RUN pip install unsloth
-RUN pip install vllm
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data
 
