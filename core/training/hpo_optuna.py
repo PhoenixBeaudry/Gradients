@@ -37,7 +37,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
     }
     if cfg["rl"] == "dpo":
-        params["beta"] = trial.suggest_float("beta", 0.01, 0.2)
+        params["beta"] = trial.suggest_float("beta", 0.01, 0.5)
 
     if cfg["adapter"] == "lora":
         params |= {
