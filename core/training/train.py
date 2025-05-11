@@ -7,25 +7,19 @@ from math import ceil
 from datetime import datetime
 import torch
 from axolotl.common.datasets import load_datasets
-from axolotl.utils.models import load_tokenizer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
 from transformers import (
-    TrainingArguments,
-    Trainer,
     DataCollatorForSeq2Seq,
     EarlyStoppingCallback,
     SchedulerType,
-    AutoModelForCausalLM
 )
 import time
 from trl import SFTConfig, SFTTrainer
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
 from unsloth import FastLanguageModel
-from unsloth import is_bfloat16_supported
 import bitsandbytes as bnb
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 # Disable parallel tokenizer threads to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -206,12 +200,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer,
-        model=model,                     # passes label_pad_token_id=-100 automatically
-        padding="longest",               # dynamic per mini‑batch
-        pad_to_multiple_of=8,            # keeps TensorCores happy; optional
-    )
     return SFTTrainer(
         model=model,
         args=tf_args,
@@ -219,7 +207,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         eval_dataset=eval_ds,
         processing_class=tokenizer,
         callbacks=callbacks,
-        data_collator=data_collator
     )
 
 
