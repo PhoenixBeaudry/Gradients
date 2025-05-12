@@ -1,0 +1,11 @@
+{
+  "input": {
+    "model": "unsloth/llama-3-8b",
+    "dataset": "nkazi/SciEntsBank",
+    "dataset_type": "nkazi/SciEntsBank",
+    "file_format": "hf",
+    "expected_repo_name": "testing_serverless",
+    "hours_to_complete": 8
+  },
+  "id": "dasdsafasf"
+}

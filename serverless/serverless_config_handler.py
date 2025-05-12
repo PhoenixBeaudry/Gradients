@@ -24,7 +24,7 @@ import asyncio
 
 hf_api = HfApi()
 
-CONFIG_DIR = "/workspace/configs"
+CONFIG_DIR = "/workspace/configs/"
 CONFIG_TEMPLATE_PATH = CONFIG_DIR + "base.yml"
 OUTPUT_DIR = "/workspace/outputs/"
 TRAIN_DIR = "/workspace/training/"
@@ -264,8 +264,7 @@ def _load_and_modify_config(
     """
     Loads the config template and modifies it to create a new job config.
     """
-    if isinstance(dataset_type, InstructTextDatasetType | DpoDatasetType | GrpoDatasetType):
-        config_path = CONFIG_TEMPLATE_PATH
+    config_path = CONFIG_TEMPLATE_PATH
 
     print("Loading config template")
     with open(config_path, "r") as file:
