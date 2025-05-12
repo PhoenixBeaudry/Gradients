@@ -4,6 +4,7 @@ from datetime import timedelta
 from math import ceil
 from core.config.config_handler import save_config
 import toml
+import json
 import yaml
 import redis
 from fastapi import Depends
@@ -61,10 +62,12 @@ async def tune_model_text(
     config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
     # Format the request for RunPod
+    # Serialize Dataset Type
+    serial_dataset_type = train_request.dataset_type.model_dump_json()
     runpod_request = {
         "model": train_request.model,
         "dataset": train_request.dataset,
-        "dataset_type": train_request.dataset_type,
+        "dataset_type": json.loads(serial_dataset_type),
         "file_format": train_request.file_format,
         "expected_repo_name": train_request.expected_repo_name,
         "hours_to_complete": train_request.hours_to_complete,

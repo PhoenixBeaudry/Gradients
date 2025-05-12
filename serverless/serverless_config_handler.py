@@ -37,7 +37,7 @@ DPO_DEFAULT_FIELD_CHOSEN = "chosen"
 DPO_DEFAULT_FIELD_REJECTED = "rejected"
 
 GRPO_DEFAULT_FIELD_PROMPT = "prompt"
-
+    
 class FileFormat(str, Enum):
     CSV = "csv"  # needs to be local file
     JSON = "json"  # needs to be local file
@@ -373,12 +373,39 @@ def setup_lora_config(config, model_size):
 def setup_config(
     dataset: str,
     model: str,
-    dataset_type: InstructTextDatasetType | DpoDatasetType | GrpoDatasetType,
+    dataset_type: dict,
     file_format: FileFormat,
     task_id: str,
     expected_repo_name: str | None,
     required_finish_time: datetime
 ):
+    # Deserialize dataset_type based on class_type
+    if isinstance(dataset_type, dict) and "class_type" in dataset_type:
+        dataset_type_class = dataset_type["class_type"]
+        class_attributes = dataset_type.get("attributes", {})
+        
+        # Create an instance directly based on the class name
+        if dataset_type_class == "DpoDatasetType":
+            dataset_type = DpoDatasetType(**class_attributes)
+        elif dataset_type_class == "InstructTextDatasetType":
+            dataset_type = InstructTextDatasetType(**class_attributes)
+        elif dataset_type_class == "GrpoDatasetType":
+            # Handle nested RewardFunction objects in GrpoDatasetType
+            if "reward_functions" in class_attributes and class_attributes["reward_functions"]:
+                reward_functions = []
+                for reward_func_dict in class_attributes["reward_functions"]:
+                    reward_functions.append(RewardFunction(**reward_func_dict))
+                class_attributes["reward_functions"] = reward_functions
+            dataset_type = GrpoDatasetType(**class_attributes)
+
+    else:
+        # Handle error or default case
+        print(f"Unable to deserialize dataset_type: {dataset_type}")
+        return {
+            "success": False,
+            "task_id": task_id,
+            "error": "Invalid dataset_type format"
+        }
     # Download dataset
     try:
         print(file_format)

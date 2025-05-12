@@ -39,6 +39,7 @@ def handler(job):
     CONFIG_DIR = "/workspace/configs"
     config_filename = f"{job_id}.yml"
     config_path = os.path.join(CONFIG_DIR, config_filename)
+
     setup_config(
         dataset,
         model,
