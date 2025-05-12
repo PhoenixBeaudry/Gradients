@@ -47,7 +47,7 @@ redis_conn = redis.Redis(
     db=0
 )
 rq_queue = Queue(connection=redis_conn)
-
+runpod.api_key = os.getenv("RUNPOD_API_KEY")
 
 async def tune_model_text(
     train_request: TrainRequestText,
@@ -73,7 +73,7 @@ async def tune_model_text(
     
     try:
         # Create a RunPod endpoint instance
-        endpoint = runpod.Endpoint(RUNPOD_ENDPOINT_ID)
+        endpoint = runpod.Endpoint("3f7fu7em4zi8m3")
         
         # Submit the job to RunPod
         job = endpoint.run(runpod_request)
