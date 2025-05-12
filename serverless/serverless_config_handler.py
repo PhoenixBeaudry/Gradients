@@ -247,7 +247,6 @@ def _process_instruct_dataset_fields(instruct_type_dict: dict) -> dict:
     return {"format": "custom", "type": processed_dict}
 
 
-
 def _load_and_modify_config(
     dataset: str,
     model: str,
