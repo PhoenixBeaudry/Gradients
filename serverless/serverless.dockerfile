@@ -39,13 +39,13 @@ ENV OMP_NUM_THREADS=4
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # TODO Copy over training files and base config
-COPY runpod_handler.py /workspace/configs
-COPY serverless_config_handler.py /workspace/configs
-COPY base.yml /workspace/configs
-COPY hpo_optuna.py /workspace/training
-COPY train.py /workspace/training
-COPY train_dpo.py /workspace/training
-COPY train_grpo.py /workspace/training
+COPY serverless/runpod_handler.py /workspace/configs
+COPY serverless/serverless_config_handler.py /workspace/configs
+COPY serverless/base.yml /workspace/configs
+COPY serverless/hpo_optuna.py /workspace/training
+COPY serverless/train.py /workspace/training
+COPY serverless/train_dpo.py /workspace/training
+COPY serverless/train_grpo.py /workspace/training
 
 CMD echo 'Preparing logging...' && \
     if [ -n "$HUGGINGFACE_TOKEN" ]; then \
