@@ -38,6 +38,55 @@ DPO_DEFAULT_FIELD_REJECTED = "rejected"
 
 GRPO_DEFAULT_FIELD_PROMPT = "prompt"
 
+class FileFormat(str, Enum):
+    CSV = "csv"  # needs to be local file
+    JSON = "json"  # needs to be local file
+    HF = "hf"  # Hugging Face dataset
+    S3 = "s3"
+
+
+class InstructTextDatasetType(BaseModel):
+    system_prompt: str | None = ""
+    system_format: str | None = "{system}"
+    field_system: str | None = None
+    field_instruction: str | None = None
+    field_input: str | None = None
+    field_output: str | None = None
+    format: str | None = None
+    no_input_format: str | None = None
+    field: str | None = None
+
+
+class RewardFunction(BaseModel):
+    """Model representing a reward function with its metadata"""
+    reward_func: str = Field(
+        ...,
+        description="String with the python code of the reward function to use",
+        examples=[
+            "def reward_func_conciseness(completions, **kwargs):",
+            "\"\"\"Reward function that favors shorter, more concise answers.\"\"\"",
+            "    return [100.0/(len(completion.split()) + 10) for completion in completions]"
+        ]
+    )
+    reward_weight: float = Field(..., ge=0)
+    func_hash: str | None = None
+    is_generic: bool | None = None
+
+
+class GrpoDatasetType(BaseModel):
+    field_prompt: str | None = None
+    reward_functions: list[RewardFunction] | None = []
+
+
+class DpoDatasetType(BaseModel):
+    field_prompt: str | None = None
+    field_system: str | None = None
+    field_chosen: str | None = None
+    field_rejected: str | None = None
+    prompt_format: str | None = "{prompt}"
+    chosen_format: str | None = "{chosen}"
+    rejected_format: str | None = "{rejected}"
+
 async def download_s3_file(file_url: str, save_path: str = None, tmp_dir: str = "/tmp") -> str:
     """Download a file from an S3 URL and save it locally, skipping download if it already exists.
 
@@ -197,55 +246,6 @@ def _process_instruct_dataset_fields(instruct_type_dict: dict) -> dict:
 
     return {"format": "custom", "type": processed_dict}
 
-
-class FileFormat(str, Enum):
-    CSV = "csv"  # needs to be local file
-    JSON = "json"  # needs to be local file
-    HF = "hf"  # Hugging Face dataset
-    S3 = "s3"
-
-
-class InstructTextDatasetType(BaseModel):
-    system_prompt: str | None = ""
-    system_format: str | None = "{system}"
-    field_system: str | None = None
-    field_instruction: str | None = None
-    field_input: str | None = None
-    field_output: str | None = None
-    format: str | None = None
-    no_input_format: str | None = None
-    field: str | None = None
-
-
-class RewardFunction(BaseModel):
-    """Model representing a reward function with its metadata"""
-    reward_func: str = Field(
-        ...,
-        description="String with the python code of the reward function to use",
-        examples=[
-            "def reward_func_conciseness(completions, **kwargs):",
-            "\"\"\"Reward function that favors shorter, more concise answers.\"\"\"",
-            "    return [100.0/(len(completion.split()) + 10) for completion in completions]"
-        ]
-    )
-    reward_weight: float = Field(..., ge=0)
-    func_hash: str | None = None
-    is_generic: bool | None = None
-
-
-class GrpoDatasetType(BaseModel):
-    field_prompt: str | None = None
-    reward_functions: list[RewardFunction] | None = []
-
-
-class DpoDatasetType(BaseModel):
-    field_prompt: str | None = None
-    field_system: str | None = None
-    field_chosen: str | None = None
-    field_rejected: str | None = None
-    prompt_format: str | None = "{prompt}"
-    chosen_format: str | None = "{chosen}"
-    rejected_format: str | None = "{rejected}"
 
 
 def _load_and_modify_config(
