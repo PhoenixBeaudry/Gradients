@@ -164,7 +164,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict):
     return get_peft_model(model, peft_config), peft_config
 
 
-def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
+def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
     # ── DPO Trainer ────────────────────────────────────────
     #### Callbacks ####
     callbacks = []
@@ -229,11 +229,11 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
     logger.info("Initializing DPO Trainer")
     return DPOTrainer(
         model=model,
+        ref_model=ref_model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
-        peft_config=peft_config,
         callbacks=callbacks,
     )
 
@@ -266,8 +266,10 @@ def main():
 
     model = load_model(cfg['base_model'], cfg)
 
+    ref_model  = copy.deepcopy(model).eval().requires_grad_(False)
+
     if cfg.get('adapter') == 'lora':
-        model, peft_config = apply_lora_adapter(model, cfg)
+        policy_model, peft_config = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"]:
         train_dataset = dataset_meta.train_dataset
@@ -296,7 +298,7 @@ def main():
         train_dataset = train_subset.select(range(target_train))
         eval_dataset  = eval_subset.select(range(target_eval))
 
-    trainer = build_trainer(cfg, model, peft_config, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, policy_model, ref_model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
