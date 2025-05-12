@@ -34,7 +34,6 @@ RUN mkdir -p /root/.aws && \
     echo "[default]\naws_access_key_id=dummy_access_key\naws_secret_access_key=dummy_secret_key" > /root/.aws/credentials && \
     echo "[default]\nregion=us-east-1" > /root/.aws/config
 
-ENV FLASH_ATTN_FORCE=1
 ENV OMP_NUM_THREADS=4
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
