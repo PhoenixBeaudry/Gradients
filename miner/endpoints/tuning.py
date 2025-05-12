@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from datetime import timedelta
 from math import ceil
+from enum import Enum
 from core.config.config_handler import save_config
 import toml
 from core.models.utility_models import DpoDatasetType
@@ -76,11 +77,14 @@ async def tune_model_text(
     
     serial_dataset_type["attributes"] = json.loads(train_request.dataset_type.model_dump_json())
 
+    # Serialize file_format (Enum)
+    file_format_str = train_request.file_format.value if isinstance(train_request.file_format, Enum) else str(train_request.file_format)
+    
     runpod_request = {
         "model": train_request.model,
         "dataset": train_request.dataset,
         "dataset_type": serial_dataset_type,
-        "file_format": train_request.file_format,
+        "file_format": file_format_str,
         "expected_repo_name": train_request.expected_repo_name,
         "hours_to_complete": train_request.hours_to_complete,
         "task_id": str(train_request.task_id)

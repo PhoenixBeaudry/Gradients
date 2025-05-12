@@ -373,7 +373,7 @@ def setup_config(
     dataset: str,
     model: str,
     dataset_type: dict,
-    file_format: FileFormat,
+    file_format: str,
     task_id: str,
     expected_repo_name: str | None,
     required_finish_time: datetime
@@ -405,6 +405,15 @@ def setup_config(
             "task_id": task_id,
             "error": "Invalid dataset_type format"
         }
+    
+    # Convert file_format string back to enum
+    file_format_str = file_format
+    try:
+        file_format = FileFormat(file_format_str)
+    except ValueError:
+        print(f"Invalid file_format: {file_format_str}, using default")
+        file_format = FileFormat.JSON  # Default
+
     # Download dataset
     try:
         print(file_format)
