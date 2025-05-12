@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+from unsloth import FastLanguageModel, PatchDPOTrainer
+PatchDPOTrainer()
+import optuna
 import os
 import argparse
 import logging
@@ -17,10 +20,8 @@ from transformers import (
 )
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState
-import optuna
 import bitsandbytes as bnb
-from unsloth import FastLanguageModel, PatchDPOTrainer
-PatchDPOTrainer()
+
 
 # Disable parallel tokenizer threads to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from unsloth import FastLanguageModel
 import os
 import argparse
 import logging
@@ -18,7 +19,6 @@ import time
 from trl import SFTConfig, SFTTrainer
 from transformers import TrainerCallback, TrainerControl, TrainerState
 import optuna
-from unsloth import FastLanguageModel
 import bitsandbytes as bnb
 
 # Disable parallel tokenizer threads to avoid warnings
