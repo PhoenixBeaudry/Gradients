@@ -178,7 +178,7 @@ async def task_offer(
                 accepted=False
             )
         
-        if any(k in request.model.lower() for k in ("qwen3", "neo", "stella", "falcon")):
+        if any(k in request.model.lower() for k in ("qwen3", "neo", "stella", "falcon", "gpt-j")):
             return MinerTaskResponse(
                 message=f"This endpoint does not currently support that model.",
                 accepted=False
