@@ -304,6 +304,9 @@ def main():
 
     trainer.train()
 
+    trainer.model.save_pretrained("final_checkpoint")
+    trainer.push_to_hub()
+
 
 
 if __name__ == '__main__':
