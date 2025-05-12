@@ -1,0 +1,335 @@
+#!/usr/bin/env python3
+import os
+from unsloth import FastLanguageModel
+import argparse
+import logging
+import yaml
+import importlib
+import sys
+import inspect
+from math import ceil
+import torch
+from datetime import datetime
+from axolotl.common.datasets import load_preference_datasets
+from trl import GRPOConfig, GRPOTrainer
+from trl.trainer.grpo_trainer import RewardFunc
+from axolotl.utils.models import load_tokenizer
+from axolotl.cli.config import load_cfg
+from axolotl.cli.args import TrainerCliArgs
+from transformers import (
+    TrainingArguments,
+    Trainer,
+    DataCollatorForSeq2Seq,
+    EarlyStoppingCallback,
+    SchedulerType,
+    AutoModelForCausalLM
+)
+import time
+from transformers import TrainerCallback, TrainerControl, TrainerState
+import optuna
+import bitsandbytes as bnb
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+
+# Disable parallel tokenizer threads to avoid warnings
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+###### Custom Callbacks ########################
+
+class TimeLimitCallback(TrainerCallback):
+    """Stop training after a fixed number of hours."""
+
+    def __init__(self, max_seconds: float):
+        """
+        Args:
+            max_hours: training time budget in hours
+        """
+        self.max_seconds = max_seconds
+        self.start_time: float | None = None
+
+    def on_train_begin(self, args, state: TrainerState, control: TrainerControl, **kwargs):
+        # record the training start time
+        self.start_time = time.time()
+        return control
+
+    def on_step_end(self, args, state: TrainerState, control: TrainerControl, **kwargs):
+        # only check once we've started
+        if self.start_time is None:
+            return control
+        elapsed = time.time() - self.start_time
+        if elapsed >= self.max_seconds:
+            print(f"\n⏱️  Reached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+            control.should_training_stop = True
+        return control
+    
+class OptunaPruningCallback(TrainerCallback):
+    """
+    Reports ``eval_loss`` back to Optuna at every evaluation and raises
+    ``optuna.TrialPruned`` when the trial should stop early.
+    """
+
+    def __init__(self, trial: optuna.Trial, monitor: str = "eval_loss"):
+        self._trial = trial
+        self._monitor = monitor
+
+    def on_evaluate(self, args, state, control, metrics, **kwargs):
+        if self._monitor not in metrics:
+            return  # nothing to report
+        step = state.global_step
+        value = float(metrics[self._monitor])
+        # Send metric to Optuna
+        self._trial.report(value, step)
+        # Ask Optuna whether the trial should be pruned
+        if self._trial.should_prune():
+            raise optuna.TrialPruned(
+                f"Trial pruned at step {step}: {self._monitor}={value}"
+            )
+        
+def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
+    storage_url = os.getenv("OPTUNA_STORAGE")
+    study_name  = os.getenv("OPTUNA_STUDY_NAME")
+    trial_id    = os.getenv("OPTUNA_TRIAL_ID")
+    if not (storage_url and study_name and trial_id):
+        return  # not an HPO child
+
+    study = optuna.load_study(study_name=study_name, storage=storage_url)
+    trial  = optuna.trial.Trial(study, trial_id=int(trial_id))
+    callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
+
+#######################################################
+CONFIG_DIR = os.path.abspath("/workspace/configs/")
+
+##### Custom Funcs for getting GRPO reward functions #####
+def reward_functions(cfg):
+    """
+    Collects and returns a list of functions for GRPOTrainer.
+    """
+    funcs = []
+    for fqn in cfg['trl']['reward_funcs']:
+        funcs.append(get_reward_func(fqn))
+    return funcs
+
+
+def get_reward_func(reward_func_fqn: str) -> RewardFunc | str:
+    """
+    Try to load <module>.py from CONFIG_DIR and return its <func>.
+    If the file doesn’t exist, just return the original string (HF model path).
+    """
+    module_name, func_name = reward_func_fqn.rsplit(".", 1)
+    module_path = os.path.join(CONFIG_DIR, f"{module_name}.py")
+    print(f"→ looking for {module_name!r} at {module_path!r}, exists? {os.path.isfile(module_path)}")
+    # 1) if we have an on-disk file, dynamically import it
+    if os.path.isfile(module_path):
+        # drop any cached module so we always load the newest version
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # get the function
+        if not hasattr(module, func_name):
+            raise AttributeError(
+                f"Module {module_name!r} has no attribute {func_name!r}"
+            )
+        reward_func = getattr(module, func_name)
+
+        # sanity check signature
+        sig = inspect.signature(reward_func)
+        if len(sig.parameters) < 2:
+            raise ValueError(
+                "Reward function must accept at least two arguments: "
+                "prompts: list and completions: list"
+            )
+
+        return reward_func
+
+    # 2) otherwise fall back to treating the FQN string as a model-path
+    return reward_func_fqn
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO or GRPO")
+    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
+    return parser.parse_args()
+
+
+def load_config(path: str) -> dict:
+    with open(path, 'r') as f:
+        return yaml.safe_load(f)
+
+
+def setup_logger() -> logging.Logger:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s"
+    )
+    return logging.getLogger(__name__)
+
+def load_model_and_tokenizer(model_name: str, cfg: dict):
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name = model_name,
+        max_seq_length = cfg["sequence_len"],
+        dtype = None,
+        load_in_4bit = False,
+    )
+
+    return model, tokenizer
+
+
+def apply_lora_adapter(model, cfg: dict):
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r = int(cfg.get('lora_r', 16)),
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                        "gate_proj", "up_proj", "down_proj",],
+        lora_alpha = int(cfg.get('lora_r', 16))*2,
+        lora_dropout = float(cfg.get('lora_dropout', 0.05)), # Supports any, but = 0 is optimized
+        bias = "none",    # Supports any, but = "none" is optimized
+        # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
+        use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
+        random_state = 3407,
+        max_seq_length = cfg["sequence_len"]
+    )
+
+    return model
+
+
+def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
+    # ── GRPO Trainer ────────────────────────────────────────
+    #### Callbacks ####
+    callbacks = []
+    if cfg.get('early_stopping', True):
+        callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
+        )
+    # calculate time left for job
+    time_remaining = datetime.fromisoformat(cfg['required_finish_time']) - datetime.now()
+    seconds_remaining = max(0.0, time_remaining.total_seconds())
+
+    if seconds_remaining is not None:
+        callbacks.append(TimeLimitCallback(seconds_remaining*0.95))
+
+    if cfg["hpo_run"]:
+        add_optuna_callback_if_needed(callbacks)
+    ###################
+
+    ##### Training Arguments ####
+    hf_kwargs = {}
+    if not cfg["hpo_run"]:
+        hf_kwargs = {
+            'hub_model_id': cfg['hub_model_id'],
+            'hub_token': cfg['hub_token'],
+            'hub_strategy': cfg['hub_strategy'],
+            'push_to_hub': True,
+        }
+    tf_args = GRPOConfig(
+        output_dir=cfg['output_dir'],
+        # GRPO params
+        max_completion_length=int(cfg["trl"]["max_completion_length"]),
+        reward_weights=cfg["trl"]["reward_weights"],
+        use_vllm=cfg["trl"]["use_vllm"],
+        num_generations=int(cfg["trl"]["num_generations"]),
+        #####
+        gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
+        per_device_train_batch_size=int(cfg['micro_batch_size']),
+        per_device_eval_batch_size=int(cfg['micro_batch_size']),
+        dataloader_num_workers=int(cfg['dataloader_num_workers']),
+        max_steps=int(cfg['max_steps']),
+        learning_rate=float(cfg['learning_rate']),
+        beta=float(cfg['beta']),
+        optim=cfg['optimizer'],
+        lr_scheduler_type=SchedulerType.COSINE,
+        logging_steps=int(cfg['logging_steps']),
+        eval_strategy='steps',
+        save_strategy='best',
+        eval_steps=int(cfg['eval_steps']),
+        save_steps=int(cfg['save_steps']),
+        save_total_limit=int(cfg['save_total_limit']),
+        metric_for_best_model=cfg['metric_for_best_model'],
+        greater_is_better=bool(cfg['greater_is_better']),
+        weight_decay=float(cfg['weight_decay']),
+        run_name=cfg['wandb_run'],
+        warmup_steps=cfg['warmup_steps'],
+        report_to="wandb",
+        auto_find_batch_size=True,
+        gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        bf16=True,
+        use_liger_kernel=True,
+        load_best_model_at_end=True,
+        **hf_kwargs,
+    )
+    #####################################
+    logger = setup_logger()
+    logger.info("Initializing DPO Trainer")
+    return GRPOTrainer(
+        model=model,
+        args=tf_args,
+        train_dataset=train_ds,
+        eval_dataset=eval_ds,
+        reward_funcs=reward_functions(cfg),
+        processing_class=tokenizer,
+        callbacks=callbacks,
+    )
+
+
+
+def main():
+    args = parse_args()
+    cfg = load_config(args.config)
+
+    ### Temp Axolotl Config to generate Dataset and Model
+    axo_cfg = load_cfg(args.config)
+    #####################################################
+
+    logger = setup_logger()
+    
+    # Performance flags
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
+
+    logger.info("Loaded config from %s", args.config)
+    
+    # after loading cfg...
+    dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
+
+    model, tokenizer = load_model_and_tokenizer(cfg['base_model'], cfg)
+    
+    if cfg.get('adapter') == 'lora':
+        model = apply_lora_adapter(model, cfg)
+
+    if not cfg["hpo_run"]:
+        train_dataset = dataset_meta.train_dataset
+        eval_dataset   = dataset_meta.eval_dataset
+    else:
+        # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
+        # 1. compute target subset sizes
+        n_train = len(dataset_meta.train_dataset)
+        target_train = int(n_train*0.2)
+
+        n_eval = len(dataset_meta.eval_dataset)
+        target_eval = int(n_eval*0.2)
+
+        # 2. deterministic shuffle so every trial sees identical data
+        train_subset = dataset_meta.train_dataset.shuffle(seed=42)
+        eval_subset  = dataset_meta.eval_dataset.shuffle(seed=42)
+
+        # 3. slice
+        train_dataset = train_subset.select(range(target_train))
+        eval_dataset  = eval_subset.select(range(target_eval))
+
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+
+    logger.info("Starting Full Model Training...")
+
+    trainer.train()
+    if not cfg["hpo_run"]:
+        trainer.model.save_pretrained("final_checkpoint")
+        trainer.push_to_hub()
+
+
+
+if __name__ == '__main__':
+    main()

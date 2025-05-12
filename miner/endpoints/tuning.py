@@ -20,6 +20,7 @@ from rq import Queue
 from rq.job import Job # Correct import for Job class
 from rq.registry import StartedJobRegistry
 from rq.exceptions import NoSuchJobError
+import runpod
 
 import core.constants as cst
 from core.models.payload_models import MinerTaskOffer
@@ -53,43 +54,38 @@ async def tune_model_text(
 ):
     logger.info("Starting model tuning.")
 
-    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
-
-    job = create_job_text(
-        job_id=str(train_request.task_id),
-        dataset=train_request.dataset,
-        model=train_request.model,
-        dataset_type=train_request.dataset_type,
-        file_format=train_request.file_format,
-        expected_repo_name=train_request.expected_repo_name,
-        required_finish_time=required_finish_time
-    )
     
     with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
         config = yaml.safe_load(file)
-    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{job.expected_repo_name}"
+    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
-    config_filename = f"{job.job_id}.yml"
-    config_path = os.path.join(cst.CONFIG_DIR, config_filename)
+    # Format the request for RunPod
+    runpod_request = {
+        "model": train_request.model,
+        "dataset": train_request.dataset,
+        "dataset_type": train_request.dataset_type,
+        "file_format": train_request.file_format,
+        "expected_repo_name": train_request.expected_repo_name,
+        "hours_to_complete": train_request.hours_to_complete,
+        "task_id": str(train_request.task_id)
+    }
+    
+    try:
+        # Create a RunPod endpoint instance
+        endpoint = runpod.Endpoint(RUNPOD_ENDPOINT_ID)
+        
+        # Submit the job to RunPod
+        job = endpoint.run(runpod_request)
+        
+        logger.info(f"Submitted job to RunPod Serverless with ID: {job.id}")
+        
+        return {"message": "Training job enqueued on RunPod Serverless.", "task_id": str(train_request.task_id)}
+        
+    except Exception as e:
+        logger.error(f"Error submitting job to RunPod: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error submitting job to RunPod: {str(e)}")
 
-    save_config(config, config_path)
-
-
-    logger.info(f"Created job {job}")
-    # worker_config.trainer.enqueue_job(job) # Replaced with RQ
-    # Calculate timeout based on time remaining
-    rq_job = rq_queue.enqueue(
-        start_tuning_container,
-        job,
-        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
-        result_ttl=86400, # Keep result for 1 day
-        failure_ttl=86400,  # Keep failure info for 1 day
-        job_id=job.job_id
-    )
-    logger.info(f"Enqueued job {rq_job.id} to RQ")
-
-    return {"message": "Training job enqueued.", "task_id": job.job_id}
 
 
 async def tune_model_grpo(
