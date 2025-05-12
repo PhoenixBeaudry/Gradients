@@ -325,6 +325,9 @@ def main():
     logger.info("Starting Full Model Training...")
 
     trainer.train()
+    if not cfg["hpo_run"]:
+        trainer.model.save_pretrained("final_checkpoint")
+        trainer.push_to_hub()
 
 
 
