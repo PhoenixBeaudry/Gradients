@@ -1,24 +1,22 @@
 {
   "input": {
-    "model": "unsloth/llama-3-8b",
-    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/5679b27435983ea9_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T000656Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=839c14d37187382924c850d8bd10572d9c585dff93ddacaafe111282d7c11c34",
+    "model": "Qwen/Qwen3-0.6B-Base",
+    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/e850d4f10c6f0dec_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T003801Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=882243c139f0dbabc940c984f98fc45739d7273dda6629f4fa0d1a691c3cd309",
     "dataset_type": {
-      "class_type": "InstructTextDatasetType",
+      "class_type": "DpoDatasetType",
       "attributes": {
-        "system_prompt": "",
-        "system_format": "{system}",
+        "field_prompt": "instruction",
         "field_system": "",
-        "field_instruction": "",
-        "field_input": "",
-        "field_output": "",
-        "format": "",
-        "no_input_format": "",
-        "field": ""
+        "field_chosen": "chosen",
+        "field_rejected": "rejected",
+        "prompt_format": "",
+        "chosen_format": "",
+        "rejected_format": ""
       }
     },
     "file_format": "s3",
-    "expected_repo_name": "testing_serverless",
+    "expected_repo_name": "3af3ce83-04b1-4089-a9c8-fef1478b38f6",
     "hours_to_complete": 8,
-    "task_id": "basldafhasf"
+    "task_id": "6afc9d19-2830-4944-b745-d592980378d5"
   }
 }
