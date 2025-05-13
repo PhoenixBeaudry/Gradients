@@ -87,28 +87,13 @@ class DpoDatasetType(BaseModel):
     rejected_format: str | None = "{rejected}"
 
 
-def download_s3_file_sync(file_url: str, save_path: str | None = None,
-                          tmp_dir: str = "/tmp") -> str:
-    parsed = urlparse(file_url)
-    local = os.path.join(save_path or tmp_dir, os.path.basename(parsed.path))
-    if os.path.exists(local) and os.path.getsize(local) > 0:
-        return local
-
-    r = requests.get(file_url, timeout=60)
-    r.raise_for_status()
-    os.makedirs(os.path.dirname(local), exist_ok=True)
-    with open(local, "wb") as f:
-        f.write(r.content)
-    return local
-
-
 def create_dataset_entry(
     dataset: str,
     dataset_type: InstructTextDatasetType | DpoDatasetType | GrpoDatasetType,
     file_format: FileFormat,
     is_eval: bool = False,
 ) -> dict:
-    dataset_entry = {"path": "/workspace/input_files"}
+    dataset_entry = {"path": dataset}
 
     if isinstance(dataset_type, InstructTextDatasetType):
         print("Process Type: DPO")
@@ -371,30 +356,6 @@ def setup_config(
             "task_id": task_id,
             "error": "Invalid dataset_type format"
         }
-    
-    # Convert file_format string back to enum
-    file_format_str = file_format
-    if file_format_str == "json":
-        file_format = FileFormat.JSON
-    elif file_format_str == "csv":
-        file_format = FileFormat.CSV
-    elif file_format_str == "hf":
-        file_format = FileFormat.HF
-    elif file_format_str == "s3":
-        file_format = FileFormat.S3
-
-    # Download dataset
-    try:
-        print(file_format)
-        if file_format != FileFormat.HF:
-            if file_format == FileFormat.S3:
-                dataset = download_s3_file_sync(dataset, "/workspace/input_data")
-                print(dataset)
-                file_format = FileFormat.JSON
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
     
     # Modify Config and save
     config_filename = f"{task_id}.yml"
