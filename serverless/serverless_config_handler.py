@@ -108,11 +108,7 @@ def create_dataset_entry(
     file_format: FileFormat,
     is_eval: bool = False,
 ) -> dict:
-    dataset_entry = {"path": dataset}
-
-    if file_format == FileFormat.JSON:
-        dataset_entry = {"path": dataset}
-
+    dataset_entry = {"path": "/workspace/input_files"}
 
     if isinstance(dataset_type, InstructTextDatasetType):
         print("Process Type: DPO")
@@ -126,10 +122,6 @@ def create_dataset_entry(
         dataset_entry.update(_process_grpo_dataset_fields(dataset_type))
     else:
         raise ValueError("Invalid dataset_type provided.")
-
-    if file_format != FileFormat.HF:
-        dataset_entry["ds_type"] = file_format.value
-        dataset_entry["data_files"] = [os.path.basename(dataset)]
 
     return dataset_entry
 
