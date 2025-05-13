@@ -150,7 +150,7 @@ async def tune_model_grpo(
         # Submit the job to RunPod
         job = endpoint.run(runpod_request)
         
-        logger.info(f"Submitted job to RunPod Serverless with ID: {job.id}")
+        logger.info(f"Submitted job to RunPod Serverless with ID: {train_request.task_id}")
         
         return {"message": "Training job enqueued on RunPod Serverless.", "task_id": str(train_request.task_id)}
         
