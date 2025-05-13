@@ -1,7 +1,7 @@
 {
   "input": {
-    "model": "Qwen/Qwen2.5-1.5B",
-    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/4faccd3618be42c5_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T054812Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=cb67b3717739d0d613ad1228f08f4d2d2596ed587e5b85ca6b581830d867f254",
+    "model": "deepseek-ai/deepseek-coder-6.7b-instruct",
+    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/f61aad9e1e25f8a6_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T230743Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=6a9c5bde0b3b9108af83add952bf974c75d397b962a3c6e5be4ed1bccfca9bdb",
     "dataset_type": {
       "class_type": "DpoDatasetType",
       "attributes": {
@@ -11,8 +11,8 @@
       }
     },
     "file_format": "s3",
-    "expected_repo_name": "0d9cc23f-0200-4b64-8294-088b942cacc1",
+    "expected_repo_name": "ffdeeaaa-da28-41fe-83e3-c49c36e6ae14",
     "hours_to_complete": 8,
-    "task_id": "01a7051a-d242-4c8b-82a8-7ef77a5838ed"
+    "task_id": "51fc84ff-37cc-40d8-87da-6e9dd7de555a"
   }
 }
