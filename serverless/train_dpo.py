@@ -221,6 +221,8 @@ def main():
     ### Temp Axolotl Config to generate Dataset and Model
     axo_cfg = load_cfg(args.config)
     #####################################################
+    print("DATASET CONFIG")
+    print(cfg)
 
     logger = setup_logger()
     
