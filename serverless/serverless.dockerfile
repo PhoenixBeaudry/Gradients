@@ -49,8 +49,8 @@ COPY serverless/train_grpo.py /workspace/training
 
 CMD echo 'Preparing logging...' && \
     echo "Attempting to log in to Hugging Face" && \
-    huggingface-cli login --token "$HUGGINGFACE_TOKEN" --add-to-git-credential; && \
+    huggingface-cli login --token "$HUGGINGFACE_TOKEN" --add-to-git-credential && \
     echo "Attempting to log in to W&B" && \
-    wandb login "$WANDB_TOKEN"; && \
+    wandb login "$WANDB_TOKEN" && \
     python -u /workspace/configs/runpod_handler.py
 # save to phoenixbeaudry/gradients-miner:serverless
