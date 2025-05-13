@@ -14,8 +14,7 @@ from transformers import AutoConfig
 from huggingface_hub import HfApi
 from urllib.parse import urlparse
 from fastapi import HTTPException
-import aiohttp
-import asyncio
+import requests
 
 
 hf_api = HfApi()
@@ -87,49 +86,20 @@ class DpoDatasetType(BaseModel):
     chosen_format: str | None = "{chosen}"
     rejected_format: str | None = "{rejected}"
 
-async def download_s3_file(file_url: str, save_path: str = None, tmp_dir: str = "/tmp") -> str:
-    """Download a file from an S3 URL and save it locally, skipping download if it already exists.
 
-    Args:
-        file_url (str): The URL of the file to download.
-        save_path (str, optional): The path where the file should be saved. If a directory is
-            provided, the file will be saved with its original name in that directory. If a file
-            path is provided, the file will be saved at that exact location. Defaults to None.
-        tmp_dir (str, optional): The temporary directory to use when save_path is not provided.
-            Defaults to "/tmp".
+def download_s3_file_sync(file_url: str, save_path: str | None = None,
+                          tmp_dir: str = "/tmp") -> str:
+    parsed = urlparse(file_url)
+    local = os.path.join(save_path or tmp_dir, os.path.basename(parsed.path))
+    if os.path.exists(local) and os.path.getsize(local) > 0:
+        return local
 
-    Returns:
-        str: The local file path where the file was saved.
-
-    Raises:
-        Exception: If the download fails with a non-200 status code.
-    """
-    parsed_url = urlparse(file_url)
-    file_name = os.path.basename(parsed_url.path)
-    if save_path:
-        if os.path.isdir(save_path):
-            local_file_path = os.path.join(save_path, file_name)
-        else:
-            local_file_path = save_path
-    else:
-        local_file_path = os.path.join(tmp_dir, file_name)
-
-    # If the file already exists and is non-empty, skip downloading
-    if os.path.isfile(local_file_path) and os.path.getsize(local_file_path) > 0:
-        return local_file_path
-
-    # Otherwise, download afresh
-    async with aiohttp.ClientSession() as session:
-        async with session.get(file_url) as response:
-            if response.status == 200:
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-                with open(local_file_path, "wb") as f:
-                    f.write(await response.read())
-            else:
-                raise Exception(f"Failed to download file: HTTP {response.status}")
-
-    return local_file_path
+    r = requests.get(file_url, timeout=60)
+    r.raise_for_status()
+    os.makedirs(os.path.dirname(local), exist_ok=True)
+    with open(local, "wb") as f:
+        f.write(r.content)
+    return local
 
 
 def create_dataset_entry(
@@ -369,7 +339,7 @@ def setup_lora_config(config, model_size):
     return config
 
 
-async def setup_config(
+def setup_config(
     dataset: str,
     model: str,
     dataset_type: dict,
@@ -419,7 +389,7 @@ async def setup_config(
         print(file_format)
         if file_format != FileFormat.HF:
             if file_format == FileFormat.S3:
-                dataset = await download_s3_file(dataset)
+                dataset = download_s3_file_sync(dataset)
                 print(dataset)
                 file_format = FileFormat.JSON
 
