@@ -26,7 +26,7 @@ from rq.job import Job # Correct import for Job class
 from rq.registry import StartedJobRegistry
 from rq.exceptions import NoSuchJobError
 import runpod
-
+from pathlib import Path
 import core.constants as cst
 from core.models.payload_models import MinerTaskOffer
 from core.models.payload_models import MinerTaskResponse
@@ -60,10 +60,25 @@ async def tune_model_text(
     logger.info("Starting model tuning.")
 
     logger.info(f"Job received is {train_request}")
-    
-    with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
-        config = yaml.safe_load(file)
-    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
+
+    # Check if file exists if not right temp config with huggingface repo
+
+    CONFIG_DIR = "/workspace/configs/"
+    config_filename = f"{train_request.task_id}.yml"
+    config_path = os.path.join(CONFIG_DIR, config_filename)
+    file_path = Path(config_path)
+
+    if file_path.exists():
+        # No need to start another tasks
+        return "Another miner has picked up this job."
+    else:
+        with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
+            config = yaml.safe_load(file)
+        config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
+
+        with open(config_path, "w") as file:
+            yaml.dump(config, file)
+
 
     # Format the request for RunPod
     # Serialize Dataset Type
@@ -207,6 +222,17 @@ async def task_offer(
             return MinerTaskResponse(
                 message=f"This endpoint only accepts text tasks: "
                         f"{TaskType.INSTRUCTTEXTTASK}, {TaskType.DPOTASK} and {TaskType.GRPOTASK}",
+                accepted=False
+            )
+        
+        CONFIG_DIR = "/workspace/configs/"
+        config_filename = f"{request.task_id}.yml"
+        config_path = os.path.join(CONFIG_DIR, config_filename)
+        file_path = Path(config_path)
+        if file_path.exists():
+            # Another miner already took the job
+            return MinerTaskResponse(
+                message=f"No thank you.",
                 accepted=False
             )
         
