@@ -191,7 +191,7 @@ def _process_dpo_dataset_fields(dataset_type: DpoDatasetType) -> dict:
         ("prompt",      "chosen",           "rejected")        : "chatml.prompt_pairs",
         ("prompt",      "chosen",           "rejected")        : "chatml.ultra",  # will be upgraded below
     }
-    key = (dataset_type['field_prompt'], dataset_type['field_chosen'], dataset_type['field_rejected'])
+    key = (dataset_type.field_prompt, dataset_type.field_chosen, dataset_type.field_rejected)
     tmpl = _FIELD_SIGNATURES.get(key)
     return {"type": tmpl, "split": "train"}
 
