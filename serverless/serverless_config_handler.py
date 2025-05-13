@@ -381,10 +381,6 @@ def setup_config(
             "task_id": task_id,
             "error": "Invalid dataset_type format"
         }
-    CSV = "csv"  # needs to be local file
-    JSON = "json"  # needs to be local file
-    HF = "hf"  # Hugging Face dataset
-    S3 = "s3"
     
     # Convert file_format string back to enum
     file_format_str = file_format
