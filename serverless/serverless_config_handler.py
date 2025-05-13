@@ -389,7 +389,7 @@ def setup_config(
         print(file_format)
         if file_format != FileFormat.HF:
             if file_format == FileFormat.S3:
-                dataset = download_s3_file_sync(dataset, "/workspace/input_data/")
+                dataset = download_s3_file_sync(dataset, "/workspace/input_data")
                 print(dataset)
                 file_format = FileFormat.JSON
 
