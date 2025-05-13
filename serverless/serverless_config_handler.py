@@ -195,7 +195,7 @@ def _process_dpo_dataset_fields(dataset_type: DpoDatasetType) -> dict:
     # Fallback to https://axolotl-ai-cloud.github.io/axolotl/docs/rlhf.html#chatml.intel
     # Column names are hardcoded in axolotl: "DPO_DEFAULT_FIELD_SYSTEM",
     # "DPO_DEFAULT_FIELD_PROMPT", "DPO_DEFAULT_FIELD_CHOSEN", "DPO_DEFAULT_FIELD_REJECTED"
-    return {"type": 'DPO_DEFAULT_DATASET_TYPE', "split": "train"}
+    return {"type": DPO_DEFAULT_DATASET_TYPE, "split": "train"}
 
 
 def _process_instruct_dataset_fields(instruct_type_dict: dict) -> dict:
