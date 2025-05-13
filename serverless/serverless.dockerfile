@@ -48,17 +48,9 @@ COPY serverless/train_dpo.py /workspace/training
 COPY serverless/train_grpo.py /workspace/training
 
 CMD echo 'Preparing logging...' && \
-    if [ -n "$HUGGINGFACE_TOKEN" ]; then \
     echo "Attempting to log in to Hugging Face" && \
-    huggingface-cli login --token "$HUGGINGFACE_TOKEN" --add-to-git-credential; \
-    else \
-    echo "HUGGINGFACE_TOKEN is not set. Skipping Hugging Face login."; \
-    fi && \
-    if [ -n "$WANDB_TOKEN" ]; then \
+    huggingface-cli login --token "$HUGGINGFACE_TOKEN" --add-to-git-credential; && \
     echo "Attempting to log in to W&B" && \
-    wandb login "$WANDB_TOKEN"; \
-    else \
-    echo "WANDB_TOKEN is not set. Skipping W&B login."
-
-CMD ["python", "-u", "/workspace/configs/runpod_handler.py"]
+    wandb login "$WANDB_TOKEN"; && \
+    python -u /workspace/configs/runpod_handler.py
 # save to phoenixbeaudry/gradients-miner:serverless
