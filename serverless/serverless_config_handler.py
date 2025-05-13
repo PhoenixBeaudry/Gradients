@@ -160,22 +160,14 @@ def _process_grpo_dataset_fields(dataset_type: GrpoDatasetType) -> dict:
 
 
 def _process_dpo_dataset_fields(dataset_type: DpoDatasetType) -> dict:
-    # Enable below when https://github.com/axolotl-ai-cloud/axolotl/issues/1417 is fixed
-    # context: https://discord.com/channels/1272221995400167588/1355226588178022452/1356982842374226125
+    if dataset_type.field_prompt == "prompt":
+        template = "chatml.prompt_pairs"
+    elif dataset_type.field_prompt == "question":
+        template = "chatml.intel"
+    elif dataset_type.field_prompt == "instruction":
+        template = "chatml.argilla"
 
-    # dpo_type_dict = dataset_type.model_dump()
-    # dpo_type_dict["type"] = "user_defined.default"
-    # if not dpo_type_dict.get("prompt_format"):
-    #     if dpo_type_dict.get("field_system"):
-    #         dpo_type_dict["prompt_format"] = "{system} {prompt}"
-    #     else:
-    #         dpo_type_dict["prompt_format"] = "{prompt}"
-    # return dpo_type_dict
-
-    # Fallback to https://axolotl-ai-cloud.github.io/axolotl/docs/rlhf.html#chatml.intel
-    # Column names are hardcoded in axolotl: "DPO_DEFAULT_FIELD_SYSTEM",
-    # "DPO_DEFAULT_FIELD_PROMPT", "DPO_DEFAULT_FIELD_CHOSEN", "DPO_DEFAULT_FIELD_REJECTED"
-    return {"type": DPO_DEFAULT_DATASET_TYPE, "split": "train"}
+    return {"type": template, "split": "train"}
 
 
 def _process_instruct_dataset_fields(instruct_type_dict: dict) -> dict:

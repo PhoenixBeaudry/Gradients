@@ -8,8 +8,7 @@ import copy
 from math import ceil
 import torch
 from datetime import datetime
-from axolotl.common.datasets import load_preference_datasets
-from axolotl.utils.models import load_tokenizer
+from datasets import load_dataset, Dataset
 from trl import DPOConfig, DPOTrainer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
@@ -243,6 +242,12 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
+    raw_train = load_dataset(
+        "json",
+        data_files={"train": "train.jsonl", "validation": "val.jsonl"},
+        split="train",
+        streaming=False,        # True ⇒ never fully materialises in RAM
+    )
     dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
     tokenizer = load_tokenizer(axo_cfg)
 
