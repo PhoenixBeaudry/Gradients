@@ -129,6 +129,11 @@ def create_dataset_entry(
     else:
         raise ValueError("Invalid dataset_type provided.")
 
+    if file_format != FileFormat.HF:
+        dataset_entry = {"path": "json"}
+        dataset_entry["ds_type"] = file_format.value
+        dataset_entry["data_files"] = [dataset]
+
     return dataset_entry
 
 
