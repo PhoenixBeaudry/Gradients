@@ -111,8 +111,10 @@ def create_dataset_entry(
     dataset_entry = {"path": dataset}
 
     if file_format == FileFormat.JSON:
-        dataset_entry["ds_type"] = "json"
-        dataset_entry["data_files"] = [dataset]
+        if not is_eval:
+            dataset_entry = {"path": "/workspace/input_data/"}
+        else:
+            dataset_entry = {"path": f"/workspace/input_data/{os.path.basename(dataset)}"}
 
     if isinstance(dataset_type, InstructTextDatasetType):
         instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
@@ -126,7 +128,7 @@ def create_dataset_entry(
 
     if file_format != FileFormat.HF:
         dataset_entry["ds_type"] = file_format.value
-        dataset_entry["data_files"] = [dataset]
+        dataset_entry["data_files"] = [os.path.basename(dataset)]
 
     return dataset_entry
 
