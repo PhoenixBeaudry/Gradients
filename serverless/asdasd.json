@@ -1,22 +1,22 @@
 {
   "input": {
-    "model": "Qwen/Qwen3-0.6B-Base",
-    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/e850d4f10c6f0dec_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T003801Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=882243c139f0dbabc940c984f98fc45739d7273dda6629f4fa0d1a691c3cd309",
+    "model": "unsloth/gemma-2-9b-it",
+    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/64fbb0afb9fe4ff9_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T051725Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=09ddcce472c4e5586a429a5cada2dd71dc83487253975b43302ffe67458a9279",
     "dataset_type": {
       "class_type": "DpoDatasetType",
       "attributes": {
-        "field_prompt": "instruction",
+        "field_prompt": "question",
         "field_system": "",
-        "field_chosen": "chosen",
-        "field_rejected": "rejected",
+        "field_chosen": "reference_answer",
+        "field_rejected": "student_answer",
         "prompt_format": "",
         "chosen_format": "",
         "rejected_format": ""
       }
     },
     "file_format": "s3",
-    "expected_repo_name": "3af3ce83-04b1-4089-a9c8-fef1478b38f6",
+    "expected_repo_name": "9cee63b9-37bd-4c90-8a5a-2fcaffcd6d5e",
     "hours_to_complete": 8,
-    "task_id": "6afc9d19-2830-4944-b745-d592980378d5"
+    "task_id": "67835f8d-0a43-4493-bfdb-a3a0b8d18e41"
   }
 }

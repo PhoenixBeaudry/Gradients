@@ -407,4 +407,6 @@ def setup_config(
         expected_repo_name,
         required_finish_time
     )
+    print("CONFIG AFTER SETUP")
+    print(config)
     save_config(config, config_path)
