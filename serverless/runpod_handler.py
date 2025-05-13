@@ -20,7 +20,7 @@ def handler(job):
         dict: Results of the training job
     """
     job_input = job["input"]
-    job_id = job["id"]
+    job_id = job_input.get("task_id")
     
     print(f"Starting training job: {job_id}")
     
