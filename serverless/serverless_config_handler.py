@@ -96,14 +96,14 @@ def create_dataset_entry(
     dataset_entry = {"path": dataset}
 
     if isinstance(dataset_type, InstructTextDatasetType):
-        print("Process Type: DPO")
+        print("Process Type: Instruct")
         instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
         dataset_entry.update(_process_instruct_dataset_fields(instruct_type_dict))
     elif isinstance(dataset_type, DpoDatasetType):
         print("Process Type: DPO")
         dataset_entry.update(_process_dpo_dataset_fields(dataset_type))
     elif isinstance(dataset_type, GrpoDatasetType):
-        print("Process Type: DPO")
+        print("Process Type: GRPO")
         dataset_entry.update(_process_grpo_dataset_fields(dataset_type))
     else:
         raise ValueError("Invalid dataset_type provided.")
