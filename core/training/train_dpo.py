@@ -229,6 +229,9 @@ def main():
     torch.backends.cudnn.benchmark = True
 
     logger.info("Loaded config from %s", args.config)
+
+    print("DATASERT CONFIG")
+    print(cfg)
     
     # after loading cfg...
     dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
