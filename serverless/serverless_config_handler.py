@@ -111,10 +111,8 @@ def create_dataset_entry(
     dataset_entry = {"path": dataset}
 
     if file_format == FileFormat.JSON:
-        if not is_eval:
-            dataset_entry = {"path": "/workspace/input_data/"}
-        else:
-            dataset_entry = {"path": f"/workspace/input_data/{os.path.basename(dataset)}"}
+        dataset_entry["ds_type"] = "json"
+        dataset_entry["data_files"] = [os.path.basename(dataset)]
 
     if isinstance(dataset_type, InstructTextDatasetType):
         instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
@@ -389,7 +387,7 @@ def setup_config(
         print(file_format)
         if file_format != FileFormat.HF:
             if file_format == FileFormat.S3:
-                dataset = download_s3_file_sync(dataset, "/workspace/")
+                dataset = download_s3_file_sync(dataset, "/workspace/input_data")
                 print(dataset)
                 file_format = FileFormat.JSON
 
