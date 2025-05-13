@@ -2,10 +2,23 @@
   "input": {
     "model": "unsloth/llama-3-8b",
     "dataset": "nkazi/SciEntsBank",
-    "dataset_type": "nkazi/SciEntsBank",
+    "dataset_type": {
+      "class_type": "InstructTextDatasetType",
+      "attributes": {
+        "system_prompt": "",
+        "system_format": "{system}",
+        "field_system": "",
+        "field_instruction": "",
+        "field_input": "",
+        "field_output": "",
+        "format": "",
+        "no_input_format": "",
+        "field": ""
+      }
+    },
     "file_format": "hf",
     "expected_repo_name": "testing_serverless",
-    "hours_to_complete": 8
-  },
-  "id": "dasdsafasf"
+    "hours_to_complete": 8,
+    "task_id": "basldafhasf"
+  }
 }

@@ -419,7 +419,7 @@ def setup_config(
         print(file_format)
         if file_format != FileFormat.HF:
             if file_format == FileFormat.S3:
-                dataset = asyncio.run(download_s3_file(dataset))
+                dataset = download_s3_file(dataset)
                 print(dataset)
                 file_format = FileFormat.JSON
 
