@@ -311,7 +311,7 @@ def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]
 def setup_lora_config(config, model_size):
     """Setup QLoRA configuration for more efficient adaptation"""
     config["adapter"] = "lora"
-    config["lora_r"] = min(256, max(64, int(model_size / 50_000_000)))
+    config["lora_r"] = 32
     config["lora_alpha"] = config["lora_r"] * 2
     config["lora_dropout"] = 0.05
     return config
