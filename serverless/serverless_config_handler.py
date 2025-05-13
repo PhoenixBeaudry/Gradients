@@ -111,8 +111,10 @@ def create_dataset_entry(
     dataset_entry = {"path": dataset}
 
     if file_format == FileFormat.JSON:
-        dataset_entry["ds_type"] = "json"
-        dataset_entry["data_files"] = [os.path.basename(dataset)]
+        if not is_eval:
+            dataset_entry = {"path": "/workspace/input_data/"}
+        else:
+            dataset_entry = {"path": f"/workspace/input_data/{os.path.basename(dataset)}"}
 
     if isinstance(dataset_type, InstructTextDatasetType):
         instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
@@ -183,14 +185,14 @@ def _process_dpo_dataset_fields(dataset_type: DpoDatasetType) -> dict:
     # Enable below when https://github.com/axolotl-ai-cloud/axolotl/issues/1417 is fixed
     # context: https://discord.com/channels/1272221995400167588/1355226588178022452/1356982842374226125
 
-    dpo_type_dict = dataset_type.model_dump()
-    dpo_type_dict["type"] = "user_defined.default"
-    if not dpo_type_dict.get("prompt_format"):
-        if dpo_type_dict.get("field_system"):
-            dpo_type_dict["prompt_format"] = "{system} {prompt}"
-        else:
-            dpo_type_dict["prompt_format"] = "{prompt}"
-    return dpo_type_dict
+    # dpo_type_dict = dataset_type.model_dump()
+    # dpo_type_dict["type"] = "user_defined.default"
+    # if not dpo_type_dict.get("prompt_format"):
+    #     if dpo_type_dict.get("field_system"):
+    #         dpo_type_dict["prompt_format"] = "{system} {prompt}"
+    #     else:
+    #         dpo_type_dict["prompt_format"] = "{prompt}"
+    # return dpo_type_dict
 
     # Fallback to https://axolotl-ai-cloud.github.io/axolotl/docs/rlhf.html#chatml.intel
     # Column names are hardcoded in axolotl: "DPO_DEFAULT_FIELD_SYSTEM",
@@ -387,7 +389,7 @@ def setup_config(
         print(file_format)
         if file_format != FileFormat.HF:
             if file_format == FileFormat.S3:
-                dataset = download_s3_file_sync(dataset, "/workspace/input_data")
+                dataset = download_s3_file_sync(dataset, "/workspace/")
                 print(dataset)
                 file_format = FileFormat.JSON
 
