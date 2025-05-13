@@ -111,9 +111,7 @@ def create_dataset_entry(
     dataset_entry = {"path": dataset}
 
     if file_format == FileFormat.JSON:
-        dataset_entry = {"path": "json"}
-        dataset_entry["ds_type"] = file_format.value
-        dataset_entry["data_files"] = [dataset]
+        dataset_entry = {"path": dataset}
 
 
     if isinstance(dataset_type, InstructTextDatasetType):
@@ -130,9 +128,8 @@ def create_dataset_entry(
         raise ValueError("Invalid dataset_type provided.")
 
     if file_format != FileFormat.HF:
-        dataset_entry = {"path": "json"}
         dataset_entry["ds_type"] = file_format.value
-        dataset_entry["data_files"] = [dataset]
+        dataset_entry["data_files"] = [os.path.basename(dataset)]
 
     return dataset_entry
 
