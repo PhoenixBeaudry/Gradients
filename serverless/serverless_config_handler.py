@@ -112,7 +112,7 @@ def create_dataset_entry(
 
     if file_format == FileFormat.JSON:
         dataset_entry["ds_type"] = "json"
-        dataset_entry["data_files"] = [os.path.basename(dataset)]
+        dataset_entry["data_files"] = [dataset]
 
     if isinstance(dataset_type, InstructTextDatasetType):
         instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
@@ -126,7 +126,7 @@ def create_dataset_entry(
 
     if file_format != FileFormat.HF:
         dataset_entry["ds_type"] = file_format.value
-        dataset_entry["data_files"] = [os.path.basename(dataset)]
+        dataset_entry["data_files"] = [dataset]
 
     return dataset_entry
 
