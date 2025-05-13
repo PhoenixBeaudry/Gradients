@@ -112,31 +112,51 @@ async def tune_model_grpo(
 ):
     logger.info("Starting model tuning.")
 
-    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete))
     logger.info(f"Job received is {train_request}")
-
-    job = create_job_text(
-        job_id=str(train_request.task_id),
-        dataset=train_request.dataset,
-        model=train_request.model,
-        dataset_type=train_request.dataset_type,
-        file_format=train_request.file_format,
-        expected_repo_name=train_request.expected_repo_name,
-        required_finish_time=required_finish_time
-    )
     
-    logger.info(f"Created job {job}")
-    rq_job = rq_queue.enqueue(
-        start_tuning_container,
-        job,
-        job_timeout=int(train_request.hours_to_complete * 3600 * 1.05), # Add timeout buffer
-        result_ttl=86400, # Keep result for 1 day
-        failure_ttl=86400,  # Keep failure info for 1 day
-        job_id=job.job_id
-    )
-    logger.info(f"Enqueued job {rq_job.id} to RQ")
+    with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
+        config = yaml.safe_load(file)
+    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
-    return {"message": "Training job enqueued.", "task_id": job.job_id}
+    # Format the request for RunPod
+    # Serialize Dataset Type
+    serial_dataset_type = {}
+    if isinstance(train_request.dataset_type, InstructTextDatasetType):
+        serial_dataset_type["class_type"] = "InstructTextDatasetType"
+    elif isinstance(train_request.dataset_type, DpoDatasetType):
+        serial_dataset_type["class_type"] = "DpoDatasetType"    
+    elif isinstance(train_request.dataset_type, GrpoDatasetType):
+        serial_dataset_type["class_type"] = "GrpoDatasetType"
+    
+    serial_dataset_type["attributes"] = json.loads(train_request.dataset_type.model_dump_json())
+
+    # Serialize file_format (Enum)
+    file_format_str = train_request.file_format.value if isinstance(train_request.file_format, Enum) else str(train_request.file_format)
+    
+    runpod_request = {
+        "model": train_request.model,
+        "dataset": train_request.dataset,
+        "dataset_type": serial_dataset_type,
+        "file_format": file_format_str,
+        "expected_repo_name": train_request.expected_repo_name,
+        "hours_to_complete": train_request.hours_to_complete,
+        "task_id": str(train_request.task_id)
+    }
+    
+    try:
+        # Create a RunPod endpoint instance
+        endpoint = runpod.Endpoint("3f7fu7em4zi8m3")
+        
+        # Submit the job to RunPod
+        job = endpoint.run(runpod_request)
+        
+        logger.info(f"Submitted job to RunPod Serverless with ID: {job.id}")
+        
+        return {"message": "Training job enqueued on RunPod Serverless.", "task_id": str(train_request.task_id)}
+        
+    except Exception as e:
+        logger.error(f"Error submitting job to RunPod: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error submitting job to RunPod: {str(e)}")
 
 
 async def get_latest_model_submission(task_id: str) -> str:
