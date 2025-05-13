@@ -1,7 +1,7 @@
 {
   "input": {
     "model": "unsloth/llama-3-8b",
-    "dataset": "nkazi/SciEntsBank",
+    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/5679b27435983ea9_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250513%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250513T000656Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=839c14d37187382924c850d8bd10572d9c585dff93ddacaafe111282d7c11c34",
     "dataset_type": {
       "class_type": "InstructTextDatasetType",
       "attributes": {
@@ -16,7 +16,7 @@
         "field": ""
       }
     },
-    "file_format": "hf",
+    "file_format": "s3",
     "expected_repo_name": "testing_serverless",
     "hours_to_complete": 8,
     "task_id": "basldafhasf"
