@@ -117,11 +117,14 @@ def create_dataset_entry(
             dataset_entry = {"path": f"/workspace/input_data/{os.path.basename(dataset)}"}
 
     if isinstance(dataset_type, InstructTextDatasetType):
+        print("Process Type: DPO")
         instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
         dataset_entry.update(_process_instruct_dataset_fields(instruct_type_dict))
     elif isinstance(dataset_type, DpoDatasetType):
+        print("Process Type: DPO")
         dataset_entry.update(_process_dpo_dataset_fields(dataset_type))
     elif isinstance(dataset_type, GrpoDatasetType):
+        print("Process Type: DPO")
         dataset_entry.update(_process_grpo_dataset_fields(dataset_type))
     else:
         raise ValueError("Invalid dataset_type provided.")
@@ -355,10 +358,13 @@ def setup_config(
         
         # Create an instance directly based on the class name
         if dataset_type_class == "DpoDatasetType":
+            print("Dataset Type: DPO")
             dataset_type = DpoDatasetType(**class_attributes)
         elif dataset_type_class == "InstructTextDatasetType":
+            print("Dataset Type: Instruct")
             dataset_type = InstructTextDatasetType(**class_attributes)
         elif dataset_type_class == "GrpoDatasetType":
+            print("Dataset Type: GRPO")
             # Handle nested RewardFunction objects in GrpoDatasetType
             if "reward_functions" in class_attributes and class_attributes["reward_functions"]:
                 reward_functions = []
