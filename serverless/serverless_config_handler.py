@@ -369,7 +369,7 @@ def setup_lora_config(config, model_size):
     return config
 
 
-def setup_config(
+async def setup_config(
     dataset: str,
     model: str,
     dataset_type: dict,
@@ -419,7 +419,7 @@ def setup_config(
         print(file_format)
         if file_format != FileFormat.HF:
             if file_format == FileFormat.S3:
-                dataset = download_s3_file(dataset)
+                dataset = await download_s3_file(dataset)
                 print(dataset)
                 file_format = FileFormat.JSON
 

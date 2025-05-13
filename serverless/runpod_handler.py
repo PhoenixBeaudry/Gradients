@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from serverless_config_handler import setup_config
 import subprocess
+import asyncio
 
 # You'll need to adapt your existing training code for the serverless environment
 def handler(job):
@@ -40,7 +41,7 @@ def handler(job):
     config_filename = f"{job_id}.yml"
     config_path = os.path.join(CONFIG_DIR, config_filename)
 
-    setup_config(
+    asyncio.run(setup_config(
         dataset,
         model,
         dataset_type,
@@ -48,8 +49,7 @@ def handler(job):
         job_id,
         expected_repo_name,
         required_finish_time
-    )
-    
+    ))
     # Execute the training process
      # Run the HPO script
     try:
