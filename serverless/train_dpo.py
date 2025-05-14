@@ -175,19 +175,30 @@ def load_dpo_datasets(cfg: dict) -> tuple:
     # 1) Read raw json/arrow/parquet … – 🤗 Datasets auto‑detects format.
     data_files = cfg["datasets"][0]['path']
 
-    raw_ds = load_dataset("json", data_files=data_files)
-    ds = raw_ds.rename_columns({
+    raw = load_dataset("json", data_files=data_files)
+
+    if isinstance(raw, DatasetDict):
+        ds_train = raw["train"]
+    else:
+        ds_train = raw    
+
+    ds_train = ds_train.rename_columns({
         cfg['datasets'][0]['field_prompt']: "prompt",
         cfg['datasets'][0]['field_chosen']:     "chosen",
         cfg['datasets'][0]['field_rejected']:      "rejected",
     })
 
-    # 2) Optional random split if no explicit eval file supplied.
-    if "eval" not in ds and cfg.get("val_set_size", 0) > 0:
-        ds = ds.train_test_split(
-            test_size=cfg["val_set_size"], seed=42
+    val_size = cfg.get("val_set_size", 0)
+    if val_size:
+        split = ds_train.train_test_split(
+            test_size=val_size, seed=42,
         )
-    train_ds, eval_ds = ds["train"], ds["test" if "test" in ds else "eval"]
+        train_ds, eval_ds = split["train"], split["test"]
+    else:
+        train_ds = ds_train
+        eval_ds  = None
+
+    train_ds, eval_ds = ds_train["train"], ds_train["test" if "test" in ds_train else "eval"]
 
     return train_ds, eval_ds
 
