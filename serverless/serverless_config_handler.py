@@ -327,7 +327,8 @@ def setup_config(
     task_id: str,
     expected_repo_name: str | None,
     required_finish_time: str,
-    testing: bool
+    testing: bool,
+    hpo: bool
 ):
     # Deserialize dataset_type based on class_type
     if isinstance(dataset_type, dict) and "class_type" in dataset_type:
@@ -378,6 +379,8 @@ def setup_config(
         required_finish_time,
         testing
     )
+    if not hpo:
+        config["do_hpo"] = False
     print("CONFIG AFTER SETUP")
     print(config)
     save_config(config, config_path)

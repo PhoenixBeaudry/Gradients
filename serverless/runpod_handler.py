@@ -32,6 +32,7 @@ def handler(job):
     expected_repo_name = job_input.get("expected_repo_name")
     required_finish_time = job_input.get("required_finish_time")
     testing = job_input.get("testing", False)
+    hpo = job_input.get("hpo", True)
     
     # Load configuration, setup training, etc.
 
@@ -53,7 +54,8 @@ def handler(job):
         job_id,
         expected_repo_name,
         required_finish_time,
-        testing
+        testing,
+        hpo
     )
     
     # Execute the training process
