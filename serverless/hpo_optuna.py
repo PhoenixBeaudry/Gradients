@@ -175,7 +175,6 @@ def run_optuna(base_cfg_path: str) -> dict:
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
 
     ### Modify HPO params for long GRPO runs
-
     study = optuna.create_study(direction="minimize",
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=True,

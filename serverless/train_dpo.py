@@ -241,7 +241,7 @@ def main():
     
     # after loading cfg...
     train_dataset, eval_dataset = load_dpo_datasets(cfg)
-
+    
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = cfg['base_model'],
         max_seq_length = cfg["sequence_len"],
@@ -281,8 +281,10 @@ def main():
         SUBSET_FRAC   = 0.05          # 5 %
         MIN_PAIRS     = 2_000         # never go below this
         MAX_PAIRS     = 10_000        # never go above this
-        target_train = int(min(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)), len(train_dataset)))
-        target_eval = int(min(max(MIN_PAIRS, min(MAX_PAIRS, len(eval_dataset) * SUBSET_FRAC))), len(eval_dataset))
+        target_train = int(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)))
+        target_eval = int(max(MIN_PAIRS, min(MAX_PAIRS, len(eval_dataset) * SUBSET_FRAC)))
+        target_train = min(target_train, len(train_dataset))
+        target_eval = min(target_eval, len(eval_dataset))
 
         # deterministic shuffle → reproducible trials
         train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
