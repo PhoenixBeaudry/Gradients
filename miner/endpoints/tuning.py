@@ -66,19 +66,13 @@ async def tune_model_text(
     CONFIG_DIR = "core/config"
     config_filename = f"{train_request.task_id}.yml"
     config_path = os.path.join(CONFIG_DIR, config_filename)
-    file_path = Path(config_path)
 
-    if file_path.exists():
-        # No need to start another tasks
-        logger.info("Not accepting a job a miner has already taken.")
-        return "Another miner has picked up this job."
-    else:
-        with open(f"{CONFIG_DIR}/base.yml", "r") as file:
-            config = yaml.safe_load(file)
-        config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
+    with open(f"{CONFIG_DIR}/base.yml", "r") as file:
+        config = yaml.safe_load(file)
+    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
-        with open(config_path, "w") as file:
-            yaml.dump(config, file)
+    with open(config_path, "w") as file:
+        yaml.dump(config, file)
 
 
     # Format the request for RunPod
@@ -133,19 +127,13 @@ async def tune_model_grpo(
     CONFIG_DIR = "core/config"
     config_filename = f"{train_request.task_id}.yml"
     config_path = os.path.join(CONFIG_DIR, config_filename)
-    file_path = Path(config_path)
 
-    if file_path.exists():
-        # No need to start another tasks
-        logger.info("Not accepting a job a miner has already taken.")
-        return "Another miner has picked up this job."
-    else:
-        with open(f"{CONFIG_DIR}/base.yml", "r") as file:
-            config = yaml.safe_load(file)
-        config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
+    with open(f"{CONFIG_DIR}/base.yml", "r") as file:
+        config = yaml.safe_load(file)
+    config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
-        with open(config_path, "w") as file:
-            yaml.dump(config, file)
+    with open(config_path, "w") as file:
+        yaml.dump(config, file)
 
     # Format the request for RunPod
     # Serialize Dataset Type
@@ -228,16 +216,30 @@ async def task_offer(
         if request.task_type == TaskType.DPOTASK:
             logger.info("Task Type: DPO")
         if request.task_type == TaskType.GRPOTASK:
-            ########### NO GRPO TASKS YET ###########
             logger.info("Task Type: GRPO")
 
-        
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
             return MinerTaskResponse(
                 message=f"This endpoint only accepts text tasks: "
                         f"{TaskType.INSTRUCTTEXTTASK}, {TaskType.DPOTASK} and {TaskType.GRPOTASK}",
                 accepted=False
             )
+        # Check model parameter count
+        # Reject if model size is 32B or larger
+        if request.model_params_count is not None and request.model_params_count >= 30_000_000_000:
+            logger.info(f"Rejecting offer: Model size too large ({request.model_params_count / 1_000_000_000:.1f}B >= 40B)")
+            return MinerTaskResponse(message="Model size too large (>= 40B)", accepted=False)
+        
+        if any(k in request.model.lower() for k in ("neo", "stella", "falcon", "gpt-j")):
+            return MinerTaskResponse(
+                message=f"This endpoint does not currently support that model.",
+                accepted=False
+            )
+        # optional: still reject absurdly long jobs if you want
+        if request.hours_to_complete >= 48:
+            logger.info(f"Rejecting offer: too long ({request.hours_to_complete}h)")
+            return MinerTaskResponse(message="Job too long", accepted=False)
+
         
         CONFIG_DIR = "core/config"
         config_filename = f"{request.task_id}.yml"
@@ -250,24 +252,14 @@ async def task_offer(
                 message=f"No thank you.",
                 accepted=False
             )
+        else:
+            #Write the config file to make sure other miners don't accept
+            with open(f"{CONFIG_DIR}/base.yml", "r") as file:
+                config = yaml.safe_load(file)
+            with open(config_path, "w") as file:
+                yaml.dump(config, file)
         
-        if any(k in request.model.lower() for k in ("neo", "stella", "falcon", "gpt-j")):
-            return MinerTaskResponse(
-                message=f"This endpoint does not currently support that model.",
-                accepted=False
-            )
-
-        # Check model parameter count
-        # Reject if model size is 32B or larger
-        if request.model_params_count is not None and request.model_params_count >= 30_000_000_000:
-            logger.info(f"Rejecting offer: Model size too large ({request.model_params_count / 1_000_000_000:.1f}B >= 40B)")
-            return MinerTaskResponse(message="Model size too large (>= 40B)", accepted=False)
         
-        # optional: still reject absurdly long jobs if you want
-        if request.hours_to_complete >= 48:
-            logger.info(f"Rejecting offer: too long ({request.hours_to_complete}h)")
-            return MinerTaskResponse(message="Job too long", accepted=False)
-
         # otherwise accept
         logger.info(f"Accepting offer): {request.model} ({request.hours_to_complete}h)")
         return MinerTaskResponse(message="-----:)-----", accepted=True)
