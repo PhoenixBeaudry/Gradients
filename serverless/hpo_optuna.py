@@ -169,7 +169,7 @@ def run_optuna(base_cfg_path: str) -> dict:
     hpo_root.mkdir(parents=True, exist_ok=True)
     storage_path = f"sqlite:///{hpo_root / 'hpo.db'}"
     base_project = os.environ.get("WANDB_PROJECT", "Gradients")
-    hpo_project  = f"{base_project}-hpo"
+    hpo_project  = f"{base_project}-HPO-Trials"
 
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
