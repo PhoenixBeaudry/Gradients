@@ -319,19 +319,15 @@ def main():
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        n_train = len(dataset_meta.train_dataset)
-        target_train = int(n_train*0.2)
+        SUBSET_FRAC   = 0.05          # 5 %
+        MIN_PAIRS     = 1_000         # never go below this
+        MAX_PAIRS     = 10_000        # never go above this
+        target_train = int(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)))
+        target_eval = int(max(MIN_PAIRS, min(MAX_PAIRS, len(eval_dataset) * SUBSET_FRAC)))
 
-        n_eval = len(dataset_meta.eval_dataset)
-        target_eval = int(n_eval*0.2)
-
-        # 2. deterministic shuffle so every trial sees identical data
-        train_subset = dataset_meta.train_dataset.shuffle(seed=42)
-        eval_subset  = dataset_meta.eval_dataset.shuffle(seed=42)
-
-        # 3. slice
-        train_dataset = train_subset.select(range(target_train))
-        eval_dataset  = eval_subset.select(range(target_eval))
+        # deterministic shuffle → reproducible trials
+        train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
+        eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
 
     trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
