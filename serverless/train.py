@@ -91,7 +91,6 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
 #######################################################
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
