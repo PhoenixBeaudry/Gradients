@@ -75,7 +75,7 @@ wandb_run: your_name
 wandb_runid: default
 hub_model_id:
 hub_repo:
-hub_strategy: checkpoint
+hub_strategy: end
 hub_token:
 plugins:
   - axolotl.integrations.liger.LigerPlugin
