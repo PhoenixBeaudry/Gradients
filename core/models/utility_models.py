@@ -4,6 +4,7 @@ from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 
 
@@ -44,7 +45,7 @@ class WinningSubmission(BaseModel):
     model_repo: str
 
     # Turn off protected namespace for model
-    model_config = {"protected_namespaces": ()}
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class MinerTaskResult(BaseModel):
@@ -75,14 +76,15 @@ class InstructTextDatasetType(BaseModel):
 
 class RewardFunction(BaseModel):
     """Model representing a reward function with its metadata"""
+
     reward_func: str = Field(
         ...,
         description="String with the python code of the reward function to use",
         examples=[
             "def reward_func_conciseness(completions, **kwargs):",
-            "\"\"\"Reward function that favors shorter, more concise answers.\"\"\"",
-            "    return [100.0/(len(completion.split()) + 10) for completion in completions]"
-        ]
+            '"""Reward function that favors shorter, more concise answers."""',
+            "    return [100.0/(len(completion.split()) + 10) for completion in completions]",
+        ],
     )
     reward_weight: float = Field(..., ge=0)
     func_hash: str | None = None
@@ -125,6 +127,7 @@ class TextJob(Job):
 
 
 class DiffusionJob(Job):
+    model_config = ConfigDict(protected_namespaces=())
     dataset_zip: str = Field(
         ...,
         description="Link to dataset zip file",

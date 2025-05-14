@@ -120,8 +120,8 @@ NINETEEN_API_KEY = os.getenv("NINETEEN_API_KEY")
 MINIMUM_MINER_POOL = 1
 
 
-MIN_IDEAL_NUM_MINERS_IN_POOL = 5
-MAX_IDEAL_NUM_MINERS_IN_POOL = 9
+MIN_IDEAL_NUM_MINERS_IN_POOL = 8
+MAX_IDEAL_NUM_MINERS_IN_POOL = 15
 MIN_IMAGE_COMPETITION_HOURS = 1
 MAX_IMAGE_COMPETITION_HOURS = 2
 TASK_TIME_DELAY = 15  # number of minutes we wait to retry an organic request
@@ -130,6 +130,7 @@ MAX_DELAY_TIMES = 6
 # Maximum number of evaluation attempts when all scores are zero (including the first one)
 MAX_EVAL_ATTEMPTS = 4
 MODEL_SIZE_REQUIRING_2_GPUS = 35 * 10**9  # 35B params
+MODEL_SIZE_REQUIRING_3_GPUS = 68 * 10**9  # 68B params
 
 
 # scoring stuff  - NOTE: Will want to slowly make more exponential now we have auditing
@@ -143,7 +144,7 @@ SIGMOID_POWER = 0.75  # Higher = more extreme difference between high and low sc
 LINEAR_WEIGHT = 0.05  # Weight for linear component (0-1) - benefits low scores
 SIGMOID_WEIGHT = 0.7  # Weight for sigmoid component (0-1) - benefits high scores
 
-REWEIGHTING_EXP = 0.7  # how much of a drop off from leader
+REWEIGHTING_EXP = 1.0  # how much of a drop off from leader
 
 SCORING_WINDOW = 7  # number of days over which we score
 OUTLIER_STD_THRESHOLD = 2.0  # number of standard deviations from the mean to reject the outlier scores
@@ -156,14 +157,14 @@ MAX_CONCURRENT_TRAININGS = 10
 MAX_CONCURRENT_EVALUATIONS = 1
 MAX_TIME_DELAY_TO_FIND_MINERS = 1  # hours
 
-PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_INSTRUCT_TEXT = 0.3
+PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_INSTRUCT_TEXT = 0.2
 PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_IMAGE = 0.5
-PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_DPO = 0.1
+PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_DPO = 0.15
 PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_GRPO = (
-    1 - PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_INSTRUCT_TEXT
+    1
+    - PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_INSTRUCT_TEXT
     - PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_IMAGE
     - PERCENTAGE_OF_TASKS_THAT_SHOULD_BE_DPO
-
 )
 PERCENTAGE_OF_IMAGE_SYNTHS_SHOULD_BE_STYLE = (
     0.5  # person synth chance is 1 minus this (only for sdxl models, flux is always person)
@@ -249,4 +250,4 @@ BETA_GRPO = 0.04
 
 # GRPO evaluation
 GRPO_INITIAL_BATCH_SIZE = 32
-GRPO_DEFAULT_NUM_GENERATIONS = 8
+GRPO_DEFAULT_NUM_GENERATIONS = 2

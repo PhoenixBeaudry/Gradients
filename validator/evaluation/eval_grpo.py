@@ -64,24 +64,61 @@ def evaluate_grpo_model(
 
     dataset_path = evaluation_config.datasets[0]["path"]
     eval_dataset = load_dataset("json", data_files=dataset_path, split="train")
+
+
     eval_dataset = _adapt_grpo_columns_to_trl(eval_dataset, evaluation_args.dataset_type)
 
     _log_dataset_and_model_info(eval_dataset, finetuned_model, tokenizer)
 
     reward_funcs_callable = []
-    for reward_function in evaluation_args.dataset_type.reward_functions:
+    reward_func_names = []
+    reward_weights = []
+
+    logger.info(f"Processing {len(evaluation_args.dataset_type.reward_functions)} reward functions")
+
+    reward_weights_list = [rf.reward_weight for rf in evaluation_args.dataset_type.reward_functions]
+    logger.info(f"Using weights directly: {reward_weights_list}")
+
+    for i, reward_function in enumerate(evaluation_args.dataset_type.reward_functions):
         reward_func_str = reward_function.reward_func
         is_valid, error_msg, reward_func_callable = validate_reward_function(reward_func_str)
         if not is_valid:
             logger.error(f"Invalid reward function:\n{reward_func_str}")
             raise ValueError(f"Invalid reward function: {error_msg}")
+
+        reward_weight = reward_weights_list[i]
         reward_funcs_callable.append(reward_func_callable)
+
+        func_name = getattr(reward_function, 'name', f"reward_func_{i}")
+        weighted_name = f"{func_name}_weight_{reward_weight:.2f}"
+        reward_func_names.append(weighted_name)
+        reward_weights.append(reward_weight)
+
+        logger.info(f"Using reward function {i}: {func_name} with weight {reward_weight:.4f}")
+
+    captured_rewards = {name: [] for name in reward_func_names}
+    raw_rewards = {name: [] for name in reward_func_names}
+    wrapped_reward_funcs = []
+
+    for i, (original_func, func_name, weight) in enumerate(zip(reward_funcs_callable, reward_func_names, reward_weights)):
+        def create_wrapper(original_func, func_name, weight):
+            def wrapper(completions, **kwargs):
+                raw_results = original_func(completions, **kwargs)
+                raw_rewards[func_name].extend(raw_results)
+                weighted_results = [r * weight for r in raw_results]
+                captured_rewards[func_name].extend(weighted_results)
+                return weighted_results
+            return wrapper
+
+        wrapped_reward_funcs.append(create_wrapper(original_func, func_name, weight))
 
     @find_executable_batch_size(starting_batch_size=cst.GRPO_INITIAL_BATCH_SIZE)
     def evaluate_grpo_with_batch_size(batch_size):
-        num_generations = cst.GRPO_DEFAULT_NUM_GENERATIONS
-        while batch_size < num_generations:
+        num_generations = max(2, cst.GRPO_DEFAULT_NUM_GENERATIONS)  # Ensure minimum of 2
+        # Reduce generations if needed, but never below 2
+        while batch_size < num_generations and num_generations > 2:
             num_generations = num_generations // 2
+        logger.info(f"Using {num_generations} generations per prompt")
         training_args = GRPOConfig(
             output_dir=evaluation_config.output_dir,
             per_device_eval_batch_size=batch_size,
@@ -92,7 +129,7 @@ def evaluate_grpo_model(
         )
         grpo_trainer = GRPOTrainer(
             model=finetuned_model,
-            reward_funcs=reward_funcs_callable,
+            reward_funcs=wrapped_reward_funcs,
             args=training_args,
             train_dataset=Dataset.from_dict({col: [] for col in eval_dataset.column_names}),
             eval_dataset=eval_dataset,
@@ -105,8 +142,14 @@ def evaluate_grpo_model(
 
     eval_results = evaluate_grpo_with_batch_size()
     logger.info(f"Final GRPO evaluation results: {eval_results}")
+
+    final_weighted_rewards = {}
+    for name, captured_reward_list in captured_rewards.items():
+        if captured_reward_list:
+            final_weighted_rewards[name] = sum(captured_reward_list) / len(captured_reward_list)
+
     evaluation_results = {
-        "eval_loss": eval_results["eval_loss"],
+        "eval_loss": sum(final_weighted_rewards.values()) - eval_results.get("eval_loss", 0.0),
     }
     return evaluation_results
 
@@ -121,9 +164,7 @@ def evaluate_finetuned_grpo_model(
         finetuned_model=finetuned_model,
         config_path=cst.VALI_CONFIG_PATH
     )
-    return evaluate_grpo_model(
-        evaluation_config, finetuned_model, tokenizer, evaluation_args
-    )
+    return evaluate_grpo_model(evaluation_config, finetuned_model, tokenizer, evaluation_args)
 
 
 def evaluate_grpo_repo(evaluation_args: EvaluationArgs) -> None:
@@ -182,7 +223,7 @@ def main():
     original_model = os.environ.get("ORIGINAL_MODEL")
     dataset_type_str = os.environ.get("DATASET_TYPE", "")
     file_format_str = os.environ.get("FILE_FORMAT")
-    models_str = os.environ.get("MODELS", "")  # Comma-separated list of LoRA repos
+    models_str = os.environ.get("MODELS", "")
     if not all([dataset, original_model, file_format_str, models_str]):
         logger.error("Missing required environment variables.")
         exit(1)
