@@ -173,7 +173,7 @@ def load_dpo_datasets(cfg: dict) -> tuple:
         cfg['eval_split']:  float (0‑1) if you want an automatic split
     """
     # 1) Read raw json/arrow/parquet … – 🤗 Datasets auto‑detects format.
-    data_files = {"train": cfg["datasets"][0]['path']}
+    data_files = cfg["datasets"][0]['path']
 
     raw_ds = load_dataset("json", data_files=data_files)
     ds = raw_ds.rename_columns({
@@ -184,7 +184,7 @@ def load_dpo_datasets(cfg: dict) -> tuple:
 
     # 2) Optional random split if no explicit eval file supplied.
     if "eval" not in ds and cfg.get("val_set_size", 0) > 0:
-        ds = ds["train"].train_test_split(
+        ds = ds.train_test_split(
             test_size=cfg["val_set_size"], seed=42
         )
     train_ds, eval_ds = ds["train"], ds["test" if "test" in ds else "eval"]
