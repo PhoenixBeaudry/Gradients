@@ -1,4 +1,3 @@
 # Todo
-- Autoconfig Workers with NUM_WORKERS AND NUM_GPUS
-- Better Job Queuing System
-- Image Support
+- reimplement required time to finish
+- remove axolotl from train and train grpo
