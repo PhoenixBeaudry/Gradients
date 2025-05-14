@@ -9,10 +9,10 @@ RUN pip install docker toml
 COPY . .
 
 ENV JOB_ID=""
-ENV DATASET=""
-ENV MODELS=""
-ENV ORIGINAL_MODEL=""
-ENV DATASET_TYPE=""
-ENV FILE_FORMAT=""
+ENV DATASET="chtmp223/suri"
+ENV MODELS="FormlessAI/810c4257-bece-43a0-9684-746534b3ab71"
+ENV ORIGINAL_MODEL="TinyLlama/TinyLlama_v1.1"
+ENV DATASET_TYPE="DpoDatasetType"
+ENV FILE_FORMAT="hf"
 
 RUN mkdir /aplp
