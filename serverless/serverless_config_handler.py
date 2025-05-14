@@ -354,9 +354,14 @@ def setup_config(
             "error": "Invalid dataset_type format"
         }
     
-    # Modify Config and save
-    config_filename = f"{task_id}.yml"
-    config_path = os.path.join(CONFIG_DIR, config_filename)
+    if not testing:
+        # Modify Config and save
+        config_filename = f"{task_id}.yml"
+        config_path = os.path.join(CONFIG_DIR, config_filename)
+    else:
+        config_filename = f"test_{task_id}.yml"
+        config_path = os.path.join(CONFIG_DIR, config_filename)
+        
     config = _load_and_modify_config(
         dataset,
         model,
