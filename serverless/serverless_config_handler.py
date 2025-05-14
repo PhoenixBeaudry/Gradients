@@ -205,9 +205,11 @@ def _load_and_modify_config(
     if not testing:
         with open(CONFIG_TEMPLATE_PATH, "r") as file:
             config = yaml.safe_load(file)
+            config["testing"] = False
     else:
         with open(CONFIG_TESTING_PATH, "r") as file:
             config = yaml.safe_load(file)
+            config["testing"] = True
 
     config["job_id"] = task_id
     config["datasets"] = []

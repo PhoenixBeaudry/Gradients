@@ -327,7 +327,7 @@ def main():
     if cfg.get('adapter') == 'lora':
         policy_model = apply_lora_adapter(model, cfg)
 
-    if not cfg["hpo_run"]:
+    if not cfg["hpo_run"] and not cfg["testing"]:
         train_dataset = train_dataset
         eval_dataset   = eval_dataset
     else:
