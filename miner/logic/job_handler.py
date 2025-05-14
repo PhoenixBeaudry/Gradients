@@ -91,8 +91,10 @@ def _load_and_modify_config(
     """
     Loads the config template and modifies it to create a new job config.
     """
-    if isinstance(dataset_type, InstructTextDatasetType | DpoDatasetType | GrpoDatasetType):
+    if isinstance(dataset_type, InstructTextDatasetType | DpoDatasetType):
         config_path = cst.CONFIG_TEMPLATE_PATH
+    elif isinstance(dataset_type, GrpoDatasetType):
+        config_path = cst.CONFIG_TEMPLATE_PATH_GRPO
 
     logger.info("Loading config template")
     with open(config_path, "r") as file:
@@ -103,10 +105,17 @@ def _load_and_modify_config(
 
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
-    
-    
-    config["required_finish_time"] = required_finish_time.isoformat()
 
+    if isinstance(dataset_type, DpoDatasetType):
+        config["rl"] = "dpo"
+    elif isinstance(dataset_type, GrpoDatasetType):
+        filename, reward_funcs_names = create_reward_funcs_file(
+            [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
+            )
+        config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
+        config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
+
+    config = update_flash_attention(config, model)
     config = update_model_info(config, model, task_id, expected_repo_name)
 
     # Modify config based on Model Size
@@ -193,6 +202,32 @@ def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]
 
     return filename, func_names
 
+
+
+def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]:
+    """
+    Create a Python file with reward functions for GRPO training.
+
+    Args:
+        reward_funcs: List of strings containing Python reward function implementations
+        task_id: Unique task identifier
+    """
+    filename = f"rewards_{task_id}"
+    filepath = os.path.join(cst.CONFIG_DIR, f"{filename}.py")
+
+    func_names = []
+    for reward_func in reward_funcs:
+        if "def " in reward_func:
+            func_name = reward_func.split("def ")[1].split("(")[0].strip()
+            func_names.append(func_name)
+
+    with open(filepath, "w") as f:
+        f.write("# Auto-generated reward functions file\n\n")
+        for reward_func in reward_funcs:
+            f.write(f"{reward_func}\n\n")
+
+    return filename, func_names
+
 def setup_lora_config(config, model_size):
     """Setup QLoRA configuration for more efficient adaptation"""
     config["adapter"] = "lora"
@@ -209,7 +244,13 @@ def create_job_diffusion(
     expected_repo_name: str | None,
     required_finish_time: datetime
 ):
-    return DiffusionJob(job_id=job_id, model=model, dataset_zip=dataset_zip, model_type=model_type, expected_repo_name=expected_repo_name, required_finish_time=required_finish_time)
+    return DiffusionJob(
+        job_id=job_id,
+        model=model,
+        dataset_zip=dataset_zip,
+        model_type=model_type,
+        expected_repo_name=expected_repo_name,
+    )
 
 
 def create_job_text(
@@ -228,8 +269,94 @@ def create_job_text(
         dataset_type=dataset_type,
         file_format=file_format,
         expected_repo_name=expected_repo_name,
-        required_finish_time=required_finish_time
     )
+
+
+def start_tuning_container_diffusion(job: DiffusionJob):
+    logger.info("=" * 80)
+    logger.info("STARTING THE DIFFUSION TUNING CONTAINER")
+    logger.info("=" * 80)
+
+    config_path = os.path.join(cst.CONFIG_DIR, f"{job.job_id}.toml")
+
+    config = _load_and_modify_config_diffusion(job)
+    save_config_toml(config, config_path)
+
+    logger.info(config)
+    if job.model_type == ImageModelType.FLUX:
+        logger.info(f"Downloading flux unet from {job.model}")
+        flux_unet_path = download_flux_unet(job.model)
+
+    prepare_dataset(
+        training_images_zip_path=job.dataset_zip,
+        training_images_repeat=(
+            cst.DIFFUSION_SDXL_REPEATS if job.model_type == ImageModelType.SDXL
+            else cst.DIFFUSION_FLUX_REPEATS
+        ),
+        instance_prompt=cst.DIFFUSION_DEFAULT_INSTANCE_PROMPT,
+        class_prompt=cst.DIFFUSION_DEFAULT_CLASS_PROMPT,
+        job_id=job.job_id,
+    )
+
+    docker_env = DockerEnvironmentDiffusion(
+        huggingface_token=cst.HUGGINGFACE_TOKEN, wandb_token=cst.WANDB_TOKEN, job_id=job.job_id, base_model=job.model_type.value
+    ).to_dict()
+    logger.info(f"Docker environment: {docker_env}")
+
+    try:
+        docker_client = docker.from_env()
+
+        volume_bindings = {
+            os.path.abspath(cst.CONFIG_DIR): {
+                "bind": "/dataset/configs",
+                "mode": "rw",
+            },
+            os.path.abspath(cst.OUTPUT_DIR): {
+                "bind": "/dataset/outputs",
+                "mode": "rw",
+            },
+            os.path.abspath(cst.DIFFUSION_DATASET_DIR): {
+                "bind": "/dataset/images",
+                "mode": "rw",
+            },
+        }
+
+        if job.model_type == ImageModelType.FLUX:
+            volume_bindings[os.path.dirname(flux_unet_path)] =  {
+                "bind": cst.CONTAINER_FLUX_PATH,
+                "mode": "rw",
+            }
+
+        container = docker_client.containers.run(
+            image=cst.MINER_DOCKER_IMAGE_DIFFUSION,
+            environment=docker_env,
+            volumes=volume_bindings,
+            runtime="nvidia",
+            device_requests=[docker.types.DeviceRequest(count=1, capabilities=[["gpu"]])],
+            detach=True,
+            tty=True,
+        )
+
+        # Use the shared stream_logs function
+        stream_logs(container)
+
+        result = container.wait()
+
+        if result["StatusCode"] != 0:
+            raise DockerException(f"Container exited with non-zero status code: {result['StatusCode']}")
+
+    except Exception as e:
+        logger.error(f"Error processing job: {str(e)}")
+        raise
+
+    finally:
+        if "container" in locals():
+            container.remove(force=True)
+
+        train_data_path = f"{cst.DIFFUSION_DATASET_DIR}/{job.job_id}"
+
+        if os.path.exists(train_data_path):
+            shutil.rmtree(train_data_path)
 
 
 def _dpo_format_prompt(row, format_str):
@@ -371,16 +498,8 @@ def start_tuning_container(job: TextJob):
     config_filename = f"{job.job_id}.yml"
     config_path = os.path.join(cst.CONFIG_DIR, config_filename)
 
-    try:
-        logger.info(job.file_format)
-        if job.file_format != FileFormat.HF:
-            if job.file_format == FileFormat.S3:
-                job.dataset = asyncio.run(download_s3_file(job.dataset))
-                logger.info(job.dataset)
-                job.file_format = FileFormat.JSON
+    docker_entrypoint = _create_docker_entrypoint(job)
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
     config = _load_and_modify_config(
         job.dataset,
@@ -470,6 +589,7 @@ def start_tuning_container(job: TextJob):
             device_requests=device_requests, # Use specific GPUs if assigned
             detach=True,
             tty=True,
+            command=["/bin/bash", "-c", docker_entrypoint]
         )
 
         last_logs = stream_logs(container)
