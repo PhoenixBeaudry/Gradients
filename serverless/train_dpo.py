@@ -8,8 +8,6 @@ import copy
 from math import ceil
 import torch
 from datetime import datetime
-from axolotl.common.datasets import load_preference_datasets
-from axolotl.utils.models import load_tokenizer
 from trl import DPOConfig, DPOTrainer
 from axolotl.cli.config import load_cfg
 from axolotl.cli.args import TrainerCliArgs
@@ -18,8 +16,9 @@ from transformers import (
     EarlyStoppingCallback,
     SchedulerType,
 )
+from datasets import load_dataset, DatasetDict
 import time
-from transformers import TrainerCallback, TrainerControl, TrainerState
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -150,6 +149,52 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
     return get_peft_model(model, peft_config)
 
 
+def load_tokenizer(model_name: str, cfg: dict):
+    tok = AutoTokenizer.from_pretrained(
+        model_name,
+        use_auth_token=cfg.get("hub_token"),
+        trust_remote_code=True,
+        padding_side="left",          # DPO prefers left‑padding
+        truncation_side="right"
+    )
+    if tok.pad_token_id is None:      # e.g. Llama‑3, Qwen‑2 FlashAttn
+        tok.pad_token = tok.eos_token
+    tok.add_eos_token = True
+    tok.truncation = True
+    return tok
+
+
+def load_dpo_datasets(cfg: dict) -> tuple:
+    """
+    Returns (train_ds, eval_ds) ready for DPOTrainer.
+    Accepts:
+        cfg['train_data']:  local path | HTTP/S3 URL | HF repo
+        cfg['eval_data']:   same as above             (optional)
+        cfg['eval_split']:  float (0‑1) if you want an automatic split
+    """
+    # 1) Read raw json/arrow/parquet … – 🤗 Datasets auto‑detects format.
+    data_files = {"train": cfg["datasets"][0]['path']}
+    if cfg.get("eval_data"):
+        data_files["eval"] = cfg["eval_data"]
+
+    raw_ds = load_dataset("json", data_files=data_files)
+    ds = raw_ds["train"].rename_columns({
+        cfg['datasets'][0]['field_prompt']: "prompt",
+        cfg['datasets'][0]['field_chosen']:     "chosen",
+        cfg['datasets'][0]['field_rejected']:      "rejected",
+    })
+
+    # 2) Optional random split if no explicit eval file supplied.
+    if "eval" not in ds and cfg.get("val_set_size", 0) > 0:
+        ds = ds["train"].train_test_split(
+            test_size=cfg["val_set_size"], seed=42
+        )
+    train_ds, eval_ds = ds["train"], ds["test" if "test" in ds else "eval"]
+
+    return train_ds, eval_ds
+
+
+
 def build_trainer(cfg: dict, model, ref_model, tokenizer, train_ds, eval_ds):
     # ── DPO Trainer ────────────────────────────────────────
     #### Callbacks ####
@@ -243,7 +288,7 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
+    train_dataset, eval_dataset = load_dpo_datasets(cfg)
     tokenizer = load_tokenizer(axo_cfg)
 
     model = load_model(cfg['base_model'], cfg)
@@ -254,20 +299,20 @@ def main():
         policy_model = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"]:
-        train_dataset = dataset_meta.train_dataset
-        eval_dataset   = dataset_meta.eval_dataset
+        train_dataset = train_dataset
+        eval_dataset   = eval_dataset
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        n_train = len(dataset_meta.train_dataset)
+        n_train = len(train_dataset)
         target_train = int(n_train*0.2)
 
-        n_eval = len(dataset_meta.eval_dataset)
+        n_eval = len(eval_dataset)
         target_eval = int(n_eval*0.2)
 
         # 2. deterministic shuffle so every trial sees identical data
-        train_subset = dataset_meta.train_dataset.shuffle(seed=42)
-        eval_subset  = dataset_meta.eval_dataset.shuffle(seed=42)
+        train_subset = train_dataset.shuffle(seed=42)
+        eval_subset  = eval_dataset.shuffle(seed=42)
 
         # 3. slice
         train_dataset = train_subset.select(range(target_train))
