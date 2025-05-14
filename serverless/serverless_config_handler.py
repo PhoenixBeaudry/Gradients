@@ -160,14 +160,14 @@ def _process_grpo_dataset_fields(dataset_type: GrpoDatasetType) -> dict:
 
 
 def _process_dpo_dataset_fields(dataset_type: DpoDatasetType) -> dict:
-    if dataset_type.field_prompt == "prompt":
-        template = "chatml.prompt_pairs"
-    elif dataset_type.field_prompt == "question":
-        template = "chatml.intel"
-    elif dataset_type.field_prompt == "instruction":
-        template = "chatml.argilla"
+    type = "user_defined.default"
+    field_prompt = dataset_type.field_prompt
+    field_system = dataset_type.field_system
+    field_chosen = dataset_type.field_chosen
+    field_rejected = dataset_type.field_rejected
+    full_template_config = {"type": type, "field_prompt": field_prompt, "field_system": field_system, "field_chosen": field_chosen, "field_rejected": field_rejected, "split": "train"}
 
-    return {"type": template, "split": "train"}
+    return full_template_config
 
 
 def _process_instruct_dataset_fields(instruct_type_dict: dict) -> dict:
