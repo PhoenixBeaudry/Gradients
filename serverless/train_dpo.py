@@ -174,11 +174,9 @@ def load_dpo_datasets(cfg: dict) -> tuple:
     """
     # 1) Read raw json/arrow/parquet … – 🤗 Datasets auto‑detects format.
     data_files = {"train": cfg["datasets"][0]['path']}
-    if cfg.get("eval_data"):
-        data_files["eval"] = cfg["eval_data"]
 
     raw_ds = load_dataset("json", data_files=data_files)
-    ds = raw_ds["train"].rename_columns({
+    ds = raw_ds.rename_columns({
         cfg['datasets'][0]['field_prompt']: "prompt",
         cfg['datasets'][0]['field_chosen']:     "chosen",
         cfg['datasets'][0]['field_rejected']:      "rejected",
