@@ -250,6 +250,14 @@ def main():
     if not cfg["hpo_run"] and not cfg["testing"]:
         train_dataset = dataset_meta.train_dataset
         eval_dataset   = dataset_meta.eval_dataset
+    elif cfg["testing"]:
+        # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
+        # 1. compute target subset sizes
+        target_train = int(len(train_dataset)/2)
+        target_eval = int(len(eval_dataset)/2)
+        # deterministic shuffle → reproducible trials
+        train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
+        eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
