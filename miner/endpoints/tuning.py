@@ -63,7 +63,7 @@ async def tune_model_text(
 
     # Check if file exists if not right temp config with huggingface repo
 
-    CONFIG_DIR = "/workspace/configs/"
+    CONFIG_DIR = "core/config"
     config_filename = f"{train_request.task_id}.yml"
     config_path = os.path.join(CONFIG_DIR, config_filename)
     file_path = Path(config_path)
@@ -73,7 +73,7 @@ async def tune_model_text(
         logger.info("Not accepting a job a miner has already taken.")
         return "Another miner has picked up this job."
     else:
-        with open(f"{CONFIG_DIR}base.yml", "r") as file:
+        with open(f"{CONFIG_DIR}/base.yml", "r") as file:
             config = yaml.safe_load(file)
         config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
@@ -130,7 +130,7 @@ async def tune_model_grpo(
 
     logger.info(f"Job received is {train_request}")
     
-    CONFIG_DIR = "/workspace/configs/"
+    CONFIG_DIR = "core/config"
     config_filename = f"{train_request.task_id}.yml"
     config_path = os.path.join(CONFIG_DIR, config_filename)
     file_path = Path(config_path)
@@ -140,7 +140,7 @@ async def tune_model_grpo(
         logger.info("Not accepting a job a miner has already taken.")
         return "Another miner has picked up this job."
     else:
-        with open(f"{CONFIG_DIR}base.yml", "r") as file:
+        with open(f"{CONFIG_DIR}/base.yml", "r") as file:
             config = yaml.safe_load(file)
         config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
@@ -239,7 +239,7 @@ async def task_offer(
                 accepted=False
             )
         
-        CONFIG_DIR = "/workspace/configs/"
+        CONFIG_DIR = "core/config"
         config_filename = f"{request.task_id}.yml"
         config_path = os.path.join(CONFIG_DIR, config_filename)
         file_path = Path(config_path)
