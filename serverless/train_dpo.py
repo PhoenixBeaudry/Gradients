@@ -16,7 +16,7 @@ from transformers import (
     EarlyStoppingCallback,
     SchedulerType,
 )
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, DatasetDict, Dataset
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 import bitsandbytes as bnb
@@ -164,41 +164,37 @@ def load_tokenizer(model_name: str, cfg: dict):
     return tok
 
 
-def load_dpo_datasets(cfg: dict) -> tuple:
+def load_dpo_datasets(cfg: dict):
     """
-    Returns (train_ds, eval_ds) ready for DPOTrainer.
-    Accepts:
-        cfg['train_data']:  local path | HTTP/S3 URL | HF repo
-        cfg['eval_data']:   same as above             (optional)
-        cfg['eval_split']:  float (0‑1) if you want an automatic split
+    Return (train_ds, eval_ds) ready for TRL‑DPO.
+    If cfg["val_set_size"] is 0 → eval_ds is None.
     """
-    # 1) Read raw json/arrow/parquet … – 🤗 Datasets auto‑detects format.
-    data_files = cfg["datasets"][0]['path']
+    # Load **only one** split so we always get a Dataset, never a DatasetDict
+    ds_train = load_dataset(
+        "json",
+        data_files=cfg["datasets"][0]["path"],
+        split="train"          # guarantees Dataset, not DatasetDict
+    )
 
-    raw = load_dataset("json", data_files=data_files)
-
-    if isinstance(raw, DatasetDict):
-        ds_train = raw["train"]
-    else:
-        ds_train = raw    
-
+    # Standardise column names
     ds_train = ds_train.rename_columns({
-        cfg['datasets'][0]['field_prompt']: "prompt",
-        cfg['datasets'][0]['field_chosen']:     "chosen",
-        cfg['datasets'][0]['field_rejected']:      "rejected",
+        cfg["datasets"][0]["field_prompt"]:   "prompt",
+        cfg["datasets"][0]["field_chosen"]:   "chosen",
+        cfg["datasets"][0]["field_rejected"]: "rejected",
     })
 
+    # Optional random split
     val_size = cfg.get("val_set_size", 0)
     if val_size:
-        split = ds_train.train_test_split(
-            test_size=val_size, seed=42,
-        )
+        split = ds_train.train_test_split(test_size=val_size, seed=42)
         train_ds, eval_ds = split["train"], split["test"]
     else:
-        train_ds = ds_train
-        eval_ds  = None
+        train_ds, eval_ds = ds_train, None
 
-    train_ds, eval_ds = ds_train["train"], ds_train["test" if "test" in ds_train else "eval"]
+    # Fail fast if the schema is wrong
+    REQUIRED = {"prompt", "chosen", "rejected"}
+    missing = REQUIRED - set(train_ds.column_names)
+    assert not missing, f"Dataset missing columns: {missing}"
 
     return train_ds, eval_ds
 
