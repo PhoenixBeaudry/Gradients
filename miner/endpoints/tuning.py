@@ -73,7 +73,7 @@ async def tune_model_text(
         logger.info("Not accepting a job a miner has already taken.")
         return "Another miner has picked up this job."
     else:
-        with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
+        with open(f"{CONFIG_DIR}base.yml", "r") as file:
             config = yaml.safe_load(file)
         config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
@@ -140,7 +140,7 @@ async def tune_model_grpo(
         logger.info("Not accepting a job a miner has already taken.")
         return "Another miner has picked up this job."
     else:
-        with open(cst.CONFIG_TEMPLATE_PATH, "r") as file:
+        with open(f"{CONFIG_DIR}base.yml", "r") as file:
             config = yaml.safe_load(file)
         config["hub_model_id"] = f"{cst.HUGGINGFACE_USERNAME}/{train_request.expected_repo_name}"
 
