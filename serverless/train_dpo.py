@@ -262,6 +262,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     logger.info("Initializing DPO Trainer")
     return DPOTrainer(
         model=model,
+        ref_model=None,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
@@ -292,6 +293,9 @@ def main():
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
     model = load_model(cfg['base_model'], cfg)
 
+    if cfg.get('adapter') == 'lora':
+        policy_model = apply_lora_adapter(model, cfg)
+
     if not cfg["hpo_run"]:
         train_dataset = train_dataset
         eval_dataset   = eval_dataset
@@ -309,7 +313,7 @@ def main():
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
 
 
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, policy_model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
