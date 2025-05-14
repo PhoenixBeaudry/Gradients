@@ -89,14 +89,17 @@ async def tune_model_text(
 
     # Serialize file_format (Enum)
     file_format_str = train_request.file_format.value if isinstance(train_request.file_format, Enum) else str(train_request.file_format)
-    
+
+    # calculate required finished time
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete)).isoformat()
+
     runpod_request = {
         "model": train_request.model,
         "dataset": train_request.dataset,
         "dataset_type": serial_dataset_type,
         "file_format": file_format_str,
         "expected_repo_name": train_request.expected_repo_name,
-        "hours_to_complete": train_request.hours_to_complete,
+        "required_finish_time": required_finish_time,
         "task_id": str(train_request.task_id)
     }
     
@@ -149,6 +152,9 @@ async def tune_model_grpo(
 
     # Serialize file_format (Enum)
     file_format_str = train_request.file_format.value if isinstance(train_request.file_format, Enum) else str(train_request.file_format)
+
+    # calculate required finished time
+    required_finish_time = (datetime.now() + timedelta(hours=train_request.hours_to_complete)).isoformat()
     
     runpod_request = {
         "model": train_request.model,
@@ -156,7 +162,7 @@ async def tune_model_grpo(
         "dataset_type": serial_dataset_type,
         "file_format": file_format_str,
         "expected_repo_name": train_request.expected_repo_name,
-        "hours_to_complete": train_request.hours_to_complete,
+        "required_finish_time": required_finish_time,
         "task_id": str(train_request.task_id)
     }
     

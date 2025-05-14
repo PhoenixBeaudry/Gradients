@@ -30,10 +30,7 @@ def handler(job):
     dataset_type = job_input.get("dataset_type")
     file_format = job_input.get("file_format")
     expected_repo_name = job_input.get("expected_repo_name")
-    hours_to_complete = job_input.get("hours_to_complete", 24)
-    
-    # Calculate required finish time
-    required_finish_time = (datetime.now() + timedelta(hours=hours_to_complete))
+    required_finish_time = job_input.get("required_finish_time")
     
     # Load configuration, setup training, etc.
     CONFIG_DIR = "/workspace/configs"

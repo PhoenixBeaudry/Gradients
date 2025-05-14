@@ -193,7 +193,7 @@ def _load_and_modify_config(
     file_format: FileFormat,
     task_id: str,
     expected_repo_name: str | None,
-    required_finish_time: datetime
+    required_finish_time: str
 ) -> dict:
     """
     Loads the config template and modifies it to create a new job config.
@@ -211,7 +211,7 @@ def _load_and_modify_config(
     config["datasets"].append(dataset_entry)
     
     
-    config["required_finish_time"] = required_finish_time.isoformat()
+    config["required_finish_time"] = required_finish_time
 
     config = update_model_info(config, model, task_id, expected_repo_name)
 
@@ -315,7 +315,7 @@ def setup_config(
     file_format: str,
     task_id: str,
     expected_repo_name: str | None,
-    required_finish_time: datetime
+    required_finish_time: str
 ):
     # Deserialize dataset_type based on class_type
     if isinstance(dataset_type, dict) and "class_type" in dataset_type:
