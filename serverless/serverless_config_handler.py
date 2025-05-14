@@ -3,6 +3,7 @@ from pydantic import Field
 import uuid
 from datetime import datetime
 from enum import Enum
+from datetime import timedelta
 from uuid import UUID
 import os
 import uuid
@@ -217,8 +218,10 @@ def _load_and_modify_config(
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
     
-    
-    config["required_finish_time"] = required_finish_time
+    if not testing:
+        config["required_finish_time"] = required_finish_time
+    else:
+        config["required_finish_time"] = (datetime.now() + timedelta(hours=4)).isoformat()
 
     config = update_model_info(config, model, task_id, expected_repo_name)
 
