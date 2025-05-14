@@ -9,8 +9,6 @@ from math import ceil
 import torch
 from datetime import datetime
 from trl import DPOConfig, DPOTrainer
-from axolotl.cli.config import load_cfg
-from axolotl.cli.args import TrainerCliArgs
 from transformers import (
     AutoModelForCausalLM,
     EarlyStoppingCallback,
@@ -278,8 +276,6 @@ def main():
     args = parse_args()
     cfg = load_config(args.config)
 
-    ### Temp Axolotl Config to generate Dataset and Model
-    axo_cfg = load_cfg(args.config)
     #####################################################
     print("DATASET CONFIG")
     print(cfg)
@@ -294,8 +290,7 @@ def main():
     
     # after loading cfg...
     train_dataset, eval_dataset = load_dpo_datasets(cfg)
-    tokenizer = load_tokenizer(axo_cfg)
-
+    tokenizer = load_tokenizer(cfg['base_model'], cfg)
     model = load_model(cfg['base_model'], cfg)
 
     ref_model  = copy.deepcopy(model).eval().requires_grad_(False)
