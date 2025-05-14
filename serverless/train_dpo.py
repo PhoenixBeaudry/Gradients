@@ -127,23 +127,54 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         model = prepare_model_for_kbit_training(model)
 
     # Determine target modules for LoRA
-    targets = cfg.get('target_modules') or []
+    targets = cfg.get('target_modules', [])
     if not targets:
-        for name, module in model.named_modules():
-            if isinstance(module, torch.nn.Linear) and any(x in name.lower() for x in ('attn', 'attention')):
-                targets.append(name.split('.')[-1])
-        targets = list(set(targets))
+        # Auto-detect based on model architecture
+        model_type = model.config.model_type.lower() if hasattr(model.config, "model_type") else ""
+        
+        # Model-specific target modules based on architecture
+        if "llama" in model_type or "mistral" in model_type:
+            targets = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        elif "gpt-neox" in model_type:
+            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
+        elif "falcon" in model_type:
+            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
+        elif "gpt2" in model_type:
+            targets = ["c_attn", "c_proj", "c_fc"]
+        elif "bloom" in model_type:
+            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
+        elif "opt" in model_type:
+            targets = ["q_proj", "k_proj", "v_proj", "out_proj", "fc1", "fc2"]
+        else:
+            # Fallback: detect attention and MLP modules
+            attention_patterns = ['attn', 'attention', 'self_attn', 'query', 'key', 'value']
+            mlp_patterns = ['mlp', 'feed_forward', 'fc', 'dense', 'linear', 'proj']
+            
+            for name, module in model.named_modules():
+                if isinstance(module, torch.nn.Linear):
+                    last_part = name.split('.')[-1].lower()
+                    if any(pattern in name.lower() for pattern in attention_patterns) or any(pattern == last_part for pattern in attention_patterns):
+                        targets.append(last_part)
+                    elif any(pattern in name.lower() for pattern in mlp_patterns) or any(pattern == last_part for pattern in mlp_patterns):
+                        targets.append(last_part)
+            
+            targets = list(set(targets))
+            
         if not targets:
-            raise ValueError("Could not auto-detect attention modules for LoRA. Please set 'target_modules' in config.")
+            raise ValueError("Could not auto-detect modules for LoRA. Please set 'target_modules' in config.")
+        
+        print(f"Auto-detected target modules for {model_type}: {targets}")
 
+    # Create PEFT config
     peft_config = LoraConfig(
         r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_r', 16))*2,
+        lora_alpha=int(cfg.get('lora_alpha', None) or cfg.get('lora_r', 16) * 2),
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
-        bias='none',
+        bias=cfg.get('bias', 'none'),
         task_type='CAUSAL_LM'
     )
+    
     return get_peft_model(model, peft_config)
 
 
@@ -303,7 +334,7 @@ def main():
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
         SUBSET_FRAC   = 0.05          # 5 %
-        MIN_PAIRS     = 1_000         # never go below this
+        MIN_PAIRS     = 2_000         # never go below this
         MAX_PAIRS     = 10_000        # never go above this
         target_train = int(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)))
         target_eval = int(max(MIN_PAIRS, min(MAX_PAIRS, len(eval_dataset) * SUBSET_FRAC)))
