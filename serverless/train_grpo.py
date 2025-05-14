@@ -232,7 +232,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         hf_kwargs = {
             'hub_model_id': cfg['hub_model_id'],
             'hub_token': cfg['hub_token'],
-            'hub_strategy': cfg['hub_strategy'],
+            'hub_strategy': "end",
             'push_to_hub': True,
         }
     tf_args = GRPOConfig(
