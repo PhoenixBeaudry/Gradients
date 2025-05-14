@@ -21,6 +21,7 @@ hf_api = HfApi()
 
 CONFIG_DIR = "/workspace/configs/"
 CONFIG_TEMPLATE_PATH = CONFIG_DIR + "base.yml"
+CONFIG_TESTING_PATH = CONFIG_DIR + "base_testing.yml"
 OUTPUT_DIR = "/workspace/outputs/"
 TRAIN_DIR = "/workspace/training/"
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
@@ -193,16 +194,20 @@ def _load_and_modify_config(
     file_format: FileFormat,
     task_id: str,
     expected_repo_name: str | None,
-    required_finish_time: str
+    required_finish_time: str,
+    testing: bool
 ) -> dict:
     """
     Loads the config template and modifies it to create a new job config.
     """
-    config_path = CONFIG_TEMPLATE_PATH
 
     print("Loading config template")
-    with open(config_path, "r") as file:
-        config = yaml.safe_load(file)
+    if not testing:
+        with open(CONFIG_TEMPLATE_PATH, "r") as file:
+            config = yaml.safe_load(file)
+    else:
+        with open(CONFIG_TESTING_PATH, "r") as file:
+            config = yaml.safe_load(file)
 
     config["job_id"] = task_id
     config["datasets"] = []
@@ -315,7 +320,8 @@ def setup_config(
     file_format: str,
     task_id: str,
     expected_repo_name: str | None,
-    required_finish_time: str
+    required_finish_time: str,
+    testing: bool
 ):
     # Deserialize dataset_type based on class_type
     if isinstance(dataset_type, dict) and "class_type" in dataset_type:
@@ -358,7 +364,8 @@ def setup_config(
         file_format,
         task_id,
         expected_repo_name,
-        required_finish_time
+        required_finish_time,
+        testing
     )
     print("CONFIG AFTER SETUP")
     print(config)

@@ -1,0 +1,91 @@
+##### EDITABLE CONFIGS #####
+
+## Main Training Params
+optimizer: adamw_8bit
+lr_scheduler: cosine
+learning_rate: 2e-4
+gradient_accumulation_steps: 2 # Must match Accelerate Config
+micro_batch_size: 4
+eval_batch_size: 4
+weight_decay: 0.01
+gradient_checkpointing: true
+
+adapter: lora
+lora_r: 32
+lora_alpha: 32
+lora_dropout: 0
+lora_target_linear: true
+beta: 0.1
+
+early_stopping: true
+early_stopping_patience: 5
+greater_is_better: false
+metric_for_best_model: eval_loss
+eval_steps: 100
+eval_strategy: steps
+
+max_steps: 100
+save_steps: 100
+warmup_steps: 100
+save_strategy: steps
+logging_steps: 5
+save_total_limit: 5
+
+do_hpo: false
+dataloader_num_workers: 8
+val_set_size: 0.05
+sequence_len: 32768
+
+
+##### AUTOSET PARAMS #####
+model_params_count: 0
+job_id:
+hpo_run: false
+rl:
+
+##### AXOLOTL REQUIRED - NO TOUCHING NECESSARY #####
+chat_template: llama3
+base_model: NousResearch/Meta-Llama-3-8B-Instruct
+base_model_config:
+model_type: AutoModelForCausalLM
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+datasets:
+dataset_prepared_path:
+output_dir: miner_id_24
+sample_packing: false
+eval_sample_packing: false
+pad_to_sequence_len: false
+trust_remote_code: true
+gpu_memory_limit: 80GiB
+lora_model_dir:
+bf16: true
+tf32: false
+fp16: false
+group_by_length: true
+train_on_inputs: false
+resume_from_checkpoint:
+local_rank:
+flash_attention: true
+s2_attention:
+wandb_project: Gradients-On-Demand
+wandb_mode: online
+wandb_run: your_name
+wandb_runid: default
+hub_model_id:
+hub_repo:
+hub_strategy: checkpoint
+hub_token:
+plugins:
+  - axolotl.integrations.liger.LigerPlugin
+liger_rope: true
+liger_rms_norm: true
+liger_glu_activation: true
+liger_layer_norm: true
+liger_fused_linear_cross_entropy: true
+debug:
+
+
+
+

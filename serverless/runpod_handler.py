@@ -31,11 +31,19 @@ def handler(job):
     file_format = job_input.get("file_format")
     expected_repo_name = job_input.get("expected_repo_name")
     required_finish_time = job_input.get("required_finish_time")
+    testing = job_input.get("testing", False)
     
     # Load configuration, setup training, etc.
-    CONFIG_DIR = "/workspace/configs"
-    config_filename = f"{job_id}.yml"
-    config_path = os.path.join(CONFIG_DIR, config_filename)
+
+    if not testing:
+        CONFIG_DIR = "/workspace/configs"
+        config_filename = f"{job_id}.yml"
+        config_path = os.path.join(CONFIG_DIR, config_filename)
+    else:
+        CONFIG_DIR = "/workspace/configs"
+        config_filename = f"test_{job_id}.yml"
+        config_path = os.path.join(CONFIG_DIR, config_filename)
+
 
     setup_config(
         dataset,
@@ -44,7 +52,8 @@ def handler(job):
         file_format,
         job_id,
         expected_repo_name,
-        required_finish_time
+        required_finish_time,
+        testing
     )
     
     # Execute the training process
