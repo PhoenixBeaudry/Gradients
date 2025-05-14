@@ -335,7 +335,6 @@ def main():
 
     trainer.train()
     if not cfg["hpo_run"]:
-        trainer.model.save_pretrained("final_checkpoint")
         trainer.push_to_hub()
 
 
