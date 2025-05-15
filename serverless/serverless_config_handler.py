@@ -215,10 +215,10 @@ def _load_and_modify_config(
     # RL specific params
     if isinstance(dataset_type, DpoDatasetType):
         config["rl"] = "dpo"
-        config["learning_rate"] = 5e-7
+        config["learning_rate"] = 1e-6
     elif isinstance(dataset_type, GrpoDatasetType):
         config["rl"] = "grpo"
-        config["learning_rate"] = 5e-7
+        config["learning_rate"] = 1e-6
         filename, reward_funcs_names = create_reward_funcs_file(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
