@@ -159,9 +159,8 @@ def save_config_toml(config: dict, config_path: str):
 
 def _process_grpo_dataset_fields(dataset_type: GrpoDatasetType) -> dict:
     field_prompt = dataset_type.field_prompt
-    field_chosen = dataset_type.field_chosen
-    field_rejected = dataset_type.field_rejected
-    full_template_config = {"field_prompt": field_prompt,  "field_chosen": field_chosen, "field_rejected": field_rejected}
+
+    full_template_config = {"field_prompt": field_prompt}
 
     return full_template_config
 
