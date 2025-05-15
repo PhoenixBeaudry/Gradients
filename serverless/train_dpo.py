@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 import optuna
 import os
-from unsloth import FastLanguageModel, PatchDPOTrainer
-from unsloth import is_bfloat16_supported
-PatchDPOTrainer()
 import argparse
 import logging
 import yaml
@@ -147,6 +144,89 @@ def load_dpo_datasets(cfg: dict):
 
     return train_ds, eval_ds
 
+def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
+    device_map = {"": torch.cuda.current_device()} 
+    common_kwargs = {
+        'use_auth_token': cfg.get('hub_token'),
+        'load_in_8bit': bool(cfg.get('load_in_8bit', False)),
+        'torch_dtype': torch.bfloat16,
+    }
+    return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
+
+        
+def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
+    if get_peft_model is None:
+        raise ImportError("peft library is required for LoRA adapters.")
+
+    if cfg.get('load_in_8bit', False):
+        model = prepare_model_for_kbit_training(model)
+
+    # Determine target modules for LoRA
+    targets = cfg.get('target_modules', [])
+    if not targets:
+        # Auto-detect based on model architecture
+        model_type = model.config.model_type.lower() if hasattr(model.config, "model_type") else ""
+        
+        # Model-specific target modules based on architecture
+        if "llama" in model_type or "mistral" in model_type:
+            targets = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        elif "gpt-neox" in model_type:
+            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
+        elif "falcon" in model_type:
+            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
+        elif "gpt2" in model_type:
+            targets = ["c_attn", "c_proj", "c_fc"]
+        elif "bloom" in model_type:
+            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
+        elif "opt" in model_type:
+            targets = ["q_proj", "k_proj", "v_proj", "out_proj", "fc1", "fc2"]
+        else:
+            # Fallback: detect attention and MLP modules
+            attention_patterns = ['attn', 'attention', 'self_attn', 'query', 'key', 'value']
+            mlp_patterns = ['mlp', 'feed_forward', 'fc', 'dense', 'linear', 'proj']
+            
+            for name, module in model.named_modules():
+                if isinstance(module, torch.nn.Linear):
+                    last_part = name.split('.')[-1].lower()
+                    if any(pattern in name.lower() for pattern in attention_patterns) or any(pattern == last_part for pattern in attention_patterns):
+                        targets.append(last_part)
+                    elif any(pattern in name.lower() for pattern in mlp_patterns) or any(pattern == last_part for pattern in mlp_patterns):
+                        targets.append(last_part)
+            
+            targets = list(set(targets))
+            
+        if not targets:
+            raise ValueError("Could not auto-detect modules for LoRA. Please set 'target_modules' in config.")
+        
+        print(f"Auto-detected target modules for {model_type}: {targets}")
+
+    # Create PEFT config
+    peft_config = LoraConfig(
+        r=int(cfg.get('lora_r', 16)),
+        lora_alpha=int(cfg.get('lora_alpha', None) or cfg.get('lora_r', 16) * 2),
+        target_modules=targets,
+        lora_dropout=float(cfg.get('lora_dropout', 0.05)),
+        bias=cfg.get('bias', 'none'),
+        task_type='CAUSAL_LM'
+    )
+    
+    return get_peft_model(model, peft_config)
+
+
+def load_tokenizer(model_name: str, cfg: dict):
+    tok = AutoTokenizer.from_pretrained(
+        model_name,
+        use_auth_token=cfg.get("hub_token"),
+        trust_remote_code=True,
+        padding_side="left",          # DPO prefers left‑padding
+        truncation_side="right"
+    )
+    if tok.pad_token_id is None:      # e.g. Llama‑3, Qwen‑2 FlashAttn
+        tok.pad_token = tok.eos_token
+    tok.add_eos_token = True
+    tok.truncation = True
+    return tok
+
 
 
 def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
@@ -242,27 +322,11 @@ def main():
     # after loading cfg...
     train_dataset, eval_dataset = load_dpo_datasets(cfg)
     
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name = cfg['base_model'],
-        max_seq_length = cfg["sequence_len"],
-        dtype = None,
-        load_in_4bit = False,
-    )
+    tokenizer = load_tokenizer(cfg['base_model'], cfg)
+    model = load_model(cfg['base_model'], cfg)
 
     if cfg.get('adapter') == 'lora':
-        model = FastLanguageModel.get_peft_model(
-        model,
-        r = cfg["lora_r"],
-        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
-                        "gate_proj", "up_proj", "down_proj",],
-        lora_alpha = cfg["lora_alpha"],
-        lora_dropout = cfg["lora_dropout"], # Supports any, but = 0 is optimized
-        bias = "none",    # Supports any, but = "none" is optimized
-        # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
-        use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
-        random_state = 3407,
-        max_seq_length = cfg["sequence_len"],
-    )
+        policy_model = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"] and not cfg["testing"]:
         train_dataset = train_dataset
@@ -291,7 +355,7 @@ def main():
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
 
 
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, policy_model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
