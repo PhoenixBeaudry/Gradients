@@ -239,6 +239,13 @@ async def task_offer(
         if request.hours_to_complete >= 48:
             logger.info(f"Rejecting offer: too long ({request.hours_to_complete}h)")
             return MinerTaskResponse(message="Job too long", accepted=False)
+        
+
+        # Create a RunPod endpoint instance
+        endpoint = runpod.Endpoint("3f7fu7em4zi8m3")
+        endpoint_health = endpoint.health()
+        logger.info("RunPod Endpoint Health: ")
+        logger.info(json.dumps(endpoint_health, indent=2))
 
         
         CONFIG_DIR = "core/config"

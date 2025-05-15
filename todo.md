@@ -1,5 +1,4 @@
 # Todo
-- remove axolotl from train
 - 2xGPU workers?
 - try flash-attn
 - Limit task acceptance by runpod workers available
