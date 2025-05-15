@@ -311,31 +311,28 @@ def main():
     if cfg.get('adapter') == 'lora':
         model = apply_lora_adapter(model, cfg)
 
-    if not cfg["hpo_run"] and not cfg["testing"]:
-        train_dataset = train_dataset
-        eval_dataset   = eval_dataset
-    elif cfg["testing"]:
+    if cfg["testing"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        train_dataset = train_dataset
-        eval_dataset   = eval_dataset
         target_train = int(len(train_dataset)/2)
         target_eval = int(len(eval_dataset)/2)
         # deterministic shuffle → reproducible trials
         train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
         eval_dataset  = eval_dataset.shuffle(seed=42).select(range(target_eval))
-    else:
+
+    elif cfg["hpo_run"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        train_dataset = train_dataset
-        eval_dataset   = eval_dataset
         SUBSET_FRAC   = 0.05          # 5 %
         MIN_PAIRS     = 1_000         # never go below this
         MAX_PAIRS     = 10_000        # never go above this
         target_train = int(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)))
         target_eval = int(max(MIN_PAIRS, min(MAX_PAIRS, len(eval_dataset) * SUBSET_FRAC)))
+
+        # No lower than dataset size
         target_train = min(target_train, len(train_dataset))
         target_eval = min(target_eval, len(eval_dataset))
+        
         # deterministic shuffle → reproducible trials
         train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))

@@ -202,10 +202,12 @@ def _load_and_modify_config(
         with open(CONFIG_TEMPLATE_PATH, "r") as file:
             config = yaml.safe_load(file)
             config["testing"] = False
+        config["required_finish_time"] = required_finish_time
     else:
         with open(CONFIG_TESTING_PATH, "r") as file:
             config = yaml.safe_load(file)
             config["testing"] = True
+            config["required_finish_time"] = (datetime.now() + timedelta(hours=4)).isoformat()
 
     # RL specific params
     if isinstance(dataset_type, DpoDatasetType):
@@ -217,10 +219,9 @@ def _load_and_modify_config(
         filename, reward_funcs_names = create_reward_funcs_file(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
-        config["rl"] = "grpo"
         config["max_steps"] = 1000
-        config["eval_steps"] = 1000
-        config["save_steps"] = 1000
+        config["eval_steps"] = 100
+        config["save_steps"] = 100
         config["trl"] = {}
         config["trl"]["beta"] = 0.04
         config["trl"]["max_completion_length"] = 32
@@ -237,16 +238,12 @@ def _load_and_modify_config(
 
     dataset_entry = create_dataset_entry(dataset, dataset_type, file_format)
     config["datasets"].append(dataset_entry)
-    
-    if not testing:
-        config["required_finish_time"] = required_finish_time
-    else:
-        config["required_finish_time"] = (datetime.now() + timedelta(hours=4)).isoformat()
 
     config = update_model_info(config, model, task_id, expected_repo_name)
     
     hf_cfg = AutoConfig.from_pretrained(model)
- 
+    
+    # Calculate max sequence length
     max_pos = getattr(hf_cfg, "max_position_embeddings", None) or getattr(hf_cfg, "n_ctx", None)
 
     # clamp sequence_len to the model’s max
@@ -257,8 +254,8 @@ def _load_and_modify_config(
         print(f"Sequence Length set to: {max_pos}")
     else:
         config["sequence_len"] = desired_len
+    ######################
 
-    config["mlflow_experiment_name"] = dataset
 
     config = setup_lora_config(config, config["model_params_count"])
 
@@ -288,6 +285,7 @@ def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]
             f.write(f"{reward_func}\n\n")
 
     return filename, func_names
+
 
 def setup_lora_config(config, model_size):
     """Setup QLoRA configuration for more efficient adaptation"""
@@ -360,6 +358,6 @@ def setup_config(
     )
     if not hpo:
         config["do_hpo"] = False
-    print("CONFIG AFTER SETUP")
+    print("CONFIG AFTER SETUP:")
     print(config)
     save_config(config, config_path)
