@@ -328,9 +328,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
 def main():
     args = parse_args()
     cfg = load_config(args.config)
-
-    ### Temp Axolotl Config to generate Dataset and Model
-    axo_cfg = load_cfg(args.config)
     #####################################################
 
     logger = setup_logger()
