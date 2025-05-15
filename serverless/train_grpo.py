@@ -307,7 +307,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         bf16=True,
         use_liger_kernel=True,
         load_best_model_at_end=True,
-        dataset_num_proc=4,
         **hf_kwargs,
     )
     #####################################
