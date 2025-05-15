@@ -21,8 +21,6 @@ import optuna
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
-# Disable parallel tokenizer threads to avoid warnings
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 ###### Custom Callbacks ########################
@@ -89,6 +87,9 @@ def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
 #######################################################
 
 
+
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
@@ -108,6 +109,7 @@ def setup_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
+
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()} 
     if "qwen" in model_name.lower():
@@ -116,6 +118,7 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
+
 
 
 def load_tokenizer(model_name: str, cfg: dict):
@@ -132,6 +135,7 @@ def load_tokenizer(model_name: str, cfg: dict):
     tok.truncation = True
     return tok
         
+
 
 def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
     if get_peft_model is None:
@@ -269,6 +273,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         bf16=True,
         use_liger_kernel=True,
         load_best_model_at_end=True,
+        dataset_num_proc=4,
         **hf_kwargs,
     )
     #####################################
