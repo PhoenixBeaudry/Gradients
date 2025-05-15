@@ -1,0 +1,48 @@
+{
+  "input": {
+    "model": "unsloth/Mistral-Nemo-Base-2407",
+    "dataset": "https://gradients.s3.eu-north-1.amazonaws.com/fdb97dca7a0d136a_train_data.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVVZOOA7SA4UOFLPI%2F20250515%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Date=20250515T050554Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=ab3fc79194f87dff975778ffcc5d43f342d07d671d80c23ff1560ade9e71c29f",
+    "dataset_type": {
+      "class_type": "GrpoDatasetType",
+      "attributes": {
+        "field_prompt": "captions_objects",
+        "reward_functions": [
+          {
+            "reward_func": "def technical_jargon_avoidance(completions, **kwargs):\n    \"\"\"Reward function that penalizes the use of overly technical language.\"\"\"\n    technical_words = [\"algorithm\", \"neural\", \"network\", \"tensor\", \"embedding\"]\n    return [0.0 if any(word in completion.lower() for word in technical_words) else 1.0 for completion in completions]",
+            "reward_weight": 1.2031026668906797,
+            "func_hash": "c8a7f68888de914695028cfd0dc3380e33daeb10e3db0470dfd2bc0e85c327ac",
+            "is_generic": true
+          },
+          {
+            "reward_func": "def reward_func_conciseness(completions, **kwargs):\n    \"\"\"Reward function that favors shorter, more concise answers.\"\"\"\n    return [100.0/(len(completion.split()) + 10) for completion in completions]",
+            "reward_weight": 5.038299679514816,
+            "func_hash": "1df3689f80e07430dd0ca9fc5cb7c7ca53422365337d4fd9ac7fb7a075cae779",
+            "is_generic": true
+          },
+          {
+            "reward_func": "def reward_func_conciseness(completions, **kwargs):\n    \"\"\"Reward function that favors shorter, more concise answers.\"\"\"\n    return [100.0 / (len(completion.split()) + 10) for completion in completions]",
+            "reward_weight": 7.667157830774357,
+            "func_hash": "19203baf119a8851ab73cfd3034b54411c4513a84324984e0fc70bcc7789ae34",
+            "is_generic": true
+          },
+          {
+            "reward_func": "def reward_func_correctness(completions, **kwargs):\n    \"\"\"Reward function that checks if the completion includes a specific correct answer.\"\"\"\n    correct_answer = \"The capital of France is Paris\"\n    return [1.0 if correct_answer in completion else 0.0 for completion in completions]",
+            "reward_weight": 7.0354886027471055,
+            "func_hash": "2e593b956000374dab368bc91c6a2570f01b31fe8c8a20fd1b3ff7884fed974e",
+            "is_generic": true
+          },
+          {
+            "reward_func": "def reward_func_avoid_keywords(completions, **kwargs):\n    \"\"\"Reward function that penalizes completions containing specific keywords.\"\"\"\n    import re\n    forbidden_keywords = [r\"unwanted\", r\"inappropriate\", r\"offensive\"]\n    scores = []\n    for completion in completions:\n        score = 1.0\n        for keyword in forbidden_keywords:\n            if re.search(keyword, completion, re.IGNORECASE):\n                score = 0.0\n                break\n        scores.append(score)\n    return scores",
+            "reward_weight": 8.813133531174774,
+            "func_hash": "ad1a4438bc3a5f9be5e206ccc410adf51af504bd6b836cfedf312ad28ac2e973",
+            "is_generic": true
+          }
+        ]
+      }
+    },
+    "file_format": "s3",
+    "expected_repo_name": "13382820-5029-49b3-8364-915d330339db",
+    "hours_to_complete": 5,
+    "task_id": "ae6a8a90-d5e8-4079-9a90-7758e75aff8a"
+  }
+}
