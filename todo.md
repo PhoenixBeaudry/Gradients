@@ -1,3 +1,7 @@
 # Todo
-- remove axolotl from train and train grpo
-- try use unsloth, fallback if fail
+- remove axolotl from train
+- 2xGPU workers?
+- try flash-attn
+- Limit task acceptance by runpod workers available
+- Docker image for miner
+- Go back to calculate required finish time on miner host, add timezone information
