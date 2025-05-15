@@ -15,7 +15,7 @@ lora_r: 32
 lora_alpha: 32
 lora_dropout: 0
 lora_target_linear: true
-beta: 0.1
+beta: 0.2
 
 early_stopping: true
 early_stopping_patience: 5
