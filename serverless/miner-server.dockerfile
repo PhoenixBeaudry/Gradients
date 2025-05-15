@@ -1,13 +1,10 @@
-FROM ubuntu:devel
+FROM python:2
 
 USER root
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git \
  && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get install -y python3
-RUN apt-get install -y python3-pip
 
 RUN pip install --upgrade pip setuptools wheel ninja packaging
 
