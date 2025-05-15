@@ -19,6 +19,7 @@ RUN pip install trl
 RUN pip install --upgrade transformers
 RUN pip install --no-build-isolation axolotl
 RUN pip install runpod
+RUN pip install --no-build-isolation flash-attn
 
 
 WORKDIR /workspace
