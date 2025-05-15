@@ -166,18 +166,11 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-class LeftPadCollator(DataCollatorForSeq2Seq):
-    def __init__(self, tokenizer, *args, **kwargs):
-        # Always force padding_side to left
-        tokenizer.padding_side = "left"
-        super().__init__(tokenizer, *args, **kwargs)
-    def __call__(self, *args, **kwargs):
-        # Double-check just before actual collation (paranoia)
-        self.tokenizer.padding_side = "left"
-        return super().__call__(*args, **kwargs)
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
-    device_map = {"": torch.cuda.current_device()} 
+    device_map = {"": torch.cuda.current_device()}
+    if "qwen" in model_name.lower():
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
     try:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
@@ -321,7 +314,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing GRPO Trainer")
-    data_collator = LeftPadCollator(tokenizer, padding=True)
     return GRPOTrainer(
         model=model,
         args=tf_args,
@@ -329,7 +321,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         eval_dataset=eval_ds,
         reward_funcs=reward_functions(cfg),
         processing_class=tokenizer,
-        data_collator=data_collator,
         callbacks=callbacks,
     )
 

@@ -110,17 +110,7 @@ def setup_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-class LeftPadCollator(DataCollatorForSeq2Seq):
-    def __init__(self, tokenizer, *args, **kwargs):
-        # Always force padding_side to left
-        tokenizer.padding_side = "left"
-        super().__init__(tokenizer, *args, **kwargs)
-    def __call__(self, *args, **kwargs):
-        # Double-check just before actual collation (paranoia)
-        self.tokenizer.padding_side = "left"
-        return super().__call__(*args, **kwargs)
-
-def load_dpo_datasets(cfg: dict, tokenizer):
+def load_dpo_datasets(cfg: dict):
     """
     Return (train_ds, eval_ds) ready for TRL‑DPO.
     If cfg["val_set_size"] is 0 → eval_ds is None.
@@ -147,56 +137,13 @@ def load_dpo_datasets(cfg: dict, tokenizer):
     else:
         train_ds, eval_ds = ds_train, None
 
-    # ----- Tokenization -----
-    def tokenize_dpo(batch):
-        # For each prompt, chosen, rejected in the batch:
-        chosen_texts   = [p + c for p, c in zip(batch["prompt"], batch["chosen"])]
-        rejected_texts = [p + r for p, r in zip(batch["prompt"], batch["rejected"])]
-        
-        # Tokenize chosen and rejected separately
-        tokenized_chosen = tokenizer(
-            chosen_texts,
-            truncation=True,
-            max_length=cfg.get("sequence_len", 2048),
-            padding=False,
-            return_attention_mask=True,
-        )
-        tokenized_rejected = tokenizer(
-            rejected_texts,
-            truncation=True,
-            max_length=cfg.get("sequence_len", 2048),
-            padding=False,
-            return_attention_mask=True,
-        )
-
-        # Return everything as lists of lists for HF datasets
-        return {
-            "prompt": batch["prompt"],
-            "chosen_input_ids": tokenized_chosen["input_ids"],
-            "chosen_attention_mask": tokenized_chosen["attention_mask"],
-            "rejected_input_ids": tokenized_rejected["input_ids"],
-            "rejected_attention_mask": tokenized_rejected["attention_mask"],
-        }
-
-    train_ds = train_ds.map(
-        tokenize_dpo,
-        batched=True,
-        remove_columns=train_ds.column_names,
-        num_proc=4  # or your available CPU cores
-    )
-    if eval_ds is not None:
-        eval_ds = eval_ds.map(
-            tokenize_dpo,
-            batched=True,
-            remove_columns=eval_ds.column_names,
-            num_proc=4
-        )
-
     return train_ds, eval_ds
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()} 
+    if "qwen" in model_name.lower():
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
     try:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
@@ -340,7 +287,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing DPO Trainer")
-    data_collator = LeftPadCollator(tokenizer, padding=True)
     return DPOTrainer(
         model=model,
         ref_model=None,
@@ -348,7 +294,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
-        data_collator=data_collator,
         callbacks=callbacks,
     )
 
@@ -372,7 +317,7 @@ def main():
     
     # after loading cfg...
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
-    train_dataset, eval_dataset = load_dpo_datasets(cfg, tokenizer)
+    train_dataset, eval_dataset = load_dpo_datasets(cfg)
     
     model = load_model(cfg['base_model'], cfg)
 

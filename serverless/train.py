@@ -16,7 +16,7 @@ from transformers import (
 import time
 from trl import SFTConfig, SFTTrainer
 from datasets import load_dataset, DatasetDict, Dataset
-from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer, DataCollatorForSeq2Seq
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer, DataCollatorForLanguageModeling
 import optuna
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -107,19 +107,11 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-class LeftPadCollator(DataCollatorForSeq2Seq):
-    def __init__(self, tokenizer, *args, **kwargs):
-        # Always force padding_side to left
-        tokenizer.padding_side = "left"
-        super().__init__(tokenizer, *args, **kwargs)
-    def __call__(self, *args, **kwargs):
-        # Double-check just before actual collation (paranoia)
-        self.tokenizer.padding_side = "left"
-        return super().__call__(*args, **kwargs)
-
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()} 
+    if "qwen" in model_name.lower():
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
     try:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
@@ -171,7 +163,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
 
 
-def load_sft_datasets(cfg: dict, tokenizer):
+def load_sft_datasets(cfg: dict):
     """
     Return (train_ds, eval_ds)
     If cfg["val_set_size"] is 0 → eval_ds is None.
@@ -215,32 +207,6 @@ def load_sft_datasets(cfg: dict, tokenizer):
         train_ds, eval_ds = split["train"], split["test"]
     else:
         train_ds, eval_ds = ds_train, None
-
-    def tokenize_function(batch):
-        # batched=True: batch is a dict of lists
-        texts = [p + c for p, c in zip(batch["prompt"], batch["completion"])]
-        out = tokenizer(
-            texts,
-            truncation=True,
-            max_length=cfg.get("sequence_len", 2048),
-            padding=False,
-            return_attention_mask=True,
-        )
-        out["labels"] = out["input_ids"].copy()
-        return out
-    
-    train_ds = train_ds.map(
-        tokenize_function,
-        batched=True,                    # <--- FAST batching
-        remove_columns=train_ds.column_names,
-        num_proc=4                       # <--- set to number of cores on your node
-    )
-    eval_ds = eval_ds.map(
-        tokenize_function,
-        batched=True,                    # <--- FAST batching
-        remove_columns=eval_ds.column_names,
-        num_proc=4                       # <--- set to number of cores on your node
-    )
     
     return train_ds, eval_ds
 
@@ -308,14 +274,12 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing SFT Trainer")
-    data_collator = LeftPadCollator(tokenizer, padding=True)
     return SFTTrainer(
         model=model,
         args=tf_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
-        data_collator=data_collator,
         callbacks=callbacks,
     )
 
@@ -335,7 +299,7 @@ def main():
     
     # after loading cfg...
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
-    train_dataset, eval_dataset = load_sft_datasets(cfg, tokenizer)
+    train_dataset, eval_dataset = load_sft_datasets(cfg)
 
     model = load_model(cfg['base_model'], cfg)
 
