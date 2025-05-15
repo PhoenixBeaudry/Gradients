@@ -30,7 +30,7 @@ def handler(job):
     dataset_type = job_input.get("dataset_type")
     file_format = job_input.get("file_format")
     expected_repo_name = job_input.get("expected_repo_name")
-    required_finish_time = job_input.get("required_finish_time")
+    hours_to_complete = job_input.get("hours_to_complete")
     testing = job_input.get("testing", False)
     hpo = job_input.get("hpo", True)
     
@@ -44,7 +44,9 @@ def handler(job):
         CONFIG_DIR = "/workspace/configs"
         config_filename = f"test_{job_id}.yml"
         config_path = os.path.join(CONFIG_DIR, config_filename)
-
+    
+    # calculate required finished time
+    required_finish_time = (datetime.now() + timedelta(hours=hours_to_complete)).isoformat()
 
     setup_config(
         dataset,
