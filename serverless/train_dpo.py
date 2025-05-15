@@ -4,8 +4,6 @@ import os
 import argparse
 import logging
 import yaml
-import copy
-from math import ceil
 import torch
 from datetime import datetime
 from trl import DPOConfig, DPOTrainer
@@ -14,10 +12,9 @@ from transformers import (
     EarlyStoppingCallback,
     SchedulerType,
 )
-from datasets import load_dataset, DatasetDict, Dataset
+from datasets import load_dataset
 import time
-from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer, DataCollatorForSeq2Seq
-import bitsandbytes as bnb
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 

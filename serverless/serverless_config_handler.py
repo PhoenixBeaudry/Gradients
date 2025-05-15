@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from datetime import timedelta
-from uuid import UUID
 import os
 import uuid
 import re
@@ -13,9 +12,6 @@ import yaml
 from transformers import AutoTokenizer
 from transformers import AutoConfig
 from huggingface_hub import HfApi
-from urllib.parse import urlparse
-from fastapi import HTTPException
-import requests
 
 
 hf_api = HfApi()

@@ -3,22 +3,18 @@ import os
 import argparse
 import logging
 import yaml
-from math import ceil
 from datetime import datetime
 import torch
-from axolotl.cli.args import TrainerCliArgs
 from transformers import (
     AutoModelForCausalLM,
-    DataCollatorForSeq2Seq,
     EarlyStoppingCallback,
     SchedulerType,
 )
 import time
 from trl import SFTConfig, SFTTrainer
-from datasets import load_dataset, DatasetDict, Dataset
-from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer, DataCollatorForLanguageModeling
+from datasets import load_dataset
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 import optuna
-import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 
@@ -332,7 +328,7 @@ def main():
         # No lower than dataset size
         target_train = min(target_train, len(train_dataset))
         target_eval = min(target_eval, len(eval_dataset))
-        
+
         # deterministic shuffle → reproducible trials
         train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))

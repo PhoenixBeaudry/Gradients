@@ -1,7 +1,5 @@
 import runpod
 import os
-import yaml
-import json
 from datetime import datetime, timedelta
 from serverless_config_handler import setup_config
 import subprocess

@@ -1,9 +1,7 @@
 import os
 from datetime import datetime
 from datetime import timedelta
-from math import ceil
 from enum import Enum
-from core.config.config_handler import save_config
 import toml
 from core.models.utility_models import DpoDatasetType
 from core.models.utility_models import GrpoDatasetType
@@ -18,12 +16,9 @@ from fiber.logging_utils import get_logger
 from fiber.miner.core.configuration import Config
 from fiber.miner.dependencies import get_config
 from fiber.miner.dependencies import blacklist_low_stake
-from fiber.miner.dependencies import verify_get_request
-from fiber.miner.dependencies import verify_request
 from pydantic import ValidationError
 from rq import Queue
 from rq.job import Job # Correct import for Job class
-from rq.registry import StartedJobRegistry
 from rq.exceptions import NoSuchJobError
 import runpod
 from pathlib import Path
@@ -36,8 +31,6 @@ from core.models.payload_models import TrainRequestText
 from core.models.payload_models import TrainResponse
 from core.models.utility_models import TaskType
 
-from miner.logic.job_handler import create_job_text
-from miner.logic.job_handler import start_tuning_container
 
 
 NUM_WORKERS = 4
