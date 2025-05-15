@@ -8,10 +8,10 @@ RUN apt-get update \
 
 RUN pip install --upgrade pip setuptools wheel ninja packaging
 
-WORKDIR /workspace
-
 RUN git clone https://github.com/PhoenixBeaudry/Gradients.git
-RUN cd Gradients
+
+WORKDIR /Gradients
+
 RUN git checkout serverless
 
 RUN pip install -e .
