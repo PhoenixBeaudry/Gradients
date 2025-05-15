@@ -238,7 +238,7 @@ def load_sft_datasets(cfg: dict, tokenizer):
     eval_ds = eval_ds.map(
         tokenize_function,
         batched=True,                    # <--- FAST batching
-        remove_columns=train_ds.column_names,
+        remove_columns=eval_ds.column_names,
         num_proc=4                       # <--- set to number of cores on your node
     )
     
