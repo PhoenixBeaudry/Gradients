@@ -218,6 +218,7 @@ def _load_and_modify_config(
         config["learning_rate"] = 5e-7
     elif isinstance(dataset_type, GrpoDatasetType):
         config["rl"] = "grpo"
+        config["learning_rate"] = 5e-7
         filename, reward_funcs_names = create_reward_funcs_file(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
@@ -248,24 +249,6 @@ def _load_and_modify_config(
         config["required_finish_time"] = (datetime.now() + timedelta(hours=4)).isoformat()
 
     config = update_model_info(config, model, task_id, expected_repo_name)
-
-    # Modify config based on Model Size
-    if config["model_params_count"] == None:
-        config["learning_rate"] = 2e-4
-    elif config["model_params_count"] < 2_000_000_000:
-        print("Small model detected...updating params...")
-        config["learning_rate"] = 2e-4
-
-    elif config["model_params_count"] < 8_000_000_000:
-        print("Medium model detected...updating params...")
-        config["learning_rate"] = 2e-4
-
-    elif config["model_params_count"] < 15_000_000_000:
-        print("Large model detected...updating params...")
-        config["learning_rate"] = 1e-5
-
-    elif config["model_params_count"] < 40_000_000_000:
-        config["learning_rate"] = 1e-5
     
     hf_cfg = AutoConfig.from_pretrained(model)
  
