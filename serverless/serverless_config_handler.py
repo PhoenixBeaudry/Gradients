@@ -99,8 +99,7 @@ def create_dataset_entry(
 
     if isinstance(dataset_type, InstructTextDatasetType):
         print("Process Type: Instruct")
-        instruct_type_dict = {key: value for key, value in dataset_type.model_dump().items() if value is not None}
-        dataset_entry.update(_process_instruct_dataset_fields(instruct_type_dict))
+        dataset_entry.update(_process_instruct_dataset_fields(dataset_type))
     elif isinstance(dataset_type, DpoDatasetType):
         print("Process Type: DPO")
         dataset_entry.update(_process_dpo_dataset_fields(dataset_type))
@@ -175,21 +174,13 @@ def _process_dpo_dataset_fields(dataset_type: DpoDatasetType) -> dict:
     return full_template_config
 
 
-def _process_instruct_dataset_fields(instruct_type_dict: dict) -> dict:
-    if not instruct_type_dict.get("field_output"):
-        return {
-            "type": "completion",
-            "field": instruct_type_dict.get("field_instruction"),
-        }
+def _process_instruct_dataset_fields(dataset_type: InstructTextDatasetType) -> dict:
+    field_instruction = dataset_type.field_instruction
+    field_input = dataset_type.field_input
+    field_output = dataset_type.field_output
+    full_template_config = {"field_instruction": field_instruction,  "field_input": field_input, "field_output": field_output}
 
-    processed_dict = instruct_type_dict.copy()
-    processed_dict.setdefault("no_input_format", "{instruction}")
-    if processed_dict.get("field_input"):
-        processed_dict.setdefault("format", "{instruction} {input}")
-    else:
-        processed_dict.setdefault("format", "{instruction}")
-
-    return {"format": "custom", "type": processed_dict}
+    return full_template_config
 
 
 def _load_and_modify_config(

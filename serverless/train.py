@@ -6,9 +6,6 @@ import yaml
 from math import ceil
 from datetime import datetime
 import torch
-from axolotl.common.datasets import load_datasets
-from axolotl.cli.config import load_cfg
-from axolotl.utils.models import load_tokenizer
 from axolotl.cli.args import TrainerCliArgs
 from transformers import (
     AutoModelForCausalLM,
@@ -18,7 +15,8 @@ from transformers import (
 )
 import time
 from trl import SFTConfig, SFTTrainer
-from transformers import TrainerCallback, TrainerControl, TrainerState
+from datasets import load_dataset, DatasetDict, Dataset
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 import optuna
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -119,7 +117,21 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     }
     return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, **common_kwargs)
 
+def load_tokenizer(model_name: str, cfg: dict):
+    tok = AutoTokenizer.from_pretrained(
+        model_name,
+        use_auth_token=cfg.get("hub_token"),
+        trust_remote_code=True,
+        padding_side="left", 
+        truncation_side="right"
+    )
+    if tok.pad_token_id is None:      # e.g. Llama‑3, Qwen‑2 FlashAttn
+        tok.pad_token = tok.eos_token
+    tok.add_eos_token = True
+    tok.truncation = True
+    return tok
         
+
 def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
     if get_peft_model is None:
         raise ImportError("peft library is required for LoRA adapters.")
@@ -146,6 +158,57 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         task_type='CAUSAL_LM'
     )
     return get_peft_model(model, peft_config)
+
+
+
+
+def load_sft_datasets(cfg: dict):
+    """
+    Return (train_ds, eval_ds)
+    If cfg["val_set_size"] is 0 → eval_ds is None.
+    """
+    # Load **only one** split so we always get a Dataset, never a DatasetDict
+    ds_train = load_dataset(
+        "json",
+        data_files=cfg["datasets"][0]["path"],
+        split="train"          # guarantees Dataset, not DatasetDict
+    )
+
+    def combine_prompt(example):
+        # Handles the case when "input" (the context) may be empty
+        if example["input"]:
+            prompt = f"{example['prompt']}\n{example['input']}"
+        else:
+            prompt = example["prompt"]
+        example["prompt"] = prompt
+        return example                  
+    
+    if not cfg["datasets"][0]["field_input"] == None:
+        # Standardise column names
+        ds_train = ds_train.rename_columns({
+            cfg["datasets"][0]["field_instruction"]:   "prompt",
+            cfg["datasets"][0]["field_input"]:   "input",
+            cfg["datasets"][0]["field_output"]:   "completion",
+        })
+        ds_train = ds_train.map(combine_prompt)
+    else:
+        # Standardise column names
+        ds_train = ds_train.rename_columns({
+            cfg["datasets"][0]["field_instruction"]:   "prompt",
+            cfg["datasets"][0]["field_output"]:   "completion",
+        })
+
+    
+    # Optional random split
+    val_size = cfg.get("val_set_size", 0)
+    if val_size:
+        split = ds_train.train_test_split(test_size=val_size, seed=42)
+        train_ds, eval_ds = split["train"], split["test"]
+    else:
+        train_ds, eval_ds = ds_train, None
+
+    return train_ds, eval_ds
+
 
 
 def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
@@ -224,9 +287,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
 def main():
     args = parse_args()
     cfg = load_config(args.config)
-
-    ### Temp Axolotl Config to generate Dataset and Model
-    axo_cfg = load_cfg(args.config)
     #####################################################
 
     logger = setup_logger()
@@ -238,8 +298,9 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    dataset_meta = load_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
-    tokenizer = load_tokenizer(axo_cfg)
+    dataset_meta = load_sft_datasets(cfg)
+
+    tokenizer = load_tokenizer(cfg['base_model'], cfg)
 
     model = load_model(cfg['base_model'], cfg)
 
