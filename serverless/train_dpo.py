@@ -16,7 +16,7 @@ from transformers import (
 )
 from datasets import load_dataset, DatasetDict, Dataset
 import time
-from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer, DataCollatorForSeq2Seq
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -108,6 +108,17 @@ def setup_logger() -> logging.Logger:
         format="%(asctime)s %(levelname)s %(message)s"
     )
     return logging.getLogger(__name__)
+
+
+class LeftPadCollator(DataCollatorForSeq2Seq):
+    def __init__(self, tokenizer, *args, **kwargs):
+        # Always force padding_side to left
+        tokenizer.padding_side = "left"
+        super().__init__(tokenizer, *args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        # Double-check just before actual collation (paranoia)
+        self.tokenizer.padding_side = "left"
+        return super().__call__(*args, **kwargs)
 
 
 def load_dpo_datasets(cfg: dict):
@@ -289,6 +300,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     #####################################
     logger = setup_logger()
     logger.info("Initializing DPO Trainer")
+    data_collator = LeftPadCollator(tokenizer, padding=True)
     return DPOTrainer(
         model=model,
         ref_model=None,
@@ -296,6 +308,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         processing_class=tokenizer,
+        data_collator=data_collator,
         callbacks=callbacks,
     )
 
