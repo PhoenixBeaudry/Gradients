@@ -28,7 +28,7 @@ MAX_MINUTES_PER_TRIAL = 20
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
-    if cfg["rl"] == "dpo":
+    if cfg["rl"] == "dpo" or cfg["rl"] == "grpo":
         params = {
             "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
             "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
@@ -174,8 +174,12 @@ def run_optuna(base_cfg_path: str) -> dict:
     LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
 
-    ### Modify HPO params for long GRPO runs
-    study = optuna.create_study(direction="minimize",
+    if base_cfg["rl"] == "grpo":
+        direction = "maximize"
+    else:
+        direction = "minimize"
+
+    study = optuna.create_study(direction=direction,
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=False,
                                 storage=storage,
@@ -237,10 +241,6 @@ def main():
         base_cfg = yaml.safe_load(f)
         
     if base_cfg["do_hpo"] == False:
-        launch_training(args.config)
-        return
-    # Skip HPO for GRPO tasks
-    if base_cfg["rl"] == "grpo":
         launch_training(args.config)
         return
     
