@@ -9,7 +9,7 @@ import inspect
 from math import ceil
 import torch
 from datetime import datetime
-from axolotl.common.datasets import load_preference_datasets
+from datasets import load_dataset, DatasetDict, Dataset
 from trl import GRPOConfig, GRPOTrainer
 from trl.trainer.grpo_trainer import RewardFunc
 from axolotl.utils.models import load_tokenizer
@@ -24,7 +24,7 @@ from transformers import (
     AutoModelForCausalLM
 )
 import time
-from transformers import TrainerCallback, TrainerControl, TrainerState
+from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 import optuna
 import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -204,7 +204,46 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
     )
     return get_peft_model(model, peft_config)
 
+def load_tokenizer(model_name: str, cfg: dict):
+    tok = AutoTokenizer.from_pretrained(
+        model_name,
+        use_auth_token=cfg.get("hub_token"),
+        trust_remote_code=True,
+        padding_side="left",          # DPO prefers left‑padding
+        truncation_side="right"
+    )
+    if tok.pad_token_id is None:      # e.g. Llama‑3, Qwen‑2 FlashAttn
+        tok.pad_token = tok.eos_token
+    tok.add_eos_token = True
+    tok.truncation = True
+    return tok
 
+def load_grpo_datasets(cfg: dict):
+    """
+    Return (train_ds, eval_ds) ready for TRL‑DPO.
+    If cfg["val_set_size"] is 0 → eval_ds is None.
+    """
+    # Load **only one** split so we always get a Dataset, never a DatasetDict
+    ds_train = load_dataset(
+        "json",
+        data_files=cfg["datasets"][0]["path"],
+        split="train"          # guarantees Dataset, not DatasetDict
+    )
+
+    # Standardise column names
+    ds_train = ds_train.rename_columns({
+        cfg["datasets"][0]["field_prompt"]:   "prompt",
+    })
+
+    # Optional random split
+    val_size = cfg.get("val_set_size", 0)
+    if val_size:
+        split = ds_train.train_test_split(test_size=val_size, seed=42)
+        train_ds, eval_ds = split["train"], split["test"]
+    else:
+        train_ds, eval_ds = ds_train, None
+
+    return train_ds, eval_ds
 
 
 def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
@@ -304,9 +343,9 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    dataset_meta = load_preference_datasets(cfg=axo_cfg, cli_args=TrainerCliArgs())
+    train_dataset, eval_dataset = load_grpo_datasets(cfg)
 
-    tokenizer = load_tokenizer(axo_cfg)
+    tokenizer = load_tokenizer(cfg['base_model'], cfg)
 
     model = load_model(cfg['base_model'], cfg)
     
@@ -314,8 +353,8 @@ def main():
         model = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"] and not cfg["testing"]:
-        train_dataset = dataset_meta.train_dataset
-        eval_dataset   = dataset_meta.eval_dataset
+        train_dataset = train_dataset
+        eval_dataset   = eval_dataset
     elif cfg["testing"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
@@ -327,8 +366,8 @@ def main():
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        train_dataset = dataset_meta.train_dataset
-        eval_dataset   = dataset_meta.eval_dataset
+        train_dataset = train_dataset
+        eval_dataset   = eval_dataset
         SUBSET_FRAC   = 0.05          # 5 %
         MIN_PAIRS     = 1_000         # never go below this
         MAX_PAIRS     = 10_000        # never go above this
