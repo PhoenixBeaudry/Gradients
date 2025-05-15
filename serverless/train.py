@@ -125,6 +125,7 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     except:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
 
+
 def load_tokenizer(model_name: str, cfg: dict):
     tok = AutoTokenizer.from_pretrained(
         model_name,
@@ -170,7 +171,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
 
 
-def load_sft_datasets(cfg: dict):
+def load_sft_datasets(cfg: dict, tokenizer):
     """
     Return (train_ds, eval_ds)
     If cfg["val_set_size"] is 0 → eval_ds is None.
@@ -215,6 +216,32 @@ def load_sft_datasets(cfg: dict):
     else:
         train_ds, eval_ds = ds_train, None
 
+    def tokenize_function(batch):
+        # batched=True: batch is a dict of lists
+        texts = [p + c for p, c in zip(batch["prompt"], batch["completion"])]
+        out = tokenizer(
+            texts,
+            truncation=True,
+            max_length=cfg.get("sequence_len", 2048),
+            padding=False,
+            return_attention_mask=True,
+        )
+        out["labels"] = out["input_ids"].copy()
+        return out
+    
+    train_ds = train_ds.map(
+        tokenize_function,
+        batched=True,                    # <--- FAST batching
+        remove_columns=train_ds.column_names,
+        num_proc=4                       # <--- set to number of cores on your node
+    )
+    eval_ds = eval_ds.map(
+        tokenize_function,
+        batched=True,                    # <--- FAST batching
+        remove_columns=train_ds.column_names,
+        num_proc=4                       # <--- set to number of cores on your node
+    )
+    
     return train_ds, eval_ds
 
 
@@ -293,7 +320,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     )
 
 
-
 def main():
     args = parse_args()
     cfg = load_config(args.config)
@@ -308,9 +334,8 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    train_dataset, eval_dataset = load_sft_datasets(cfg)
-
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
+    train_dataset, eval_dataset = load_sft_datasets(cfg, tokenizer)
 
     model = load_model(cfg['base_model'], cfg)
 
