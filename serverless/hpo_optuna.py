@@ -239,6 +239,10 @@ def main():
     if base_cfg["do_hpo"] == False:
         launch_training(args.config)
         return
+    # Skip HPO for GRPO tasks
+    if base_cfg["rl"] == "grpo":
+        launch_training(args.config)
+        return
     
     best_params   = run_optuna(args.config)
     optimised_cfg = write_opt_cfg(args.config, best_params)
