@@ -120,17 +120,16 @@ class LeftPadCollator(DataCollatorForSeq2Seq):
         self.tokenizer.padding_side = "left"
         return super().__call__(*args, **kwargs)
 
-
-def load_dpo_datasets(cfg: dict):
+def load_dpo_datasets(cfg: dict, tokenizer):
     """
     Return (train_ds, eval_ds) ready for TRL‑DPO.
     If cfg["val_set_size"] is 0 → eval_ds is None.
     """
-    # Load **only one** split so we always get a Dataset, never a DatasetDict
+    # Load dataset (guarantees a Dataset, not a DatasetDict)
     ds_train = load_dataset(
         "json",
         data_files=cfg["datasets"][0]["path"],
-        split="train"          # guarantees Dataset, not DatasetDict
+        split="train"
     )
 
     # Standardise column names
@@ -148,12 +147,53 @@ def load_dpo_datasets(cfg: dict):
     else:
         train_ds, eval_ds = ds_train, None
 
-    # Fail fast if the schema is wrong
-    REQUIRED = {"prompt", "chosen", "rejected"}
-    missing = REQUIRED - set(train_ds.column_names)
-    assert not missing, f"Dataset missing columns: {missing}"
+    # ----- Tokenization -----
+    def tokenize_dpo(batch):
+        # For each prompt, chosen, rejected in the batch:
+        chosen_texts   = [p + c for p, c in zip(batch["prompt"], batch["chosen"])]
+        rejected_texts = [p + r for p, r in zip(batch["prompt"], batch["rejected"])]
+        
+        # Tokenize chosen and rejected separately
+        tokenized_chosen = tokenizer(
+            chosen_texts,
+            truncation=True,
+            max_length=cfg.get("sequence_len", 2048),
+            padding=False,
+            return_attention_mask=True,
+        )
+        tokenized_rejected = tokenizer(
+            rejected_texts,
+            truncation=True,
+            max_length=cfg.get("sequence_len", 2048),
+            padding=False,
+            return_attention_mask=True,
+        )
+
+        # Return everything as lists of lists for HF datasets
+        return {
+            "prompt": batch["prompt"],
+            "chosen_input_ids": tokenized_chosen["input_ids"],
+            "chosen_attention_mask": tokenized_chosen["attention_mask"],
+            "rejected_input_ids": tokenized_rejected["input_ids"],
+            "rejected_attention_mask": tokenized_rejected["attention_mask"],
+        }
+
+    train_ds = train_ds.map(
+        tokenize_dpo,
+        batched=True,
+        remove_columns=train_ds.column_names,
+        num_proc=4  # or your available CPU cores
+    )
+    if eval_ds is not None:
+        eval_ds = eval_ds.map(
+            tokenize_dpo,
+            batched=True,
+            remove_columns=eval_ds.column_names,
+            num_proc=4
+        )
 
     return train_ds, eval_ds
+
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()} 
@@ -331,9 +371,9 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    train_dataset, eval_dataset = load_dpo_datasets(cfg)
-    
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
+    train_dataset, eval_dataset = load_dpo_datasets(cfg, tokenizer)
+    
     model = load_model(cfg['base_model'], cfg)
 
     if cfg.get('adapter') == 'lora':
