@@ -298,7 +298,7 @@ def main():
     logger.info("Loaded config from %s", args.config)
     
     # after loading cfg...
-    dataset_meta = load_sft_datasets(cfg)
+    train_dataset, eval_dataset = load_sft_datasets(cfg)
 
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
 
@@ -308,13 +308,13 @@ def main():
         model = apply_lora_adapter(model, cfg)
 
     if not cfg["hpo_run"] and not cfg["testing"]:
-        train_dataset = dataset_meta.train_dataset
-        eval_dataset   = dataset_meta.eval_dataset
+        train_dataset = train_dataset
+        eval_dataset   = eval_dataset
     elif cfg["testing"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        train_dataset = dataset_meta.train_dataset
-        eval_dataset   = dataset_meta.eval_dataset
+        train_dataset = train_dataset
+        eval_dataset   = eval_dataset
         target_train = int(len(train_dataset)/2)
         target_eval = int(len(eval_dataset)/2)
         # deterministic shuffle → reproducible trials
@@ -323,8 +323,8 @@ def main():
     else:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        train_dataset = dataset_meta.train_dataset
-        eval_dataset   = dataset_meta.eval_dataset
+        train_dataset = train_dataset
+        eval_dataset   = eval_dataset
         SUBSET_FRAC   = 0.05          # 5 %
         MIN_PAIRS     = 1_000         # never go below this
         MAX_PAIRS     = 10_000        # never go above this
