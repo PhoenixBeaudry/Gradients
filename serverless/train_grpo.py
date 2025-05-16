@@ -19,7 +19,6 @@ from transformers import (
 import time
 from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
 import optuna
-import bitsandbytes as bnb
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 
@@ -169,18 +168,19 @@ def setup_logger() -> logging.Logger:
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()}
     if any(k in model_name.lower() for k in ("qwen", "phi")):
-        return AutoModelForCausalLM.from_pretrained(model_name, load_in_8bit=True, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
     try:
-        return AutoModelForCausalLM.from_pretrained(model_name, load_in_8bit=True, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
-        return AutoModelForCausalLM.from_pretrained(model_name, load_in_8bit=True, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
+        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
 
         
 def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
     if get_peft_model is None:
         raise ImportError("peft library is required for LoRA adapters.")
 
-    model = prepare_model_for_kbit_training(model)
+    if cfg.get('load_in_8bit', False):
+        model = prepare_model_for_kbit_training(model)
 
     # Determine target modules for LoRA
     targets = cfg.get('target_modules') or []
