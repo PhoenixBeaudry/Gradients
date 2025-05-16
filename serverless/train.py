@@ -246,7 +246,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
         per_device_eval_batch_size=int(cfg['micro_batch_size']),
-        dataloader_num_workers=int(cfg['dataloader_num_workers']),
         max_steps=int(cfg['max_steps']),
         learning_rate=float(cfg['learning_rate']),
         optim=cfg['optimizer'],
@@ -270,6 +269,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         use_liger_kernel=True,
         load_best_model_at_end=True,
         dataset_num_proc=16,
+        dataloader_num_workers=16,
         **hf_kwargs,
     )
     #####################################
