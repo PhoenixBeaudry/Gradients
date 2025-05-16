@@ -1,5 +1,4 @@
 # Todo
-- 2xGPU workers?
-- Limit task acceptance by runpod workers available
+- 2xGPU workers
 - Docker image for miner
 - Go back to calculate required finish time on miner host, add timezone information

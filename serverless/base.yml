@@ -18,7 +18,7 @@ lora_target_linear: true
 beta: 0.2
 
 early_stopping: true
-early_stopping_patience: 3
+early_stopping_patience: 5
 greater_is_better: false
 metric_for_best_model: eval_loss
 eval_steps: 50
