@@ -45,7 +45,7 @@ redis_conn = redis.Redis(
     db=0
 )
 rq_queue = Queue(connection=redis_conn)
-runpod.api_key = os.getenv("RUNPOD_API_KEY")
+runpod.api_key = os.getenv("ENDPOINT_API_KEY")
 
 async def tune_model_text(
     train_request: TrainRequestText,
