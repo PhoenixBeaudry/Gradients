@@ -1,6 +1,4 @@
 import os
-from datetime import datetime
-from datetime import timedelta
 from enum import Enum
 import toml
 from core.models.utility_models import DpoDatasetType
@@ -8,7 +6,6 @@ from core.models.utility_models import GrpoDatasetType
 from core.models.utility_models import InstructTextDatasetType
 import json
 import yaml
-import redis
 from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.routing import APIRouter
@@ -17,9 +14,6 @@ from fiber.miner.core.configuration import Config
 from fiber.miner.dependencies import get_config
 from fiber.miner.dependencies import blacklist_low_stake
 from pydantic import ValidationError
-from rq import Queue
-from rq.job import Job # Correct import for Job class
-from rq.exceptions import NoSuchJobError
 import runpod
 from pathlib import Path
 import core.constants as cst
@@ -37,14 +31,6 @@ MAX_NUM_WORKERS = 6 # Ensure this matches max workers on runpod endpoint
 
 logger = get_logger(__name__)
 
-# Connect to Redis and initialize RQ Queue
-redis_conn = redis.Redis(
-    host=cst.REDIS_HOST,
-    port=cst.REDIS_PORT,
-    password=cst.REDIS_PASSWORD, # Add password from constants
-    db=0
-)
-rq_queue = Queue(connection=redis_conn)
 runpod.api_key = os.getenv("ENDPOINT_API_KEY")
 
 async def tune_model_text(
@@ -296,74 +282,6 @@ async def task_offer_image(
         raise HTTPException(status_code=500, detail=f"Error processing task offer: {str(e)}")
     
 
-async def requeue_job(job_id: str):
-    """
-    Requeue a job that is either failed or finished.
-    """
-    try:
-        # Fetch the job by ID using the connection
-        logger.info(f"Attempting to fetch job {job_id} from Redis")
-        job = Job.fetch(job_id, connection=redis_conn)
-        
-        # Log detailed job information for debugging
-        logger.info(f"Job {job_id} found with status: {job.get_status()}")
-        logger.info(f"Job details - is_finished: {job.is_finished}, is_failed: {job.is_failed}")
-        logger.info(f"Job function: {job.func_name}")
-        
-        # Check if the job is failed or finished
-        if job.is_failed or job.is_finished:
-            original_status = "failed" if job.is_failed else "finished"
-            logger.info(f"Requeuing {original_status} job {job_id}")
-            
-            try:
-                # Try to get original job arguments
-                logger.info("Extracting job arguments")
-                func_name = job.func_name
-                args = job.args
-                kwargs = job.kwargs
-                timeout = job.timeout
-                
-                # Create a new job instead of using requeue()
-                logger.info(f"Creating new job with same parameters: func={func_name}, args={args}")
-                new_job = rq_queue.enqueue_call(
-                    func=func_name,
-                    args=args,
-                    kwargs=kwargs,
-                    timeout=timeout,
-                    result_ttl=86400,
-                    failure_ttl=86400
-                )
-                
-                logger.info(f"Successfully created new job with ID: {new_job.id}")
-                return {"message": f"{original_status.capitalize()} job {job_id} successfully requeued as {new_job.id}."}
-            except Exception as inner_e:
-                logger.error(f"Error during manual requeue: {str(inner_e)}")
-                logger.error(f"Error type: {type(inner_e)}")
-                # Fall back to standard requeue if manual approach fails
-                logger.info("Falling back to standard requeue method")
-                job.requeue()
-                return {"message": f"{original_status.capitalize()} job {job_id} successfully requeued using fallback method."}
-        else:
-            # If job exists but isn't failed or finished, report its status
-            current_status = job.get_status()
-            logger.warning(f"Job {job_id} found but is not failed or finished (Status: {current_status}). Cannot requeue.")
-            raise HTTPException(
-                status_code=409, # Conflict status code
-                detail=f"Job {job_id} exists but is not failed or finished (Status: {current_status}). Only failed or finished jobs can be requeued."
-            )
-
-    except NoSuchJobError:
-        # Handle case where job ID doesn't exist in Redis at all
-        logger.error(f"Job {job_id} not found in Redis.")
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
-    except Exception as e:
-        # Log detailed error information
-        logger.error(f"Error processing requeue for job {job_id}: {str(e)}")
-        logger.error(f"Error type: {type(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error processing requeue for job {job_id}: {str(e)}")
-
 
 def factory_router() -> APIRouter:
     router = APIRouter()
@@ -412,15 +330,5 @@ def factory_router() -> APIRouter:
         dependencies=[Depends(blacklist_low_stake)],
     )
     
-    # Add route for requeueing jobs
-    router.add_api_route(
-        "/requeue_job/{job_id}", # Renamed route
-        requeue_job,             # Renamed function
-        tags=["Admin"],
-        methods=["POST"],
-        summary="Requeue a Job", # Updated summary
-        description="Requeue a job that is either failed or finished using its ID.", # Updated description
-        # Consider adding authentication/authorization dependency here for production
-    )
 
     return router
