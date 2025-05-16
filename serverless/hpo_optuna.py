@@ -133,7 +133,6 @@ def objective(trial: optuna.Trial,
 
     cmd = [
         "accelerate", "launch",
-        "--multi_gpu",
         "--mixed_precision", "bf16",
         "--use_deepspeed",
         "--zero_stage", "2",
@@ -229,7 +228,6 @@ def launch_training(cfg_path: str):
 
     cmd = [
         "accelerate", "launch",
-        "--multi_gpu",
         "--mixed_precision", "bf16",
         "--use_deepspeed",
         "--zero_stage", "2",
