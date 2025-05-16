@@ -36,10 +36,32 @@ RUN mkdir -p /root/.aws && \
     echo "[default]\naws_access_key_id=dummy_access_key\naws_secret_access_key=dummy_secret_key" > /root/.aws/credentials && \
     echo "[default]\nregion=us-east-1" > /root/.aws/config
 
-ENV OMP_NUM_THREADS=4
-ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+    
+#### ENV Setup
+# ───────────────────────────────────────────────────────────────────────────
+# 1. Disable Hugging Face tokenizer threads—they conflict with DataLoader
+ENV TOKENIZERS_PARALLELISM=false
 
-# TODO Copy over training files and base config
+# 2. Pin CPU-side BLAS threads to 1 to avoid oversubscription
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV NUMEXPR_NUM_THREADS=1
+
+# 3. Enable cuDNN autotuner for best conv performance
+ENV CUDNN_BENCHMARK=1
+ENV CUDNN_DETERMINISTIC=0
+
+# 4. Avoid tiny-block fragmentation in PyTorch’s CUDA allocator
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+
+# 5. Suppress bitsandbytes “Welcome” banner (if you’re using 8-bit loading)
+ENV BITSANDBYTES_NOWELCOME=1
+
+# 6.NCCL tuning for multi-GPU efficiency
+ENV NCCL_BLOCKING_WAIT=1
+# ───────────────────────────────────────────────────────────────────────────
+
 COPY serverless/runpod_handler.py /workspace/configs
 COPY serverless/serverless_config_handler.py /workspace/configs
 COPY serverless/base.yml /workspace/configs
