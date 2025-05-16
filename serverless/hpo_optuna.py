@@ -23,7 +23,7 @@ MAX_TRIALS_TO_RUN = 20
 TRIAL_MAX_STEPS = 100
 TRIAL_EVAL_STEPS = 20
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
-MAX_MINUTES_PER_TRIAL = 20
+MAX_MINUTES_PER_TRIAL = 25
                    
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
