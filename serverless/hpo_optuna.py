@@ -135,6 +135,8 @@ def objective(trial: optuna.Trial,
         "accelerate", "launch",
         "--multi_gpu",
         "--mixed_precision", "bf16",
+        "--use_deepspeed",
+        "--zero_stage", 2,
         path_to_train_file,
         "--config", str(tmp_cfg),
     ]
@@ -229,9 +231,12 @@ def launch_training(cfg_path: str):
         "accelerate", "launch",
         "--multi_gpu",
         "--mixed_precision", "bf16",
+        "--use_deepspeed",
+        "--zero_stage", 2,
         path_to_train_file,
         "--config", cfg_path,
     ]
+
     LOG.info("🚀  Starting full training run")
     subprocess.run(cmd, check=True)
 # ╰──────────────────────────────────────────────────────────────────────────╯
