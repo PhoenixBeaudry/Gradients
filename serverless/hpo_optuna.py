@@ -20,28 +20,28 @@ logging.basicConfig(level=logging.INFO,
 LOG = logging.getLogger("hpo_optuna")
 
 MAX_TRIALS_TO_RUN = 20
-TRIAL_MAX_STEPS = 100
-TRIAL_EVAL_STEPS = 20
+TRIAL_MAX_STEPS = 180
+TRIAL_EVAL_STEPS = 30
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
-MAX_MINUTES_PER_TRIAL = 25
+MAX_MINUTES_PER_TRIAL = 30
                    
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     if cfg["rl"] == "dpo" or cfg["rl"] == "grpo":
         params = {
-            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
+            "learning_rate":               trial.suggest_float("learning_rate", 3e-7, 7e-6, log=True),
             "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32, 64, 128]),
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
-            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
-            "beta":                        trial.suggest_float("beta", 0.01, 0.5)
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
+            "beta":                        trial.suggest_float("beta", 0.05, 0.5)
         }
     else:
         params = {
-        "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 6e-4, log=True),
+        "learning_rate":               trial.suggest_float("learning_rate", 3e-6, 7e-5, log=True),
         "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32, 64, 128]),
         "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
-        "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
+        "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
     }
         
     if cfg["adapter"] == "lora":
