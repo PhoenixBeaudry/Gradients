@@ -132,7 +132,9 @@ def objective(trial: optuna.Trial,
         path_to_train_file = "/workspace/training/train.py"
 
     cmd = [
-        "python",
+        "accelerate", "launch",
+        "--multi_gpu",
+        "--mixed_precision", "bf16",
         path_to_train_file,
         "--config", str(tmp_cfg),
     ]
@@ -224,7 +226,9 @@ def launch_training(cfg_path: str):
 
 
     cmd = [
-        "python",
+        "accelerate", "launch",
+        "--multi_gpu",
+        "--mixed_precision", "bf16",
         path_to_train_file,
         "--config", cfg_path,
     ]
