@@ -210,6 +210,8 @@ async def task_offer(
             logger.info("Task Type: DPO")
         if request.task_type == TaskType.GRPOTASK:
             logger.info("Task Type: GRPO")
+            # REJECT GRPO TODO FIX
+            return MinerTaskResponse(message=f"No GRPO for now.", accepted=False)
 
 
         ######### Rejections #########
