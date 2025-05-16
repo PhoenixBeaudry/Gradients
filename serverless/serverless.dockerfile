@@ -20,7 +20,7 @@ RUN pip install --upgrade transformers
 RUN pip install --no-build-isolation axolotl
 RUN pip install runpod
 RUN pip install --no-build-isolation flash-attn
-
+RUN pip install deepspeed
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data /workspace/training
