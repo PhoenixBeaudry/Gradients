@@ -302,8 +302,6 @@ def main():
     cfg = load_config(args.config)
 
     #####################################################
-    print("DATASET CONFIG")
-    print(cfg)
 
     logger = setup_logger()
     
