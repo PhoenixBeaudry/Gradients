@@ -225,10 +225,10 @@ async def task_offer(
             return MinerTaskResponse(message="Model size too large (>= 40B)", accepted=False)
         
         # Reject if unsupported model
-        if any(k in request.model.lower() for k in ("neo", "stella", "falcon", "gpt-j")):
-            logger.info(f"Rejecting offer: Unsupported Model: ({request.model.lower()})")
-            return MinerTaskResponse(
-                message=f"This endpoint does not currently support that model.", accepted=False)
+        # if any(k in request.model.lower() for k in ("neo", "stella", "falcon", "gpt-j")):
+        #     logger.info(f"Rejecting offer: Unsupported Model: ({request.model.lower()})")
+        #     return MinerTaskResponse(
+        #         message=f"This endpoint does not currently support that model.", accepted=False)
         
         # Reject absurdly long jobs
         if request.hours_to_complete >= 48:
