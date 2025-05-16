@@ -31,7 +31,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     if cfg["rl"] == "dpo" or cfg["rl"] == "grpo":
         params = {
             "learning_rate":               trial.suggest_float("learning_rate", 3e-7, 7e-6, log=True),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32, 64, 128]),
+            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [8, 16, 32, 64, 128]),
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
             "beta":                        trial.suggest_float("beta", 0.05, 0.5)
@@ -39,7 +39,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     else:
         params = {
         "learning_rate":               trial.suggest_float("learning_rate", 3e-6, 7e-5, log=True),
-        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32, 64, 128]),
+        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [8, 16, 32, 64, 128]),
         "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
     }
