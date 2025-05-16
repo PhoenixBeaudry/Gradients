@@ -33,7 +33,7 @@ from core.models.utility_models import TaskType
 
 
 
-NUM_WORKERS = 4
+MAX_NUM_WORKERS = 10 # Ensure this matches max workers on runpod endpoint
 
 logger = get_logger(__name__)
 
@@ -211,47 +211,50 @@ async def task_offer(
         if request.task_type == TaskType.GRPOTASK:
             logger.info("Task Type: GRPO")
 
+
+        ######### Rejections #########
         if request.task_type not in [TaskType.INSTRUCTTEXTTASK, TaskType.DPOTASK, TaskType.GRPOTASK]:
-            return MinerTaskResponse(
-                message=f"This endpoint only accepts text tasks: "
-                        f"{TaskType.INSTRUCTTEXTTASK}, {TaskType.DPOTASK} and {TaskType.GRPOTASK}",
-                accepted=False
-            )
+            return MinerTaskResponse(message=f"This endpoint only accepts text tasks.", accepted=False)
+        
         # Check model parameter count
         # Reject if model size is 32B or larger
         if request.model_params_count is not None and request.model_params_count >= 30_000_000_000:
             logger.info(f"Rejecting offer: Model size too large ({request.model_params_count / 1_000_000_000:.1f}B >= 40B)")
             return MinerTaskResponse(message="Model size too large (>= 40B)", accepted=False)
         
+        # Reject if unsupported model
         if any(k in request.model.lower() for k in ("neo", "stella", "falcon", "gpt-j")):
+            logger.info(f"Rejecting offer: Unsupported Model: ({request.model.lower()})")
             return MinerTaskResponse(
-                message=f"This endpoint does not currently support that model.",
-                accepted=False
-            )
-        # optional: still reject absurdly long jobs if you want
+                message=f"This endpoint does not currently support that model.", accepted=False)
+        
+        # Reject absurdly long jobs
         if request.hours_to_complete >= 48:
             logger.info(f"Rejecting offer: too long ({request.hours_to_complete}h)")
             return MinerTaskResponse(message="Job too long", accepted=False)
         
+        #################################
+
 
         # Create a RunPod endpoint instance
         endpoint = runpod.Endpoint("3f7fu7em4zi8m3")
         endpoint_health = endpoint.health()
-        logger.info("RunPod Endpoint Health: ")
-        logger.info(json.dumps(endpoint_health, indent=2))
+        active_workers = int(endpoint_health["workers"]["running"])
+        logger.info(f"Currently Active Runpod Workers: {active_workers}")
 
+        # Reject if all workers busy
+        if active_workers >= MAX_NUM_WORKERS:
+            logger.info("Rejecting offer as all workers are busy.")
+            return MinerTaskResponse(message=f"All our workers are busy... Sorry!", accepted=False)
         
         CONFIG_DIR = "core/config"
         config_filename = f"{request.task_id}.yml"
         config_path = os.path.join(CONFIG_DIR, config_filename)
         file_path = Path(config_path)
         if file_path.exists():
-            logger.info("Not accepting a job a miner has already taken.")
+            logger.info("Rejecting offer a miner has already taken.")
             # Another miner already took the job
-            return MinerTaskResponse(
-                message=f"No thank you.",
-                accepted=False
-            )
+            return MinerTaskResponse(message=f"No thank you.", accepted=False)
         else:
             #Write the config file to make sure other miners don't accept
             with open(f"{CONFIG_DIR}/base.yml", "r") as file:
@@ -263,6 +266,7 @@ async def task_offer(
         # otherwise accept
         logger.info(f"Accepting offer): {request.model} ({request.hours_to_complete}h)")
         return MinerTaskResponse(message="-----:)-----", accepted=True)
+
 
     except ValidationError as e:
         logger.error(f"Validation error in task_offer: {str(e)}")
