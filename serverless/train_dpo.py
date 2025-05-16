@@ -139,10 +139,13 @@ def load_dpo_datasets(cfg: dict):
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()} 
-    if any(k in model_name.lower() for k in ("qwen", "phi", "mistral")):
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
-        model.config.use_cache = False
-        return model
+    if any(k in model_name.lower() for k in ("qwen", "phi", "mistral", "nuextract")):
+        try:
+            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+            model.config.use_cache = False
+            return model
+        except:
+            return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
     try:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
