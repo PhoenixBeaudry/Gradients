@@ -252,8 +252,8 @@ def _load_and_modify_config(
         config["sequence_len"] = desired_len
     ######################
 
-
-    config = setup_lora_config(config, config["model_params_count"])
+    if config["adapter"] == "lora":
+        config = setup_lora_config(config)
 
     return config
 
@@ -283,7 +283,7 @@ def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]
     return filename, func_names
 
 
-def setup_lora_config(config, model_size):
+def setup_lora_config(config):
     """Setup QLoRA configuration for more efficient adaptation"""
     config["adapter"] = "lora"
     config["lora_r"] = 32
