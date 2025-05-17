@@ -30,26 +30,33 @@ MAX_MINUTES_PER_TRIAL = 45
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
+
+
     if cfg["rl"] == "dpo" or cfg["rl"] == "grpo":
         params = {
+            "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
             "learning_rate":               trial.suggest_float("learning_rate", 6e-7, 2e-4, log=True),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [4, 8, 16, 32]),
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
             "beta":                        trial.suggest_float("beta", 0.05, 0.5)
         }
     else:
         params = {
+        "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
         "learning_rate":               trial.suggest_float("learning_rate", 3e-6, 2e-4, log=True),
-        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [4, 8, 16, 32]),
         "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2]),
         "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
     }
-        
-    if cfg["adapter"] == "lora":
+
+    if params["adapter"] == "lora":
         params |= {
+            "micro_batch_size":   trial.suggest_categorical("micro_batch_size", [1, 2, 3, 4]),
             "lora_r":       trial.suggest_int("lora_r", 8, 1024),
             "lora_dropout":       trial.suggest_float("lora_dropout", 0.0, 0.2),
+        }
+    else:
+        params |= {
+            "micro_batch_size":   trial.suggest_categorical("micro_batch_size", [4, 8, 16, 32]),
         }
 
     return params
