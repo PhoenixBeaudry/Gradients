@@ -324,7 +324,7 @@ def main():
     model = load_model(cfg['base_model'], cfg)
 
     if cfg.get('adapter') == 'lora':
-        policy_model = apply_lora_adapter(model, cfg)
+        model = apply_lora_adapter(model, cfg)
 
     if cfg["testing"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
@@ -353,7 +353,7 @@ def main():
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
 
 
-    trainer = build_trainer(cfg, policy_model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
 
     logger.info("Starting Full Model Training...")
 
