@@ -21,6 +21,7 @@ RUN pip install --no-build-isolation axolotl
 RUN pip install runpod
 RUN pip install --no-build-isolation flash-attn
 RUN pip install deepspeed
+RUN pip install vllm
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data /workspace/training
