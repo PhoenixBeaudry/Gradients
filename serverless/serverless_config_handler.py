@@ -357,10 +357,10 @@ def setup_config(
         
     print("Initial Config:")
     print("=======================================")
-    print(f"Task ID: {config["job_id"]}")
-    print(f"Model: {config["base_model"]}")
-    print(f"HuggingFace Repo: {config["hub_model_id"]}")
-    print(f"RL Type: {config["rl"]}")
+    print(f"Task ID: {config['job_id']}")
+    print(f"Model: {config['base_model']}")
+    print(f"HuggingFace Repo: {config['hub_model_id']}")
+    print(f"RL Type: {config['rl']}")
     print("=======================================")
 
     save_config(config, config_path)
