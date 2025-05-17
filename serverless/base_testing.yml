@@ -21,7 +21,7 @@ early_stopping: true
 early_stopping_patience: 5
 greater_is_better: false
 metric_for_best_model: eval_loss
-eval_steps: 100
+eval_steps: 50
 eval_strategy: steps
 
 max_steps: 100
