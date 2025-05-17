@@ -48,7 +48,7 @@ class TimeLimitCallback(TrainerCallback):
             return control
         elapsed = time.time() - self.start_time
         if elapsed >= self.max_seconds:
-            print(f"\n⏱️  Reached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+            print(f"\nReached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
             control.should_training_stop = True
         return control
     

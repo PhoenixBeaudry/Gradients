@@ -124,7 +124,7 @@ def objective(trial: optuna.Trial,
     with tmp_cfg.open("w") as f:
         yaml.safe_dump(cfg, f)
 
-    LOG.info("🔎  Starting trial %d with params: %s", trial.number, trial_params)
+    LOG.info("Starting trial %d with params: %s", trial.number, trial_params)
      # ── prepare environment for subprocess ──────────────────────────────────
     env = os.environ.copy()
     env["WANDB_PROJECT"] = hpo_project          # override globally
@@ -156,8 +156,8 @@ def objective(trial: optuna.Trial,
                             stderr=subprocess.STDOUT, text=True, check=True)
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
-        LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout)
-        LOG.info("⚠️  Waiting 3s before starting next trial for cleanup...")
+        LOG.warning("Trial %d failed:\n%s", trial.number, e.stdout)
+        LOG.info("Waiting 3s before starting next trial for cleanup...")
         time.sleep(10)
         return float("inf")
 
@@ -165,11 +165,11 @@ def objective(trial: optuna.Trial,
     for extractor in (loss_from_wandb, lambda _: loss_from_stdout(stdout), loss_from_state):
         val = extractor(out_dir) if extractor is loss_from_wandb or extractor is loss_from_state else extractor(None)
         if val is not None:
-            LOG.info("✅  Trial %d completed – eval_loss: %.4f", trial.number, val)
+            LOG.info("Trial %d completed – eval_loss: %.4f", trial.number, val)
             shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
             return val
 
-    LOG.warning("⚠️  eval_loss not found for trial %d – penalising.", trial.number)
+    LOG.warning("eval_loss not found for trial %d – penalising.", trial.number)
     return float("inf")
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
@@ -185,7 +185,7 @@ def run_optuna(base_cfg_path: str) -> dict:
     base_project = os.environ.get("WANDB_PROJECT", "Gradients")
     hpo_project  = f"{base_project}-HPO-Trials"
 
-    LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
+    LOG.info("HPO sweep starting  (project: %s)…", hpo_project)
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
 
     if base_cfg["rl"] == "grpo":
@@ -208,7 +208,7 @@ def run_optuna(base_cfg_path: str) -> dict:
                    n_trials=MAX_TRIALS_TO_RUN,
                    show_progress_bar=True)
 
-    LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
+    LOG.info("HPO finished – best eval_loss %.5f with params %s",
             study.best_value, study.best_params)
         
     return study.best_params
