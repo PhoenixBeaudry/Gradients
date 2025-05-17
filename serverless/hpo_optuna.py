@@ -22,6 +22,8 @@ LOG = logging.getLogger("hpo_optuna")
 MAX_TRIALS_TO_RUN = 20
 TRIAL_MAX_STEPS = 150
 TRIAL_EVAL_STEPS = 30
+TESTING_TRIAL_MAX_STEPS = 50
+TESTING_TRIAL_EVAL_STEPS = 25
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
 MAX_MINUTES_PER_TRIAL = 45
                    
@@ -106,6 +108,13 @@ def objective(trial: optuna.Trial,
         "eval_steps":       TRIAL_EVAL_STEPS,
         "save_steps": 300
     }
+
+    if cfg["testing"] == True:
+        cfg |= {
+            "max_steps":        TESTING_TRIAL_MAX_STEPS,
+            "eval_steps":       TESTING_TRIAL_EVAL_STEPS,
+        }
+
     cfg["hpo_run"] = True
     cfg["required_finish_time"] = (datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)).isoformat()
 
