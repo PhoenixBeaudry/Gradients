@@ -19,35 +19,41 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 LOG = logging.getLogger("hpo_optuna")
 
-MAX_TRIALS_TO_RUN = 20
-TRIAL_MAX_STEPS = 100
-TRIAL_EVAL_STEPS = 20
+MAX_TRIALS_TO_RUN = 12
+TRIAL_MAX_STEPS = 150
+TRIAL_EVAL_STEPS = 30
+TESTING_TRIAL_MAX_STEPS = 50
+TESTING_TRIAL_EVAL_STEPS = 25
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
-MAX_MINUTES_PER_TRIAL = 20
+MAX_MINUTES_PER_TRIAL = 45
                    
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
+
+
     if cfg["rl"] == "dpo" or cfg["rl"] == "grpo":
         params = {
-            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
-            "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
-            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
+            "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
+            "micro_batch_size":   trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
+            "learning_rate":               trial.suggest_float("learning_rate", 6e-7, 2e-4, log=True),
+            "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2]),
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
+            "beta":                        trial.suggest_float("beta", 0.05, 0.5)
         }
-        params["beta"] = trial.suggest_float("beta", 0.01, 0.5)
     else:
         params = {
-        "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 6e-4, log=True),
-        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
-        "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4, 8]),
-        "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.2),
+        "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
+        "micro_batch_size":   trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
+        "learning_rate":               trial.suggest_float("learning_rate", 3e-6, 2e-4, log=True),
+        "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2]),
+        "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
     }
-        
 
-    if cfg["adapter"] == "lora":
+    if params["adapter"] == "lora":
         params |= {
-            "lora_r":       trial.suggest_int("lora_r", 16, 1024),
+            "lora_r":       trial.suggest_int("lora_r", 8, 1024),
+            "lora_dropout":       trial.suggest_float("lora_dropout", 0.0, 0.2),
         }
 
     return params
@@ -104,6 +110,13 @@ def objective(trial: optuna.Trial,
         "eval_steps":       TRIAL_EVAL_STEPS,
         "save_steps": 300
     }
+
+    if cfg["testing"] == True:
+        cfg |= {
+            "max_steps":        TESTING_TRIAL_MAX_STEPS,
+            "eval_steps":       TESTING_TRIAL_EVAL_STEPS,
+        }
+
     cfg["hpo_run"] = True
     cfg["required_finish_time"] = (datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)).isoformat()
 
@@ -113,7 +126,7 @@ def objective(trial: optuna.Trial,
     with tmp_cfg.open("w") as f:
         yaml.safe_dump(cfg, f)
 
-    LOG.info("🔎  Starting trial %d with params: %s", trial.number, trial_params)
+    LOG.info("Starting trial %d with params: %s", trial.number, trial_params)
      # ── prepare environment for subprocess ──────────────────────────────────
     env = os.environ.copy()
     env["WANDB_PROJECT"] = hpo_project          # override globally
@@ -132,7 +145,10 @@ def objective(trial: optuna.Trial,
         path_to_train_file = "/workspace/training/train.py"
 
     cmd = [
-        "python",
+        "accelerate", "launch",
+        "--mixed_precision", "bf16",
+        "--use_deepspeed",
+        "--zero_stage", "2",
         path_to_train_file,
         "--config", str(tmp_cfg),
     ]
@@ -142,8 +158,8 @@ def objective(trial: optuna.Trial,
                             stderr=subprocess.STDOUT, text=True, check=True)
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
-        LOG.warning("⚠️  Trial %d failed:\n%s", trial.number, e.stdout)
-        LOG.info("⚠️  Waiting 3s before starting next trial for cleanup...")
+        LOG.warning("Trial %d failed:\n%s", trial.number, e.stdout)
+        LOG.info("Waiting 3s before starting next trial for cleanup...")
         time.sleep(10)
         return float("inf")
 
@@ -151,11 +167,11 @@ def objective(trial: optuna.Trial,
     for extractor in (loss_from_wandb, lambda _: loss_from_stdout(stdout), loss_from_state):
         val = extractor(out_dir) if extractor is loss_from_wandb or extractor is loss_from_state else extractor(None)
         if val is not None:
-            LOG.info("✅  Trial %d completed – eval_loss: %.4f", trial.number, val)
+            LOG.info("Trial %d completed – eval_loss: %.4f", trial.number, val)
             shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
             return val
 
-    LOG.warning("⚠️  eval_loss not found for trial %d – penalising.", trial.number)
+    LOG.warning("eval_loss not found for trial %d – penalising.", trial.number)
     return float("inf")
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
@@ -171,7 +187,7 @@ def run_optuna(base_cfg_path: str) -> dict:
     base_project = os.environ.get("WANDB_PROJECT", "Gradients")
     hpo_project  = f"{base_project}-HPO-Trials"
 
-    LOG.info("🚦  HPO sweep starting  (project: %s)…", hpo_project)
+    LOG.info("HPO sweep starting  (project: %s)…", hpo_project)
     storage = RDBStorage(url=storage_path, engine_kwargs={"connect_args": {"timeout": 30}, "pool_pre_ping": True})
 
     if base_cfg["rl"] == "grpo":
@@ -194,7 +210,7 @@ def run_optuna(base_cfg_path: str) -> dict:
                    n_trials=MAX_TRIALS_TO_RUN,
                    show_progress_bar=True)
 
-    LOG.info("🏆  HPO finished – best eval_loss %.5f with params %s",
+    LOG.info("HPO finished – best eval_loss %.5f with params %s",
             study.best_value, study.best_params)
         
     return study.best_params
@@ -224,10 +240,14 @@ def launch_training(cfg_path: str):
 
 
     cmd = [
-        "python",
+        "accelerate", "launch",
+        "--mixed_precision", "bf16",
+        "--use_deepspeed",
+        "--zero_stage", "2",
         path_to_train_file,
         "--config", cfg_path,
     ]
+
     LOG.info("🚀  Starting full training run")
     subprocess.run(cmd, check=True)
 # ╰──────────────────────────────────────────────────────────────────────────╯

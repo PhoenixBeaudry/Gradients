@@ -215,13 +215,12 @@ def _load_and_modify_config(
         filename, reward_funcs_names = create_reward_funcs_file(
             [reward_function.reward_func for reward_function in dataset_type.reward_functions], task_id
             )
-        config["max_steps"] = 10000
-        config["eval_steps"] = 100
+        config["eval_steps"] = 200
         config["save_steps"] = 100
         config["trl"] = {}
         config["trl"]["beta"] = 0.04
         config["trl"]["max_completion_length"] = 32
-        config["trl"]["use_vllm"] = False 
+        config["trl"]["use_vllm"] = False
         config["trl"]["num_generations"] = 2
         config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
         config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
@@ -252,8 +251,8 @@ def _load_and_modify_config(
         config["sequence_len"] = desired_len
     ######################
 
-
-    config = setup_lora_config(config, config["model_params_count"])
+    if config["adapter"] == "lora":
+        config = setup_lora_config(config)
 
     return config
 
@@ -283,7 +282,7 @@ def create_reward_funcs_file(reward_funcs: list[str], task_id: str) -> list[str]
     return filename, func_names
 
 
-def setup_lora_config(config, model_size):
+def setup_lora_config(config):
     """Setup QLoRA configuration for more efficient adaptation"""
     config["adapter"] = "lora"
     config["lora_r"] = 32
@@ -354,6 +353,13 @@ def setup_config(
     )
     if not hpo:
         config["do_hpo"] = False
-    print("CONFIG AFTER SETUP:")
-    print(config)
+        
+    print("Initial Config:")
+    print("=======================================")
+    print(f"Task ID: {config['job_id']}")
+    print(f"Model: {config['base_model']}")
+    print(f"HuggingFace Repo: {config['hub_model_id']}")
+    print(f"RL Type: {config['rl']}")
+    print("=======================================")
+
     save_config(config, config_path)

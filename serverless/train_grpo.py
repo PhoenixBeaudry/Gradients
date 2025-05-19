@@ -48,7 +48,7 @@ class TimeLimitCallback(TrainerCallback):
             return control
         elapsed = time.time() - self.start_time
         if elapsed >= self.max_seconds:
-            print(f"\n⏱️  Reached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+            print(f"\nReached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
             control.should_training_stop = True
         return control
     
@@ -167,8 +167,13 @@ def setup_logger() -> logging.Logger:
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()}
-    if "qwen" in model_name.lower():
-        return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
+    if any(k in model_name.lower() for k in ("qwen", "phi", "mistral", "nuextract")):
+        try:
+            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+            model.config.use_cache = False
+            return model
+        except:
+            return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
     try:
         return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
@@ -250,7 +255,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
-            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8), early_stopping_threshold=1e-4)
+            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
         )
     # calculate time left for job
     time_remaining = datetime.fromisoformat(cfg['required_finish_time']) - datetime.now()
@@ -283,7 +288,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
         per_device_train_batch_size=int(cfg['micro_batch_size']),
         per_device_eval_batch_size=int(cfg['micro_batch_size']),
-        dataloader_num_workers=int(cfg['dataloader_num_workers']),
         max_steps=int(cfg['max_steps']),
         learning_rate=float(cfg['learning_rate']),
         beta=float(cfg['beta']),
@@ -296,17 +300,19 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         save_steps=int(cfg['save_steps']),
         save_total_limit=int(cfg['save_total_limit']),
         metric_for_best_model=cfg['metric_for_best_model'],
-        greater_is_better=bool(cfg['greater_is_better']),
         weight_decay=float(cfg['weight_decay']),
         run_name=cfg['wandb_run'],
         warmup_steps=cfg['warmup_steps'],
         report_to="wandb",
+        greater_is_better=True,
         auto_find_batch_size=True,
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         bf16=True,
+        ddp_find_unused_parameters=False,
         use_liger_kernel=True,
         load_best_model_at_end=True,
+        dataloader_num_workers=16,
         **hf_kwargs,
     )
     #####################################
@@ -377,9 +383,11 @@ def main():
 
     logger.info("Starting Full Model Training...")
 
-    trainer.train()
-    if not cfg["hpo_run"]:
-        trainer.push_to_hub()
+    try:
+        trainer.train()
+    finally:
+        if not cfg["hpo_run"]:
+            trainer.push_to_hub()
 
 
 
