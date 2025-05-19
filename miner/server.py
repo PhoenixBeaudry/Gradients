@@ -1,7 +1,9 @@
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import os
 from fiber.logging_utils import get_logger
 from fiber.miner.core import configuration
 
@@ -35,6 +37,20 @@ def factory_app(debug: bool = False) -> FastAPI:
             sync_thread.join()
 
     app = FastAPI(lifespan=lifespan, debug=debug)
+
+    # Middleware to restrict access by client IP
+    ALLOWED_IPS = ["185.141.218.75"]
+
+    @app.middleware("http")
+    async def ip_restrict_middleware(request: Request, call_next):
+        client_ip = request.client.host
+        if client_ip not in ALLOWED_IPS:
+            logger.info(f"Access denied from IP {client_ip}.")
+            return JSONResponse(
+                status_code=403,
+                content={"detail": f"Access denied from IP {client_ip}."}
+            )
+        return await call_next(request)
 
     return app
 
