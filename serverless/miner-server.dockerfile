@@ -1,4 +1,4 @@
-FROM python:3
+FROM pytorch/pytorch:2.7.0-cuda11.8-cudnn9-devel
 
 USER root
 
@@ -6,11 +6,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git \
  && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install build-essential libgtk-3-dev libwebkit2gtk-4.0-dev -y
-RUN apt-get update && apt-get install -yq libgconf-2-4
-RUN apt-get install libsoup2.4 -y
-RUN apt-get install gir1.2-javascriptcoregtk-4.0 -y
-RUN apt-get install libjavascriptcoregtk-4.0-dev -y
+RUN apt-get update && apt-get install build-essential
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
@@ -34,7 +30,12 @@ RUN pip install -e .
 
 RUN apt-get update && \
     apt-get install -y openssh-server && \
-    mkdir /var/run/sshd
+    mkdir /var/run/sshd && \
+    echo 'root:root' | chpasswd && \
+    sed -i 's/#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+EXPOSE 22
 
 CMD ["/usr/sbin/sshd", "-D"]
 
@@ -47,3 +48,4 @@ CMD ["/usr/sbin/sshd", "-D"]
 # WALLET_NAME=default
 # HOTKEY_NAME=default
 # SUBTENSOR_NETWORK=finney
+
