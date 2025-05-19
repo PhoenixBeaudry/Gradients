@@ -20,7 +20,7 @@ RUN git clone https://github.com/PhoenixBeaudry/Gradients.git /Gradients
 
 WORKDIR /Gradients
 
-RUN git checkout serverless
+RUN git checkout miner-docker
 
 RUN pip install -e .
 
