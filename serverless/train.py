@@ -345,9 +345,11 @@ def main():
 
     logger.info("Starting Full Model Training...")
 
-    trainer.train()
-    if not cfg["hpo_run"]:
-        trainer.push_to_hub()
+    try:
+        trainer.train()
+    finally:
+        if not cfg["hpo_run"]:
+            trainer.push_to_hub()
 
 
 
