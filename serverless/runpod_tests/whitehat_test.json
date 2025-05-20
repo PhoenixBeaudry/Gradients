@@ -1,0 +1,19 @@
+{
+  "input": {
+    "model": "bigscience/bloom-560m",
+    "dataset": "virattt/financial-qa-10K",
+    "dataset_type": {
+      "class_type": "InstructTextDatasetType",
+      "attributes": {
+        "system_format": "{system}",
+        "field_instruction": "questions",
+        "field_input": "story",
+        "field_output": "answers.input_text"
+      }
+    },
+    "file_format": "hf",
+    "expected_repo_name": "WHITEHAT-2edb2258-9017-4851-845b-332f4deb61d1",
+    "hours_to_complete": 8,
+    "task_id": "WHITEHAT-0f7f79e2-4a87-4b51-9bab-6fcd351aa022"
+  }
+}

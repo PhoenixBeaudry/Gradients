@@ -172,11 +172,17 @@ def load_sft_datasets(cfg: dict):
     If cfg["val_set_size"] is 0 → eval_ds is None.
     """
     # Load **only one** split so we always get a Dataset, never a DatasetDict
-    ds_train = load_dataset(
-        "json",
-        data_files=cfg["datasets"][0]["path"],
-        split="train"          # guarantees Dataset, not DatasetDict
-    )
+    try:
+        ds_train = load_dataset(
+            cfg["datasets"][0]["path"],
+            split="train"          # guarantees Dataset, not DatasetDict
+        )
+    except:
+        ds_train = load_dataset(
+            "json",
+            data_files=cfg["datasets"][0]["path"],
+            split="train"          # guarantees Dataset, not DatasetDict
+        )
 
     def combine_prompt(example):
         # Handles the case when "input" (the context) may be empty
