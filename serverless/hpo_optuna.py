@@ -166,7 +166,11 @@ def objective(trial: optuna.Trial,
                             stderr=subprocess.STDOUT, text=True, check=True)
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
-        LOG.warning("Trial %d failed:\n%s", trial.number, e.stdout)
+        LOG.warning("Trial %d failed:\n%s", trial.number)
+        if "torch.OutOfMemoryError" in e.stdout:
+            LOG.warning("Failed due to OOM error.")
+        else:
+            LOG.warning(f"Failed due to: \n {e.stdout}")
         LOG.info("Waiting 3s before starting next trial for cleanup...")
         time.sleep(10)
         return float("inf")
