@@ -22,6 +22,8 @@ LOG = logging.getLogger("hpo_optuna")
 MAX_TRIALS_TO_RUN = 15
 TRIAL_MAX_STEPS = 100
 TRIAL_EVAL_STEPS = 20
+GRPO_MAX_STEPS = 100
+GRPO_EVAL_STEPS = 50
 TESTING_TRIAL_MAX_STEPS = 50
 TESTING_TRIAL_EVAL_STEPS = 25
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.20
@@ -115,6 +117,12 @@ def objective(trial: optuna.Trial,
         cfg |= {
             "max_steps":        TESTING_TRIAL_MAX_STEPS,
             "eval_steps":       TESTING_TRIAL_EVAL_STEPS,
+        }
+        
+    if cfg["rl"] == "grpo":
+        cfg |= {
+            "max_steps":        GRPO_MAX_STEPS,
+            "eval_steps":       GRPO_EVAL_STEPS,
         }
 
     cfg["hpo_run"] = True
