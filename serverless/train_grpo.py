@@ -22,7 +22,8 @@ import optuna
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 
-
+torch.cuda.empty_cache()
+torch.backends.cudnn.benchmark = True
 
 ###### Custom Callbacks ########################
 
