@@ -209,6 +209,8 @@ def _load_and_modify_config(
     if isinstance(dataset_type, DpoDatasetType):
         config["rl"] = "dpo"
         config["learning_rate"] = 1e-6
+        config["label_smoothing"] = 0.0
+        config["beta"] = 0.04
     elif isinstance(dataset_type, GrpoDatasetType):
         config["rl"] = "grpo"
         config["learning_rate"] = 1e-6
@@ -226,6 +228,7 @@ def _load_and_modify_config(
         config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
         config["rl_beta"] = 0.1
         config["beta"] = 0.04
+        config["epsilon"] = 0.2
 
 
     config["job_id"] = task_id

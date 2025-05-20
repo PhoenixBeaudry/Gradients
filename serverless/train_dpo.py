@@ -265,6 +265,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         learning_rate=float(cfg['learning_rate']),
         beta=float(cfg['beta']),
         optim=cfg['optimizer'],
+        label_smoothing=float(cfg['label_smoothing']),
         lr_scheduler_type=SchedulerType.COSINE,
         logging_steps=int(cfg['logging_steps']),
         eval_strategy='steps',

@@ -281,6 +281,8 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         # GRPO params
         max_completion_length=int(cfg["trl"]["max_completion_length"]),
         reward_weights=cfg["trl"]["reward_weights"],
+        beta=float(cfg['beta']),
+        epsilon=float(cfg['epsilon']),
         use_vllm=cfg["trl"]["use_vllm"],
         num_generations=int(cfg["trl"]["num_generations"]),
         #####
@@ -289,7 +291,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         per_device_eval_batch_size=int(cfg['micro_batch_size']),
         max_steps=int(cfg['max_steps']),
         learning_rate=float(cfg['learning_rate']),
-        beta=float(cfg['beta']),
         optim=cfg['optimizer'],
         lr_scheduler_type=SchedulerType.COSINE,
         logging_steps=int(cfg['logging_steps']),
