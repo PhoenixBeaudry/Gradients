@@ -118,7 +118,7 @@ def objective(trial: optuna.Trial,
             "max_steps":        TESTING_TRIAL_MAX_STEPS,
             "eval_steps":       TESTING_TRIAL_EVAL_STEPS,
         }
-        
+
     if cfg["rl"] == "grpo":
         cfg |= {
             "max_steps":        GRPO_MAX_STEPS,
@@ -154,9 +154,7 @@ def objective(trial: optuna.Trial,
 
     cmd = [
         "accelerate", "launch",
-        "--mixed_precision", "bf16",
-        "--use_deepspeed",
-        "--zero_stage", "2",
+        "--config_file", "/workspace/configs/accelerate.yaml",
         path_to_train_file,
         "--config", str(tmp_cfg),
     ]
@@ -249,9 +247,7 @@ def launch_training(cfg_path: str):
 
     cmd = [
         "accelerate", "launch",
-        "--mixed_precision", "bf16",
-        "--use_deepspeed",
-        "--zero_stage", "2",
+        "--config_file", "/workspace/configs/accelerate.yaml",
         path_to_train_file,
         "--config", cfg_path,
     ]
