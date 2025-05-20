@@ -36,7 +36,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
 
     if cfg["rl"] == "dpo" or cfg["rl"] == "grpo":
         params = {
-            "optimizer":                   trial.suggest_categorical("adapter", ["adamw_8bit", "lion_8bit"]),
+            "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
             "micro_batch_size":   trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
             "learning_rate":               trial.suggest_float("learning_rate", 6e-7, 1e-4, log=True),
@@ -46,7 +46,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         }
     else:
         params = {
-            "optimizer":                   trial.suggest_categorical("adapter", ["adamw_8bit", "lion_8bit"]),
+            "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
             "micro_batch_size":   trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
             "learning_rate":               trial.suggest_float("learning_rate", 3e-6, 1e-4, log=True),
