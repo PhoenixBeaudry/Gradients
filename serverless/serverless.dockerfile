@@ -63,6 +63,7 @@ COPY serverless/runpod_handler.py /workspace/configs
 COPY serverless/serverless_config_handler.py /workspace/configs
 COPY serverless/base.yml /workspace/configs
 COPY serverless/base_testing.yml /workspace/configs
+COPY serverless/accelerate.yaml /workspace/configs
 
 COPY serverless/hpo_optuna.py /workspace/training
 COPY serverless/train.py /workspace/training
