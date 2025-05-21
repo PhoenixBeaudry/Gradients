@@ -1,2 +1,2 @@
 # Todo
-- Full Finetune option in HPO
+- Dynamic Eval Set Size for full training run (Mainly for GRPO)
