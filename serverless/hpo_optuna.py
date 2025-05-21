@@ -41,7 +41,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.03),
             "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
-            "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.3, log=True)
+            "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.3)
         }
     elif cfg["rl"] == "grpo":
         params = {

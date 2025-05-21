@@ -25,8 +25,7 @@ def factory_app(debug: bool = False) -> FastAPI:
             sync_thread = threading.Thread(target=metagraph.periodically_sync_nodes, daemon=True)
             sync_thread.start()
         
-        # Old backup restoration logic removed - RQ handles job persistence via Redis
-        logger.info("Miner server started. Ready to enqueue jobs to RQ.")
+        logger.info("Miner server started. Ready to enqueue jobs to RunPod.")
 
         yield
 
