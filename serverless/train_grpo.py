@@ -166,7 +166,7 @@ def setup_logger() -> logging.Logger:
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()}
-    if any(k in model_name.lower() for k in ("qwen", "phi", "mistral", "nuextract")):
+    if any(k in model_name.lower() for k in ("qwen", "phi", "mistral", "nuextract", "nous-capybara")):
         try:
             model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
             model.config.use_cache = False
