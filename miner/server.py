@@ -1,6 +1,6 @@
 import threading
 from contextlib import asynccontextmanager
-import time
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import os
@@ -18,19 +18,13 @@ logger = get_logger(__name__)
 def factory_app(debug: bool = False) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        working = False
-        while not working:
-            try:
-                config = configuration.factory_config()
-                metagraph = config.metagraph
-                sync_thread = None
-                if metagraph.substrate is not None:
-                    sync_thread = threading.Thread(target=metagraph.periodically_sync_nodes, daemon=True)
-                    sync_thread.start()
-                working = True
-            except:
-                logger.info("Unable to connect to Finney, waiting 30s then retrying....")
-                time.sleep(30)
+        config = configuration.factory_config()
+        metagraph = config.metagraph
+        sync_thread = None
+        if metagraph.substrate is not None:
+            sync_thread = threading.Thread(target=metagraph.periodically_sync_nodes, daemon=True)
+            sync_thread.start()
+        
         # Old backup restoration logic removed - RQ handles job persistence via Redis
         logger.info("Miner server started. Ready to enqueue jobs to RQ.")
 
