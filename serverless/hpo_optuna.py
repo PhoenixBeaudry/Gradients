@@ -41,7 +41,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.03),
             "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
-            "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.3)
+            "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.3),
         }
     elif cfg["rl"] == "grpo":
         params = {
@@ -52,7 +52,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.03),
             "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
-            "epsilon":                     trial.suggest_float("epsilon", 0.1, 0.3)
+            "epsilon":                     trial.suggest_float("epsilon", 0.1, 0.3),
         }
     else:
         params = {
@@ -171,7 +171,7 @@ def objective(trial: optuna.Trial,
                             stderr=subprocess.STDOUT, text=True, check=True)
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
-        LOG.warning("Trial %d failed:\n%s", trial.number)
+        LOG.warning("Trial %d failed:\n", trial.number)
         if "torch.OutOfMemoryError" in e.stdout:
             LOG.warning("Failed due to OOM error.")
         else:
