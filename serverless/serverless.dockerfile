@@ -70,7 +70,7 @@ RUN pip install --no-cache-dir \
     einops \
     scipy \
     numba \
-    packing \
+    packaging \
     toml
 
 # RunPod specific
