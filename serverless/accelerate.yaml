@@ -26,10 +26,6 @@ deepspeed_config:
     number_checkpoints: null
     synchronize_checkpoint_boundary: false
     profile: false
-  # Training optimizations
-  train_micro_batch_size_per_gpu: auto
-  train_batch_size: auto
-  gradient_accumulation_steps: auto
   # Communication optimizations
   communication_data_type: fp16  # Use fp16 for communication even with bf16 compute
   prescale_gradients: false
