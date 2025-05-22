@@ -71,7 +71,8 @@ RUN pip install --no-cache-dir \
     scipy \
     numba \
     packaging \
-    toml
+    toml \
+    hf_xet
 
 # RunPod specific
 RUN pip install runpod
