@@ -289,7 +289,7 @@ def setup_lora_config(config):
     """Setup QLoRA configuration for more efficient adaptation"""
     config["adapter"] = "lora"
     config["lora_r"] = 32
-    config["lora_alpha"] = config["lora_r"] * 2
+    config["lora_alpha"] = config["lora_alpha"]
     config["lora_dropout"] = 0.05
     return config
 
