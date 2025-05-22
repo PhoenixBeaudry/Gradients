@@ -25,7 +25,7 @@ TRIAL_EVAL_STEPS = 50
 TESTING_TRIAL_MAX_STEPS = 50
 TESTING_TRIAL_EVAL_STEPS = 25
 TIMEOUT_PERCENTAGE_OF_TOTAL = 0.40
-MAX_MINUTES_PER_TRIAL = 20
+MAX_MINUTES_PER_TRIAL = 30
                    
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
