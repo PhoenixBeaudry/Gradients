@@ -62,7 +62,7 @@ main_process_port: null
 main_training_function: main
 mixed_precision: bf16
 num_machines: 1
-num_processes: 4  # Match your GPU count (you mentioned 4 GPUs: "0,1,2,3")
+num_processes: 3  # Match your GPU count (you mentioned 4 GPUs: "0,1,2,3")
 rdzv_backend: static
 same_network: true
 tpu_env: []

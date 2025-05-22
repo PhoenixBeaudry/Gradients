@@ -27,7 +27,7 @@ from core.models.utility_models import TaskType
 
 
 
-MAX_NUM_WORKERS = 8 # Ensure this matches max workers on runpod endpoint
+MAX_NUM_WORKERS = 6 # Ensure this matches max workers on runpod endpoint
 
 logger = get_logger(__name__)
 
