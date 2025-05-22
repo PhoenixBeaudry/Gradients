@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel ninja
 # Install ML packages with specific versions for compatibility
 RUN pip install --no-cache-dir \
     numpy \
-    transformers= \
+    transformers \
     accelerate \
     datasets\
     sentencepiece\
