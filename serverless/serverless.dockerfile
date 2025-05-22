@@ -47,23 +47,13 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir flash-attn==2.7.3 --no-build-isolation
 
 # Install DeepSpeed with CPU Adam and other optimizations
-ENV DS_BUILD_CPU_ADAM=1
-ENV DS_BUILD_FUSED_ADAM=1
-ENV DS_BUILD_FUSED_LAMB=1
-ENV DS_BUILD_UTILS=1
-ENV DS_BUILD_AIO=0
-ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0"
-RUN pip install --no-cache-dir deepspeed
+RUN pip install --no-cache-dir -U deepspeed
 
 # Install Triton for kernel compilation
 RUN pip install --no-cache-dir triton
 
 # Install xFormers for additional memory-efficient attention
 RUN pip install --no-cache-dir xformers
-
-# Install Unsloth with specific configuration
-ENV UNSLOTH_COMPILE_TORCH=1
-RUN pip install --no-cache-dir "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git@main"
 
 # Install additional optimizations
 RUN pip install --no-cache-dir \
