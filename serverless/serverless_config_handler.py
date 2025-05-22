@@ -228,7 +228,6 @@ def _load_and_modify_config(
         config["trl"]["reward_weights"] = [reward_function.reward_weight for reward_function in dataset_type.reward_functions]
         config["rl_beta"] = 0.1
         config["beta"] = 0.04
-        config["epsilon"] = 0.2
 
 
     config["job_id"] = task_id

@@ -282,7 +282,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         max_completion_length=int(cfg["trl"]["max_completion_length"]),
         reward_weights=cfg["trl"]["reward_weights"],
         beta=float(cfg['beta']),
-        epsilon=float(cfg['epsilon']),
         use_vllm=cfg["trl"]["use_vllm"],
         num_generations=int(cfg["trl"]["num_generations"]),
         #####
