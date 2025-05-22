@@ -171,14 +171,20 @@ def objective(trial: optuna.Trial,
                             stderr=subprocess.STDOUT, text=True, check=True)
         stdout = cp.stdout
     except subprocess.CalledProcessError as e:
-        LOG.warning("Trial %d failed:\n", trial.number)
         if "torch.OutOfMemoryError" in e.stdout:
+            LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning("Failed due to OOM error.")
+            LOG.info("Waiting 3s before starting next trial for cleanup...")
+            time.sleep(10)
+            return float("inf")
+        elif "Reached time limit of" in e.stdout:
+            LOG.info("Trial ran out of time: attemping to find last loss...")
         else:
+            LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning(f"Failed due to: \n {e.stdout}")
-        LOG.info("Waiting 3s before starting next trial for cleanup...")
-        time.sleep(10)
-        return float("inf")
+            LOG.info("Waiting 3s before starting next trial for cleanup...")
+            time.sleep(10)
+            return float("inf")
 
     # ── extract eval_loss (3 fallback methods) ──────────────────────────────
     for extractor in (loss_from_wandb, lambda _: loss_from_stdout(stdout), loss_from_state):
