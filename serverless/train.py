@@ -108,11 +108,7 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     device_map = {"": torch.cuda.current_device()}
     
     try:
-        if any(k in model_name.lower() for k in ("meta-llama-3.1")):
-            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="eager")
-            model.config.pretraining_tp = 1
-        else:
-            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
 
