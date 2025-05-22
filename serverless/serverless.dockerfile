@@ -69,7 +69,9 @@ RUN pip install --no-cache-dir "unsloth[colab-new] @ git+https://github.com/unsl
 RUN pip install --no-cache-dir \
     einops \
     scipy \
-    numba
+    numba \
+    packing \
+    toml
 
 # RunPod specific
 RUN pip install runpod
