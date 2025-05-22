@@ -21,29 +21,29 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel ninja
 
 # Install ML packages with specific versions for compatibility
 RUN pip install --no-cache-dir \
-    numpy==1.26.4 \
-    transformers==4.46.2 \
-    accelerate==1.1.1 \
-    datasets==3.1.0 \
-    sentencepiece==0.2.0 \
-    huggingface_hub==0.26.2 \
-    wandb==0.18.5 \
-    peft==0.13.2 \
-    bitsandbytes==0.44.1 \
-    safetensors==0.4.5 \
-    tokenizers==0.20.3
+    numpy \
+    transformers= \
+    accelerate \
+    datasets\
+    sentencepiece\
+    huggingface_hub \
+    wandb \
+    peft \
+    bitsandbytes \
+    safetensors \
+    tokenizers
 
 # Install training frameworks
 RUN pip install --no-cache-dir \
-    trl==0.12.1 \
-    liger-kernel==0.4.0 \
-    pytorch-ignite==0.5.1 \
-    optuna==4.1.0 \
-    mlflow==2.18.0 \
-    protobuf==5.28.3
+    trl \
+    liger-kernel \
+    pytorch-ignite \
+    optuna \
+    mlflow \
+    protobuf
 
 # Install Flash Attention 2 (much faster than flash-attn v1)
-RUN pip install --no-cache-dir flash-attn==2.6.3 --no-build-isolation
+RUN pip install --no-cache-dir flash-attn==2.7.3 --no-build-isolation
 
 # Install DeepSpeed with CPU Adam and other optimizations
 ENV DS_BUILD_CPU_ADAM=1
@@ -52,13 +52,13 @@ ENV DS_BUILD_FUSED_LAMB=1
 ENV DS_BUILD_UTILS=1
 ENV DS_BUILD_AIO=0
 ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0"
-RUN pip install --no-cache-dir deepspeed==0.16.2
+RUN pip install --no-cache-dir deepspeed
 
 # Install Triton for kernel compilation
-RUN pip install --no-cache-dir triton==3.1.0
+RUN pip install --no-cache-dir triton
 
 # Install xFormers for additional memory-efficient attention
-RUN pip install --no-cache-dir xformers==0.0.28.post3
+RUN pip install --no-cache-dir xformers
 
 # Install Unsloth with specific configuration
 ENV UNSLOTH_COMPILE_TORCH=1
@@ -66,12 +66,12 @@ RUN pip install --no-cache-dir "unsloth[colab-new] @ git+https://github.com/unsl
 
 # Install additional optimizations
 RUN pip install --no-cache-dir \
-    einops==0.8.0 \
-    scipy==1.14.1 \
-    numba==0.60.0
+    einops \
+    scipy \
+    numba
 
 # RunPod specific
-RUN pip install --no-cache-dir runpod==1.7.3
+RUN pip install runpod
 
 
 WORKDIR /workspace
