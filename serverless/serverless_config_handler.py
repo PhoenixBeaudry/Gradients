@@ -135,6 +135,7 @@ def update_model_info(config: dict, model: str, job_id: str = "", expected_repo_
     config["base_model"] = model
     if any(k in model.lower() for k in ("meta-llama-3.1")):
         config["packing"] = False
+        config["use_liger_kernel"] = False
     config["base_model_config"] = model
     config["wandb_runid"] = f"{job_id[:6]}_{config['rl']}"
     config["wandb_run"] = f"{job_id[:6]}_{config['rl']}"

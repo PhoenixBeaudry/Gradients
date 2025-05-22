@@ -312,7 +312,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         gradient_checkpointing_kwargs={"use_reentrant": False},
         bf16=True,
         ddp_find_unused_parameters=False,
-        use_liger_kernel=True,
+        use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
         dataloader_num_workers=16,
         **hf_kwargs,

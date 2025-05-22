@@ -10,6 +10,7 @@ eval_batch_size: 64
 weight_decay: 0.01
 gradient_checkpointing: true
 packing: true
+use_liger_kernel: true
 
 adapter: lora
 lora_r: 32
