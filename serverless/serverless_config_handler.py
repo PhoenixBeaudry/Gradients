@@ -221,7 +221,7 @@ def _load_and_modify_config(
         config["save_steps"] = 100
         config["trl"] = {}
         config["trl"]["beta"] = 0.04
-        config["trl"]["max_completion_length"] = 32
+        config["trl"]["max_completion_length"] = 128
         config["trl"]["use_vllm"] = False
         config["trl"]["num_generations"] = 2
         config["trl"]["reward_funcs"] = [f"{filename}.{func_name}" for func_name in reward_funcs_names]
