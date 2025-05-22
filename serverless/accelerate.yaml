@@ -1,37 +1,14 @@
 # serverless/accelerate.yaml - Optimized version
 compute_environment: LOCAL_MACHINE
 deepspeed_config:
-  deepspeed_multinode_launcher: standard
   gradient_clipping: 1.0
   offload_optimizer_device: none
   offload_param_device: none
   zero3_init_flag: false
   zero3_save_16bit_model: false
   zero_stage: 2
-  # DeepSpeed optimizations
-  zero_optimization:
-    stage: 2
-    allgather_partitions: true
-    allgather_bucket_size: 5e8
-    reduce_scatter: true
-    reduce_bucket_size: 5e8
-    overlap_comm: true
-    contiguous_gradients: true
-    cpu_offload: false
-  # Activation checkpointing config
-  activation_checkpointing:
-    partition_activations: true
-    cpu_checkpointing: false
-    contiguous_memory_optimization: true
-    number_checkpoints: null
-    synchronize_checkpoint_boundary: false
-    profile: false
   # Communication optimizations
   communication_data_type: fp16  # Use fp16 for communication even with bf16 compute
-  prescale_gradients: false
-  # Performance optimizations
-  eigenvalue_enabled: false
-  seq_parallel_enabled: false
   # FP16/BF16 settings
   fp16:
     enabled: false
@@ -40,13 +17,6 @@ deepspeed_config:
   # Optimizer settings
   zero_allow_untested_optimizer: true
   zero_force_ds_cpu_optimizer: false
-  # Memory optimizations
-  sub_group_size: 1e9
-  stage3_prefetch_bucket_size: 5e8
-  stage3_param_persistence_threshold: 1e6
-  stage3_max_live_parameters: 1e9
-  stage3_max_reuse_distance: 1e9
-  stage3_gather_16bit_weights_on_model_save: true
 distributed_type: DEEPSPEED
 downcast_bf16: 'no'
 enable_cpu_affinity: false  # Set to true if you have control over CPU affinity
@@ -58,7 +28,6 @@ main_training_function: main
 mixed_precision: bf16
 num_machines: 1
 num_processes: 3  # Match your GPU count (you mentioned 4 GPUs: "0,1,2,3")
-rdzv_backend: static
 same_network: true
 tpu_env: []
 tpu_use_cluster: false
