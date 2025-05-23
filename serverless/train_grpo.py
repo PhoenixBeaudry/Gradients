@@ -340,9 +340,8 @@ def main():
     logger = setup_logger()
     
     # Performance flags
-    torch.cuda.empty_cache()
-    torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.benchmark = True
+    torch.cuda.empty_cache()
 
     logger.info("Loaded config from %s", args.config)
     

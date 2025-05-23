@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 from serverless_config_handler import setup_config
 import subprocess
+import psutil
 
 # You'll need to adapt your existing training code for the serverless environment
 def handler(job):
@@ -17,6 +18,12 @@ def handler(job):
     Returns:
         dict: Results of the training job
     """
+
+    # Set machine specific env vars
+    num_phys_cpus = psutil.cpu_count(logical=False)
+    num_omp_threads = int(num_phys_cpus/6)
+    os.environ['OMP_NUM_THREADS'] = str(num_omp_threads)
+
     job_input = job["input"]
     job_id = job_input.get("task_id")
     

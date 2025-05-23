@@ -68,7 +68,8 @@ RUN pip install --no-cache-dir \
     numba \
     packaging \
     toml \
-    hf_xet
+    hf_xet \
+    psutil
 
 # RunPod specific
 RUN pip install runpod
@@ -79,17 +80,15 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
-ENV OMP_NUM_THREADS=1
-ENV MKL_NUM_THREADS=1
-ENV OPENBLAS_NUM_THREADS=1
-ENV NUMEXPR_NUM_THREADS=1
+ENV NCCL_DEBUG=WARN
+ENV NCCL_ASYNC_ERROR_HANDLING=1
 
 # CUDA optimizations
 ENV CUDNN_BENCHMARK=1
+ENV PYTORCH_NVML_BASED_CUDA_CHECK=1
 
 # PyTorch optimizations
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-ENV TORCH_NCCL_BLOCKING_WAIT=1
 
 
 # AWS credentials (keep existing)
