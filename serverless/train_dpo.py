@@ -254,6 +254,10 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
             'hub_strategy': "end",
             'push_to_hub': True,
         }
+        lr_scheduler=SchedulerType.COSINE
+    else:
+        lr_scheduler=SchedulerType.CONSTANT_WITH_WARMUP
+        
     tf_args = DPOConfig(
         output_dir=cfg['output_dir'],
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
@@ -264,7 +268,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         beta=float(cfg['beta']),
         optim=cfg['optimizer'],
         label_smoothing=float(cfg['label_smoothing']),
-        lr_scheduler_type=SchedulerType.COSINE,
+        lr_scheduler_type=lr_scheduler,
         logging_steps=int(cfg['logging_steps']),
         eval_strategy='steps',
         save_strategy='best',

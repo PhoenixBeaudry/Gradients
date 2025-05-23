@@ -275,6 +275,10 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
             'hub_strategy': "end",
             'push_to_hub': True,
         }
+        lr_scheduler=SchedulerType.COSINE
+    else:
+        lr_scheduler=SchedulerType.CONSTANT_WITH_WARMUP
+        
     tf_args = GRPOConfig(
         output_dir=cfg['output_dir'],
         # GRPO params
@@ -290,7 +294,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         max_steps=int(cfg['max_steps']),
         learning_rate=float(cfg['learning_rate']),
         optim=cfg['optimizer'],
-        lr_scheduler_type=SchedulerType.COSINE,
+        lr_scheduler_type=lr_scheduler,
         logging_steps=int(cfg['logging_steps']),
         eval_strategy='steps',
         save_strategy='best',
