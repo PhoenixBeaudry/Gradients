@@ -139,7 +139,6 @@ def load_dpo_datasets(cfg: dict):
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
-    
     try:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
@@ -158,54 +157,23 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         model = prepare_model_for_kbit_training(model)
 
     # Determine target modules for LoRA
-    targets = cfg.get('target_modules', [])
+    targets = cfg.get('target_modules') or []
     if not targets:
-        # Auto-detect based on model architecture
-        model_type = model.config.model_type.lower() if hasattr(model.config, "model_type") else ""
-        
-        # Model-specific target modules based on architecture
-        if "llama" in model_type or "mistral" in model_type:
-            targets = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-        elif "gpt-neox" in model_type:
-            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
-        elif "falcon" in model_type:
-            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
-        elif "gpt2" in model_type:
-            targets = ["c_attn", "c_proj", "c_fc"]
-        elif "bloom" in model_type:
-            targets = ["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"]
-        elif "opt" in model_type:
-            targets = ["q_proj", "k_proj", "v_proj", "out_proj", "fc1", "fc2"]
-        else:
-            # Fallback: detect attention and MLP modules
-            attention_patterns = ['attn', 'attention', 'self_attn', 'query', 'key', 'value']
-            mlp_patterns = ['mlp', 'feed_forward', 'fc', 'dense', 'linear', 'proj']
-            
-            for name, module in model.named_modules():
-                if isinstance(module, torch.nn.Linear):
-                    last_part = name.split('.')[-1].lower()
-                    if any(pattern in name.lower() for pattern in attention_patterns) or any(pattern == last_part for pattern in attention_patterns):
-                        targets.append(last_part)
-                    elif any(pattern in name.lower() for pattern in mlp_patterns) or any(pattern == last_part for pattern in mlp_patterns):
-                        targets.append(last_part)
-            
-            targets = list(set(targets))
-            
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Linear) and any(x in name.lower() for x in ('attn', 'attention')):
+                targets.append(name.split('.')[-1])
+        targets = list(set(targets))
         if not targets:
-            raise ValueError("Could not auto-detect modules for LoRA. Please set 'target_modules' in config.")
-        
-        print(f"Auto-detected target modules for {model_type}: {targets}")
+            raise ValueError("Could not auto-detect attention modules for LoRA. Please set 'target_modules' in config.")
 
-    # Create PEFT config
     peft_config = LoraConfig(
         r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_alpha', None) or cfg.get('lora_r', 16) * 2),
+        lora_alpha=int(cfg.get('lora_alpha', 16)),
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
-        bias=cfg.get('bias', 'none'),
+        bias='none',
         task_type='CAUSAL_LM'
     )
-    
     return get_peft_model(model, peft_config)
 
 
@@ -289,7 +257,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         load_best_model_at_end=True,
         dataset_num_proc=2,
         dataloader_num_workers=2,
-        torch_compile=cfg["torch_compile"],
         **hf_kwargs,
     )
     #####################################
@@ -358,24 +325,13 @@ def main():
 
 
     logger.info("Starting Full Model Training...")
-
-    if not cfg["hpo_run"]:
-        try:
-            logger.info("Trying Torch Compile Training...")
-            cfg["torch_compile"] = True
-            trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
-            trainer.train()
-        except:
-            logger.info("Torch Compile Training Failed, reverting to normal training...")
-            torch.cuda.empty_cache()
-            cfg["torch_compile"] = False
-            trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
-            trainer.train()
-        finally:
-            trainer.push_to_hub()
-    else:
-        trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    
+    try:
         trainer.train()
+    finally:
+        if not cfg["hpo_run"]:
+            trainer.push_to_hub()
 
 
 

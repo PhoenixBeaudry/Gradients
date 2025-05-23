@@ -165,7 +165,6 @@ def setup_logger() -> logging.Logger:
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
-    
     try:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
@@ -196,13 +195,15 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
 
     peft_config = LoraConfig(
         r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_r', 16))*2,
+        lora_alpha=int(cfg.get('lora_alpha', 16)),
         target_modules=targets,
         lora_dropout=float(cfg.get('lora_dropout', 0.05)),
         bias='none',
         task_type='CAUSAL_LM'
     )
     return get_peft_model(model, peft_config)
+
+
 
 def load_tokenizer(model_name: str, cfg: dict):
     tok = AutoTokenizer.from_pretrained(
@@ -217,6 +218,7 @@ def load_tokenizer(model_name: str, cfg: dict):
     tok.add_eos_token = True
     tok.truncation = True
     return tok
+
 
 def load_grpo_datasets(cfg: dict):
     """
@@ -313,7 +315,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         ddp_find_unused_parameters=False,
         use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
-        torch_compile=cfg["torch_compile"],
         **hf_kwargs,
     )
     #####################################
@@ -381,24 +382,13 @@ def main():
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
 
     logger.info("Starting Full Model Training...")
-
-    if not cfg["hpo_run"]:
-        try:
-            logger.info("Trying Torch Compile Training...")
-            cfg["torch_compile"] = True
-            trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
-            trainer.train()
-        except:
-            logger.info("Torch Compile Training Failed, reverting to normal training...")
-            torch.cuda.empty_cache()
-            cfg["torch_compile"] = False
-            trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
-            trainer.train()
-        finally:
-            trainer.push_to_hub()
-    else:
-        trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    
+    try:
         trainer.train()
+    finally:
+        if not cfg["hpo_run"]:
+            trainer.push_to_hub()
 
 
 
