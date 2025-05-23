@@ -46,15 +46,16 @@ RUN pip install --no-cache-dir \
 # Install Flash Attention 2 (much faster than flash-attn v1)
 RUN pip install --no-cache-dir flash-attn==2.7.3 --no-build-isolation
 
-ENV DS_BUILD_OPS=1
-# Install DeepSpeed with CPU Adam and other optimizations
-RUN pip install --no-cache-dir -U deepspeed
-
 # Install Triton for kernel compilation
 RUN pip install --no-cache-dir triton
 
 # Install xFormers for additional memory-efficient attention
 RUN pip install --no-cache-dir xformers
+
+ENV DS_BUILD_OPS=1
+# Install DeepSpeed with CPU Adam and other optimizations
+RUN pip install --no-cache-dir -U deepspeed
+
 
 # Install additional optimizations
 RUN pip install --no-cache-dir \
