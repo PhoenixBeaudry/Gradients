@@ -74,7 +74,7 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
-ENV OMP_NUM_THREADS=1
+ENV OMP_NUM_THREADS=4
 
 # 3. Enable cuDNN autotuner for best conv performance
 ENV CUDNN_BENCHMARK=1
@@ -83,7 +83,7 @@ ENV CUDNN_DETERMINISTIC=0
 
 # Ensure high-speed P2P/NCCL comms and fault tolerance
 ENV NCCL_DEBUG=WARN \
-    NCCL_ASYNC_ERROR_HANDLING=1  
+    TORCH_NCCL_ASYNC_ERROR_HANDLING=1  
 
 # PyTorch optimizations
 ENV PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,backend:cudaMallocAsync"
