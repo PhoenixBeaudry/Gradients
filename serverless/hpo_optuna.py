@@ -24,7 +24,7 @@ TRIAL_MAX_STEPS = 300
 TRIAL_EVAL_STEPS = 50
 TESTING_TRIAL_MAX_STEPS = 50
 TESTING_TRIAL_EVAL_STEPS = 25
-TIMEOUT_PERCENTAGE_OF_TOTAL = 0.40
+PERCENT_TIME_FOR_HPO = 0.40
 MAX_MINUTES_PER_TRIAL = 30
                    
 
@@ -109,7 +109,8 @@ def objective(trial: optuna.Trial,
               base_cfg: dict,
               hpo_project: str,
               study_name: str,
-              storage_path: str) -> float:
+              storage_path: str,
+              time_when_hpo_finished: datetime) -> float:
     cfg          = copy.deepcopy(base_cfg)
     trial_params = sample_space(trial, cfg)
     cfg.update(trial_params)
@@ -174,11 +175,15 @@ def objective(trial: optuna.Trial,
         if "torch.OutOfMemoryError" in e.stdout:
             LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning("Failed due to OOM error.")
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             LOG.info("Waiting 3s before starting next trial for cleanup...")
             time.sleep(5)
             return float("inf")
         elif "optuna.exceptions.TrialPruned" in e.stdout:
             LOG.info("Trial was pruned.")
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             time.sleep(5)
             return float("inf")
         elif "Reached time limit of" in e.stdout:
@@ -187,6 +192,8 @@ def objective(trial: optuna.Trial,
             LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning(f"Failed due to: \n {e.stdout}")
             LOG.info("Waiting 3s before starting next trial for cleanup...")
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             time.sleep(5)
             return float("inf")
 
@@ -196,9 +203,13 @@ def objective(trial: optuna.Trial,
         if val is not None:
             LOG.info("Trial %d completed – eval_loss: %.4f", trial.number, val)
             shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             return val
 
     LOG.warning("eval_loss not found for trial %d – penalising.", trial.number)
+    hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+    LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
     return float("inf")
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
@@ -230,10 +241,12 @@ def run_optuna(base_cfg_path: str) -> dict:
     
     # calculate how much time we have left for job:
     time_remaining = datetime.fromisoformat(base_cfg['required_finish_time']) - datetime.now()
-    seconds_remaining = max(0.0, time_remaining.total_seconds())
-    LOG.info(f"Time allocated to HPO Search {seconds_remaining/3600*TIMEOUT_PERCENTAGE_OF_TOTAL}")
-    study.optimize(lambda t: objective(t, base_cfg, hpo_project, study_name, storage_path),
-                   timeout=int(seconds_remaining * TIMEOUT_PERCENTAGE_OF_TOTAL),
+    seconds_remaining = max(0.0, time_remaining.total_seconds()*PERCENT_TIME_FOR_HPO)
+    time_when_hpo_finished = datetime.now() + timedelta(seconds=seconds_remaining)
+
+    LOG.info(f"Time allocated to HPO Search {seconds_remaining/3600}h")
+    study.optimize(lambda t: objective(t, base_cfg, hpo_project, study_name, storage_path, time_when_hpo_finished),
+                   timeout=int(seconds_remaining),
                    n_trials=MAX_TRIALS_TO_RUN,
                    show_progress_bar=True)
 
