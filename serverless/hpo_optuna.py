@@ -176,12 +176,16 @@ def objective(trial: optuna.Trial,
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             LOG.info("Waiting 3s before starting next trial for cleanup...")
             time.sleep(5)
+            if cfg["rl"] == "grpo":
+                return float("-inf")
             return float("inf")
         elif "optuna.exceptions.TrialPruned" in e.stdout:
             LOG.info("Trial was pruned.")
             hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             time.sleep(5)
+            if cfg["rl"] == "grpo":
+                return float("-inf")
             return float("inf")
         elif "Reached time limit of" in e.stdout:
             LOG.info("Trial ran out of time: attemping to find last loss...")
@@ -192,6 +196,8 @@ def objective(trial: optuna.Trial,
             hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             time.sleep(5)
+            if cfg["rl"] == "grpo":
+                return float("-inf")
             return float("inf")
 
     # ── extract eval_loss (3 fallback methods) ──────────────────────────────
@@ -207,6 +213,8 @@ def objective(trial: optuna.Trial,
     LOG.warning("eval_loss not found for trial %d – penalising.", trial.number)
     hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
     LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
+    if cfg["rl"] == "grpo":
+        return float("-inf")
     return float("inf")
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
