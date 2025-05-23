@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timedelta
 from serverless_config_handler import setup_config
 import subprocess
-import psutil
 
 # You'll need to adapt your existing training code for the serverless environment
 def handler(job):

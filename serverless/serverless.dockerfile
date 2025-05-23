@@ -76,6 +76,10 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 ENV TOKENIZERS_PARALLELISM=false
 ENV OMP_NUM_THREADS=8
 
+# Enable cuDNN autotuner for best conv performance
+ENV CUDNN_BENCHMARK=1
+ENV CUDNN_DETERMINISTIC=0
+
 # Lazy load kernels (faster startup on many GPUs)
 ENV CUDA_MODULE_LOADING=LAZY  
 
@@ -83,7 +87,8 @@ ENV CUDA_MODULE_LOADING=LAZY
 ENV NCCL_DEBUG=WARN \
     NCCL_P2P_DISABLE=0 \
     NCCL_IB_DISABLE=0 \
-    NCCL_ASYNC_ERROR_HANDLING=1  
+    NCCL_ASYNC_ERROR_HANDLING=1 \
+    TORCH_NCCL_BLOCKING_WAIT=1 
 
 # PyTorch optimizations
 ENV PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,backend:cudaMallocAsync"

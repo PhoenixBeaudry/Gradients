@@ -169,6 +169,7 @@ def objective(trial: optuna.Trial,
         if "torch.OutOfMemoryError" in e.stdout:
             LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning("Failed due to OOM error.")
+            LOG.warning(f"Debug Print: {e.stdout}")
             hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             LOG.info("Waiting 3s before starting next trial for cleanup...")
