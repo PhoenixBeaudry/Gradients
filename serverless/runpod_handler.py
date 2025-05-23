@@ -18,16 +18,11 @@ def handler(job):
     Returns:
         dict: Results of the training job
     """
-
-    # Set machine specific env vars
-    num_phys_cpus = psutil.cpu_count(logical=False)
-    num_omp_threads = int(num_phys_cpus/6)
-    os.environ['OMP_NUM_THREADS'] = str(num_omp_threads)
+    print(f"Starting training job: {job_id}")
 
     job_input = job["input"]
     job_id = job_input.get("task_id")
     
-    print(f"Starting training job: {job_id}")
     
     # Extract training parameters from the job input
     model = job_input.get("model")

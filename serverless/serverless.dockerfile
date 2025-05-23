@@ -80,12 +80,16 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
-ENV NCCL_DEBUG=WARN
-ENV NCCL_ASYNC_ERROR_HANDLING=1
+ENV OMP_NUM_THREADS=16
 
-# CUDA optimizations
-ENV CUDNN_BENCHMARK=1
-ENV PYTORCH_NVML_BASED_CUDA_CHECK=1
+# Lazy load kernels (faster startup on many GPUs)
+ENV CUDA_MODULE_LOADING=LAZY  
+
+# Ensure high-speed P2P/NCCL comms and fault tolerance
+ENV NCCL_DEBUG=WARN \
+    NCCL_P2P_DISABLE=0 \
+    NCCL_IB_DISABLE=0 \
+    NCCL_ASYNC_ERROR_HANDLING=1  
 
 # PyTorch optimizations
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
