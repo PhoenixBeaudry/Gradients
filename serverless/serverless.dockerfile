@@ -74,7 +74,7 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
-ENV OMP_NUM_THREADS=4
+ENV OMP_NUM_THREADS=1
 
 # 3. Enable cuDNN autotuner for best conv performance
 ENV CUDNN_BENCHMARK=1
@@ -115,9 +115,6 @@ COPY serverless/hpo_optuna.py /workspace/training
 COPY serverless/train.py /workspace/training
 COPY serverless/train_dpo.py /workspace/training
 COPY serverless/train_grpo.py /workspace/training
-
-# Warmup script to pre-compile Triton kernels (optional but recommended)
-RUN echo "import torch; torch.cuda.is_available()" | python
 
 CMD echo 'Preparing logging...' && \
     echo "Attempting to log in to Hugging Face" && \
