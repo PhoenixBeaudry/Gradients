@@ -88,17 +88,6 @@ ENV CUDNN_DETERMINISTIC=0
 ENV PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 ENV TORCH_NCCL_BLOCKING_WAIT=1
 
-# Triton cache
-ENV TRITON_CACHE_DIR="/tmp/.triton"
-
-# DeepSpeed optimizations
-ENV DS_ACCELERATOR="cuda"
-ENV DS_ENV_FILE="/workspace/.ds_env"
-
-# Create DeepSpeed environment file
-RUN echo "DS_BUILD_CPU_ADAM=1" > /workspace/.ds_env && \
-    echo "DS_BUILD_FUSED_ADAM=1" >> /workspace/.ds_env && \
-    echo "DS_BUILD_FUSED_LAMB=1" >> /workspace/.ds_env
 
 # AWS credentials (keep existing)
 ENV CONFIG_DIR="/workspace/configs"
