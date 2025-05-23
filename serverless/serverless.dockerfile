@@ -74,7 +74,7 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
-ENV OMP_NUM_THREADS=16
+ENV OMP_NUM_THREADS=8
 
 # 3. Enable cuDNN autotuner for best conv performance
 ENV CUDNN_BENCHMARK=1

@@ -276,8 +276,8 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         load_best_model_at_end=True,
         packing=cfg['packing'],
         eval_packing=cfg['packing'],
-        dataset_num_proc=4,
-        dataloader_num_workers=4,
+        dataset_num_proc=2,
+        dataloader_num_workers=2,
         torch_compile=cfg["torch_compile"],
         **hf_kwargs,
     )
