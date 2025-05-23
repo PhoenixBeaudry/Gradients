@@ -74,7 +74,7 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
-ENV OMP_NUM_THREADS=16
+ENV OMP_NUM_THREADS=8
 
 # Lazy load kernels (faster startup on many GPUs)
 ENV CUDA_MODULE_LOADING=LAZY  
