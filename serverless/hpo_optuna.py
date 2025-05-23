@@ -175,7 +175,11 @@ def objective(trial: optuna.Trial,
             LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning("Failed due to OOM error.")
             LOG.info("Waiting 3s before starting next trial for cleanup...")
-            time.sleep(10)
+            time.sleep(5)
+            return float("inf")
+        elif "optuna.exceptions.TrialPruned" in e.stdout:
+            LOG.info("Trial was pruned.")
+            time.sleep(5)
             return float("inf")
         elif "Reached time limit of" in e.stdout:
             LOG.info("Trial ran out of time: attemping to find last loss...")
@@ -183,7 +187,7 @@ def objective(trial: optuna.Trial,
             LOG.warning("Trial %d failed:\n", trial.number)
             LOG.warning(f"Failed due to: \n {e.stdout}")
             LOG.info("Waiting 3s before starting next trial for cleanup...")
-            time.sleep(10)
+            time.sleep(5)
             return float("inf")
 
     # ── extract eval_loss (3 fallback methods) ──────────────────────────────
