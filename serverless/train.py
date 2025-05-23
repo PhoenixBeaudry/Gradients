@@ -231,7 +231,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
     if seconds_remaining is not None:
         callbacks.append(TimeLimitCallback(seconds_remaining*0.95))
 
-    if cfg["hpo_run"]:
+    if cfg["hpo_run"] and not cfg.get("pretrain", False):
         add_optuna_callback_if_needed(callbacks)
     ###################
 
@@ -326,7 +326,7 @@ def main():
         train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
         eval_dataset  = eval_dataset.shuffle(seed=42).select(range(target_eval))
 
-    elif cfg["hpo_run"]:
+    elif cfg["hpo_run"] and not cfg.get("pretrain", False):
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
         SUBSET_FRAC   = 0.05          # 5 %

@@ -215,10 +215,60 @@ def objective(trial: optuna.Trial,
     return float("inf")
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
+# ╭─────────────────────────── SFT pretraining ──────────────────────────────╮
+def run_sft_pretrain(cfg: dict, cfg_path: str) -> str:
+    """Run an SFT pretraining phase for DPO jobs.
+
+    Returns the directory containing the trained model."""
+    sft_cfg = copy.deepcopy(cfg)
+    sft_cfg["rl"] = "sft"
+    sft_cfg["hpo_run"] = True
+    sft_cfg["do_hpo"] = False
+    sft_cfg["pretrain"] = True
+    sft_cfg["output_dir"] = str(Path(cfg["output_dir"]) / "sft_pre")
+
+    sft_cfg |= {
+        "learning_rate": 5e-5,
+        "lora_r": 16,
+        "lora_alpha": 16,
+        "lora_dropout": 0.05,
+        "max_steps": TRIAL_MAX_STEPS,
+        "eval_steps": TRIAL_EVAL_STEPS,
+        "save_steps": TRIAL_EVAL_STEPS,
+        "warmup_steps": 50,
+    }
+
+    ds = sft_cfg["datasets"][0]
+    ds["field_instruction"] = ds.pop("field_prompt")
+    ds["field_output"] = ds.pop("field_chosen")
+    ds["field_input"] = None
+    ds.pop("field_rejected", None)
+
+    pre_cfg_path = cfg_path.replace(".yml", "_sft.yml")
+    with open(pre_cfg_path, "w") as f:
+        yaml.safe_dump(sft_cfg, f)
+
+    cmd = [
+        "accelerate", "launch",
+        "--config_file", "/workspace/configs/accelerate.yaml",
+        "/workspace/training/train.py",
+        "--config", pre_cfg_path,
+    ]
+    LOG.info("Running SFT pretraining…")
+    subprocess.run(cmd, check=True)
+    return sft_cfg["output_dir"]
+# ╰──────────────────────────────────────────────────────────────────────────╯
+
 # ╭──────────────────────── Run Optuna sweep ─────────────────────────────────╮
 def run_optuna(base_cfg_path: str) -> dict:
     with open(base_cfg_path) as f:
         base_cfg = yaml.safe_load(f)
+
+    if base_cfg.get("rl") == "dpo":
+        model_dir = run_sft_pretrain(base_cfg, base_cfg_path)
+        base_cfg["base_model"] = model_dir
+        with open(base_cfg_path, "w") as f:
+            yaml.safe_dump(base_cfg, f)
 
     study_name   = base_cfg.get("job_id", "optuna")
     hpo_root     = Path(base_cfg.get("output_root", "./hpo_runs")) / study_name
