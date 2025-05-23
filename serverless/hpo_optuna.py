@@ -36,7 +36,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params = {
             "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
-            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 5e-5, log=True),
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
             "beta":                        trial.suggest_float("beta", 0.01, 0.5, log=True),
             "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.2),
@@ -45,7 +45,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params = {
             "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
-            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 2e-5, log=True),
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
             "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
         }
@@ -53,7 +53,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params = {
             "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
-            "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 2e-4, log=True),
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.15),
         }
 
