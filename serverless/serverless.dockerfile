@@ -86,7 +86,7 @@ ENV NCCL_DEBUG=WARN \
     NCCL_ASYNC_ERROR_HANDLING=1  
 
 # PyTorch optimizations
-ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+ENV PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:512,backend:cudaMallocAsync"
 
 
 # AWS credentials (keep existing)
