@@ -314,7 +314,6 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         ddp_find_unused_parameters=False,
         use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
-        dataloader_num_workers=16,
         **hf_kwargs,
     )
     #####################################
