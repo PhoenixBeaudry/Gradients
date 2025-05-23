@@ -23,7 +23,7 @@ greater_is_better: false
 metric_for_best_model: eval_loss
 eval_steps: 50
 eval_strategy: steps
-
+torch_compile: false
 max_steps: 100
 save_steps: 100
 warmup_steps: 150

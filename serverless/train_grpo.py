@@ -314,6 +314,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         ddp_find_unused_parameters=False,
         use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
+        torch_compile=cfg["torch_compile"],
         **hf_kwargs,
     )
     #####################################
@@ -381,15 +382,25 @@ def main():
         train_dataset = train_dataset.shuffle(seed=42).select(range(target_train))
         eval_dataset  = eval_dataset .shuffle(seed=42).select(range(target_eval))
 
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
-
     logger.info("Starting Full Model Training...")
 
-    try:
-        trainer.train()
-    finally:
-        if not cfg["hpo_run"]:
+    if not cfg["hpo_run"]:
+        try:
+            logger.info("Trying Torch Compile Training...")
+            cfg["torch_compile"] = True
+            trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+            trainer.train()
+        except:
+            logger.info("Torch Compile Training Failed, reverting to normal training...")
+            torch.cuda.empty_cache()
+            cfg["torch_compile"] = False
+            trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+            trainer.train()
+        finally:
             trainer.push_to_hub()
+    else:
+        trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+        trainer.train()
 
 
 
