@@ -80,8 +80,6 @@ ENV OMP_NUM_THREADS=1
 ENV CUDNN_BENCHMARK=1
 ENV CUDNN_DETERMINISTIC=0
 
-# Lazy load kernels (faster startup on many GPUs)
-ENV CUDA_MODULE_LOADING=LAZY  
 
 # Ensure high-speed P2P/NCCL comms and fault tolerance
 ENV NCCL_DEBUG=WARN \
