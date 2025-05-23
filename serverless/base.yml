@@ -5,8 +5,8 @@ optimizer: adamw_8bit
 lr_scheduler: cosine
 learning_rate: 2e-4
 gradient_accumulation_steps: 2 # Must match Accelerate Config
-micro_batch_size: 64
-eval_batch_size: 64
+micro_batch_size: 128
+eval_batch_size: 128
 weight_decay: 0.01
 gradient_checkpointing: true
 packing: true
