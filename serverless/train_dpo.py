@@ -140,9 +140,9 @@ def load_dpo_datasets(cfg: dict):
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     try:
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16)
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
 
     model.config.use_cache = False
     model.train()
