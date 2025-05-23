@@ -226,7 +226,7 @@ def run_optuna(base_cfg_path: str) -> dict:
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=False,
                                 storage=storage,
-                                pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+                                pruner=HyperbandPruner(min_resource=3, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
     
     # calculate how much time we have left for job:
     time_remaining = datetime.fromisoformat(base_cfg['required_finish_time']) - datetime.now()
