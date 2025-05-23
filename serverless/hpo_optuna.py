@@ -36,7 +36,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params = {
             "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
             "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 5e-5, log=True),
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
@@ -47,7 +46,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params = {
             "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
             "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 2e-5, log=True),
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
@@ -57,7 +55,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params = {
             "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
             "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
-            "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
             "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 2e-4, log=True),
             "gradient_accumulation_steps": trial.suggest_categorical("gradient_accumulation_steps", [1, 2, 4]),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.15),
