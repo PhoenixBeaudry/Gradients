@@ -52,14 +52,8 @@ RUN pip install --no-cache-dir triton
 # Install xFormers for additional memory-efficient attention
 RUN pip install --no-cache-dir xformers
 
-ENV DS_BUILD_CUTLASS_OPS=0
-ENV DS_BUILD_RAGGED_DEVICE_OPS=0
-ENV DS_BUILD_EVOFORMER_ATTN=0 
-ENV DS_ACCELERATOR=cuda
-ENV DS_BUILD_OPS=1
 # Install DeepSpeed with CPU Adam and other optimizations
 RUN pip install --no-cache-dir -U deepspeed
-
 
 # Install additional optimizations
 RUN pip install --no-cache-dir \
