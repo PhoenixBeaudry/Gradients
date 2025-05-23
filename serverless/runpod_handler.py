@@ -18,10 +18,12 @@ def handler(job):
     Returns:
         dict: Results of the training job
     """
-    print(f"Starting training job: {job_id}")
+    
 
     job_input = job["input"]
     job_id = job_input.get("task_id")
+    print(f"Starting training job: {job_id}")
+    
     
     
     # Extract training parameters from the job input
