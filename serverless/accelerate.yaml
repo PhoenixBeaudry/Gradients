@@ -1,25 +1,11 @@
-# serverless/accelerate.yaml - Optimized version
 compute_environment: LOCAL_MACHINE
 deepspeed_config:
-  gradient_clipping: 1.0
-  offload_optimizer_device: none
-  offload_param_device: none
-  zero3_init_flag: false
-  zero3_save_16bit_model: false
-  zero_stage: 2
-  # Communication optimizations
-  communication_data_type: fp16  # Use fp16 for communication even with bf16 compute
-  # FP16/BF16 settings
-  fp16:
-    enabled: false
-  bf16:
-    enabled: true
-  # Optimizer settings
-  zero_allow_untested_optimizer: true
-  zero_force_ds_cpu_optimizer: false
+ gradient_clipping: 1.0
+ offload_optimizer_device: none
+ offload_param_device: none
+ zero3_init_flag: false
+ zero_stage: 2
 distributed_type: DEEPSPEED
-downcast_bf16: 'no'
-enable_cpu_affinity: false  # Set to true if you have control over CPU affinity
 fsdp_config: {}
 machine_rank: 0
 main_process_ip: null
@@ -27,23 +13,5 @@ main_process_port: null
 main_training_function: main
 mixed_precision: bf16
 num_machines: 1
-num_processes: 3  # Match your GPU count (you mentioned 4 GPUs: "0,1,2,3")
-same_network: true
-tpu_env: []
-tpu_use_cluster: false
-tpu_use_sudo: false
+num_processes: 3
 use_cpu: false
-
-# Alternative: FSDP configuration for comparison
-# If you want to try FSDP instead of DeepSpeed:
-# distributed_type: FSDP
-# fsdp_config:
-#   fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
-#   fsdp_backward_prefetch_policy: BACKWARD_PRE
-#   fsdp_forward_prefetch: true
-#   fsdp_offload_params: false
-#   fsdp_sharding_strategy: FULL_SHARD
-#   fsdp_state_dict_type: SHARDED_STATE_DICT
-#   fsdp_sync_module_states: true
-#   fsdp_transformer_layer_cls_to_wrap: null
-#   fsdp_use_orig_params: true
