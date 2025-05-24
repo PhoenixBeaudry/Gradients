@@ -77,8 +77,6 @@ ENV TOKENIZERS_PARALLELISM=false
 
 # Ensure high-speed P2P/NCCL comms and fault tolerance
 ENV NCCL_DEBUG=WARN 
-ENV NCCL_P2P_DISABLE=1
-
 
 # AWS credentials (keep existing)
 ENV CONFIG_DIR="/workspace/configs"
