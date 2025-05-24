@@ -75,22 +75,9 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 # Environment variables for optimal performance
 ENV TOKENIZERS_PARALLELISM=false
 
-# 3. Enable cuDNN autotuner for best conv performance
-ENV CUDNN_BENCHMARK=1
-
-
 # Ensure high-speed P2P/NCCL comms and fault tolerance
 ENV NCCL_DEBUG=WARN 
-ENV TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 ENV NCCL_P2P_DISABLE=1
-
-# PyTorch optimizations
-ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-ENV TORCH_CUDNN_V8_API_ENABLED=1
-ENV TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
-ENV TORCH_BACKENDS_CUDNN_BENCHMARK=1
-ENV TORCH_BACKENDS_CUDA_MATMUL_ALLOW_TF32=1
-ENV TORCH_BACKENDS_CUDNN_ALLOW_TF32=1
 
 
 # AWS credentials (keep existing)
