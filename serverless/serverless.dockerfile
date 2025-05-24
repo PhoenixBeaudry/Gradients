@@ -90,9 +90,6 @@ RUN mkdir -p /root/.aws && \
     echo "[default]\naws_access_key_id=dummy_access_key\naws_secret_access_key=dummy_secret_key" > /root/.aws/credentials && \
     echo "[default]\nregion=us-east-1" > /root/.aws/config
 
-# Pre-compile Python files for faster startup
-RUN python -m compileall /usr/local/lib/python*/site-packages/
-
 # Copy configuration files
 COPY serverless/runpod_handler.py /workspace/configs
 COPY serverless/serverless_config_handler.py /workspace/configs
