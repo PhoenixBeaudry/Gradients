@@ -82,6 +82,7 @@ ENV CUDNN_BENCHMARK=1
 # Ensure high-speed P2P/NCCL comms and fault tolerance
 ENV NCCL_DEBUG=WARN 
 ENV TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+ENV NCCL_P2P_DISABLE=1
 
 # PyTorch optimizations
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
