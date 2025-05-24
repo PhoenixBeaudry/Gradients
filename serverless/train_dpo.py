@@ -139,11 +139,10 @@ def load_dpo_datasets(cfg: dict):
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
-    device_map = {"": torch.cuda.current_device()} 
     try:
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, device_map=device_map, torch_dtype=torch.bfloat16)
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
 
     model.config.use_cache = False
     model.generation_config.temperature=None
@@ -260,8 +259,8 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         dataloader_pin_memory=False,
         use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
-        dataset_num_proc=2,
-        dataloader_num_workers=2,
+        dataset_num_proc=4,
+        dataloader_num_workers=4,
         **hf_kwargs,
     )
     #####################################
