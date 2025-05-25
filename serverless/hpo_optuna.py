@@ -157,6 +157,7 @@ def objective(trial: optuna.Trial,
 
     cmd = [
         "accelerate", "launch",
+        "--num_processes", "6", 
         "--use_deepspeed",
         "--zero_stage", "3",
         "--mixed_precision", "bf16",
@@ -305,7 +306,9 @@ def launch_training(cfg_path: str):
 
     cmd = [
         "accelerate", "launch",
+        "--num_processes", "6", 
         "--use_deepspeed",
+        "--zero_stage", "3",
         "--mixed_precision", "bf16",
         path_to_train_file,
         "--config", cfg_path,
