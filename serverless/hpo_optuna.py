@@ -100,36 +100,39 @@ def loss_from_state(out_dir: Path) -> float | None:
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
 # ╭──────────────────────── Objective (single trial) ─────────────────────────╮
-def objective(trial: optuna.Trial,
-              base_cfg: dict,
-              hpo_project: str,
-              study_name: str,
-              storage_path: str,
-              time_when_hpo_finished: datetime) -> float:
-    cfg          = copy.deepcopy(base_cfg)
+def objective(
+    trial: optuna.Trial,
+    base_cfg: dict,
+    hpo_project: str,
+    study_name: str,
+    storage_path: str,
+    time_when_hpo_finished: datetime,
+) -> float:
+    cfg = copy.deepcopy(base_cfg)
     trial_params = sample_space(trial, cfg)
     cfg.update(trial_params)
 
-    trial_id     = f"trial{trial.number}"
-    out_dir      = Path(cfg.get("output_root", "./hpo_runs")) / trial_id
+    trial_id = f"trial{trial.number}"
+    out_dir = Path(cfg.get("output_root", "./hpo_runs")) / trial_id
     cfg |= {
-        "output_dir":        str(out_dir),
-        "wandb_run":         f"{cfg['job_id'][:5]}_{cfg['rl']}_{trial_id}",
-        "wandb_project":     hpo_project,
-        "max_steps":        TRIAL_MAX_STEPS,
-        "eval_steps":       TRIAL_EVAL_STEPS,
-        "save_steps": 500
+        "output_dir": str(out_dir),
+        "wandb_run": f"{cfg['job_id'][:5]}_{cfg['rl']}_{trial_id}",
+        "wandb_project": hpo_project,
+        "max_steps": TRIAL_MAX_STEPS,
+        "eval_steps": TRIAL_EVAL_STEPS,
+        "save_steps": 500,
     }
 
     if cfg["testing"] == True:
         cfg |= {
-            "max_steps":        TESTING_TRIAL_MAX_STEPS,
-            "eval_steps":       TESTING_TRIAL_EVAL_STEPS,
+            "max_steps": TESTING_TRIAL_MAX_STEPS,
+            "eval_steps": TESTING_TRIAL_EVAL_STEPS,
         }
 
-
     cfg["hpo_run"] = True
-    cfg["required_finish_time"] = (datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)).isoformat()
+    cfg["required_finish_time"] = (
+        datetime.now() + timedelta(minutes=MAX_MINUTES_PER_TRIAL)
+    ).isoformat()
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -138,14 +141,14 @@ def objective(trial: optuna.Trial,
         yaml.safe_dump(cfg, f)
 
     LOG.info("Starting trial %d with params: %s", trial.number, trial_params)
-     # ── prepare environment for subprocess ──────────────────────────────────
+    # ── prepare environment for subprocess ─────────────────────────────
     env = os.environ.copy()
-    env["WANDB_PROJECT"] = hpo_project          # override globally
-    env.pop("WANDB_RUN_ID",  None)              # avoid carry‑over
-    env.pop("WANDB_NAME",    None)
-    env["OPTUNA_STORAGE"]   = storage_path
+    env["WANDB_PROJECT"] = hpo_project  # override globally
+    env.pop("WANDB_RUN_ID", None)  # avoid carry‑over
+    env.pop("WANDB_NAME", None)
+    env["OPTUNA_STORAGE"] = storage_path
     env["OPTUNA_STUDY_NAME"] = study_name
-    env["OPTUNA_TRIAL_ID"]   = str(trial._trial_id)
+    env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
 
     if cfg["rl"] == "dpo":
         path_to_train_file = "/workspace/training/train_dpo.py"
@@ -157,7 +160,6 @@ def objective(trial: optuna.Trial,
 
     cmd = [
         "accelerate", "launch",
-        "--num_processes", "6", 
         "--use_deepspeed",
         "--zero_stage", "2",
         "--mixed_precision", "bf16",
@@ -165,77 +167,68 @@ def objective(trial: optuna.Trial,
         "--config", str(tmp_cfg),
     ]
 
+    # ── Run subprocess, capture output after process completes ────────
+    stdout = ""
+    process_error = None
     try:
-        cp = subprocess.Popen(
+        with subprocess.Popen(
             cmd,
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1  # line-buffered
-        )
-        stdout_lines = []
-        try:
-            # Live log following
-            for line in cp.stdout:
-                LOG.info("[trial %d] %s", trial.number, line.rstrip())
-                stdout_lines.append(line)
-            cp.wait()
+            bufsize=1,
+        ) as cp:
+            stdout, _ = cp.communicate()  # No live streaming
             if cp.returncode != 0:
-                raise subprocess.CalledProcessError(cp.returncode, cmd, output="".join(stdout_lines))
-            stdout = "".join(stdout_lines)
-        except Exception as e:
-            cp.terminate()
-            raise e
-        
-    except subprocess.CalledProcessError as e:
-        if "torch.OutOfMemoryError" in e.stdout:
-            LOG.warning("Trial %d failed:\n", trial.number)
-            LOG.warning("Failed due to OOM error.")
-            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
-            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
-            LOG.info("Waiting 3s before starting next trial for cleanup...")
-            time.sleep(5)
-            if cfg["rl"] == "grpo":
-                return float("-inf")
-            return float("inf")
-        elif "optuna.exceptions.TrialPruned" in e.stdout:
-            LOG.info("Trial was pruned.")
-            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
-            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
-            time.sleep(5)
-            if cfg["rl"] == "grpo":
-                return float("-inf")
-            return float("inf")
-        elif "Reached time limit of" in e.stdout:
-            LOG.info("Trial ran out of time: attemping to find last loss...")
-        else:
-            LOG.warning("Trial %d failed:\n", trial.number)
-            LOG.warning(f"Failed due to: \n {e.stdout}")
-            LOG.info("Waiting 3s before starting next trial for cleanup...")
-            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
-            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
-            time.sleep(5)
-            if cfg["rl"] == "grpo":
-                return float("-inf")
-            return float("inf")
+                process_error = subprocess.CalledProcessError(
+                    cp.returncode, cmd, output=stdout
+                )
+    except Exception as e:
+        LOG.error(f"Subprocess failed for trial {trial.number}: {e}")
+        process_error = e
 
-    # ── extract eval_loss (3 fallback methods) ──────────────────────────────
+    # ── Error handling (match your original structure) ──────────────
+    if process_error:
+        msg = str(getattr(process_error, "output", "")) + "\n" + str(process_error)
+        if "torch.OutOfMemoryError" in msg:
+            LOG.warning("Trial %d failed: OOM error.", trial.number)
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
+            LOG.info("Waiting 3s before starting next trial for cleanup...")
+            time.sleep(5)
+            return float("-inf") if cfg["rl"] == "grpo" else float("inf")
+        elif "optuna.exceptions.TrialPruned" in msg:
+            LOG.info("Trial was pruned.")
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
+            time.sleep(5)
+            return float("-inf") if cfg["rl"] == "grpo" else float("inf")
+        elif "Reached time limit of" in msg:
+            LOG.info("Trial ran out of time: attempting to find last loss...")
+        else:
+            LOG.warning("Trial %d failed:\n%s", trial.number, msg)
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
+            LOG.info("Waiting 3s before starting next trial for cleanup...")
+            time.sleep(5)
+            return float("-inf") if cfg["rl"] == "grpo" else float("inf")
+
+    # ── extract eval_loss (3 fallback methods) ─────────────────────
     for extractor in (loss_from_wandb, lambda _: loss_from_stdout(stdout), loss_from_state):
         val = extractor(out_dir) if extractor is loss_from_wandb or extractor is loss_from_state else extractor(None)
         if val is not None:
             LOG.info("Trial %d completed – eval_loss: %.4f", trial.number, val)
             shutil.rmtree(tmp_cfg.parent, ignore_errors=True)
-            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             return val
 
     LOG.warning("eval_loss not found for trial %d – penalising.", trial.number)
-    hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds()/3600
+    hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
     LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
-    if cfg["rl"] == "grpo":
-        return float("-inf")
-    return float("inf")
+    return float("-inf") if cfg["rl"] == "grpo" else float("inf")
+
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
 # ╭──────────────────────── Run Optuna sweep ─────────────────────────────────╮
@@ -306,7 +299,6 @@ def launch_training(cfg_path: str):
 
     cmd = [
         "accelerate", "launch",
-        "--num_processes", "6", 
         "--use_deepspeed",
         "--zero_stage", "2",
         "--mixed_precision", "bf16",
