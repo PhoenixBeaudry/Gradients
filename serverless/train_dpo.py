@@ -152,7 +152,7 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
 
     return model
         
-def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
+def get_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
     if get_peft_model is None:
         raise ImportError("peft library is required for LoRA adapters.")
 
@@ -177,7 +177,7 @@ def apply_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCa
         bias='none',
         task_type='CAUSAL_LM'
     )
-    return get_peft_model(model, peft_config)
+    return peft_config
 
 
 def load_tokenizer(model_name: str, cfg: dict):
@@ -196,7 +196,7 @@ def load_tokenizer(model_name: str, cfg: dict):
 
 
 
-def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
+def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
     # ── DPO Trainer ────────────────────────────────────────
     #### Callbacks ####
     callbacks = []
@@ -274,6 +274,7 @@ def build_trainer(cfg: dict, model, tokenizer, train_ds, eval_ds):
         eval_dataset=eval_ds,
         processing_class=tokenizer,
         callbacks=callbacks,
+        peft_config=peft_config
     )
 
 
@@ -299,7 +300,9 @@ def main():
     model = load_model(cfg['base_model'], cfg)
 
     if cfg.get('adapter') == 'lora':
-        model = apply_lora_adapter(model, cfg)
+        peft_config = get_lora_adapter(model, cfg)
+    else:
+        peft_config = None
 
     if cfg["testing"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
@@ -329,7 +332,7 @@ def main():
 
 
     logger.info("Starting Full Model Training...")
-    trainer = build_trainer(cfg, model, tokenizer, train_dataset, eval_dataset)
+    trainer = build_trainer(cfg, model, peft_config, tokenizer, train_dataset, eval_dataset)
     
     try:
         trainer.train()

@@ -32,32 +32,35 @@ MAX_MINUTES_PER_TRIAL = 30
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
 
+    # Invariant Params
+    params = {
+        "optimizer":                      trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
+        "adapter":                        trial.suggest_categorical("adapter", ["lora", "None"]),
+    }
 
+    # DPO Params
     if cfg["rl"] == "dpo":
-        params = {
-            "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
-            "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
+        params |= {
             "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
             "beta":                        trial.suggest_float("beta", 0.01, 0.5, log=True),
             "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.2),
         }
+    # GRPO Params
     elif cfg["rl"] == "grpo":
-        params = {
-            "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
-            "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
+        params |= {
             "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
             "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
         }
+    # SFT Params
     else:
-        params = {
-            "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
-            "adapter":                     trial.suggest_categorical("adapter", ["lora", "None"]),
+        params |= {
             "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True),
             "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.15),
         }
 
+    # LORA Params
     if params["adapter"] == "lora":
         params |= {
             "lora_r":       trial.suggest_int("lora_r", 16, 1024, step=16),
