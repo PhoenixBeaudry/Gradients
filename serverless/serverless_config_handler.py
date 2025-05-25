@@ -363,6 +363,7 @@ def setup_config(
     print("=======================================")
     print(f"Task ID: {config['job_id']}")
     print(f"Model: {config['base_model']}")
+    print(f"Model Params: {config['model_params_count']}")
     print(f"HuggingFace Repo: {config['hub_model_id']}")
     print(f"RL Type: {config['rl']}")
     print("=======================================")
