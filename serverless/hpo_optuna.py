@@ -12,7 +12,8 @@ from pathlib import Path
 import yaml, optuna
 from datetime import datetime, timedelta
 from optuna.pruners import HyperbandPruner
-from optuna.storages import RDBStorage      
+from optuna.storages import RDBStorage    
+  
 
 # ── logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO,
@@ -163,9 +164,28 @@ def objective(trial: optuna.Trial,
     ]
 
     try:
-        cp = subprocess.run(cmd, env=env, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, check=True)
-        stdout = cp.stdout
+        cp = subprocess.Popen(
+            cmd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1  # line-buffered
+        )
+        stdout_lines = []
+        try:
+            # Live log following
+            for line in cp.stdout:
+                LOG.info("[trial %d] %s", trial.number, line.rstrip())
+                stdout_lines.append(line)
+            cp.wait()
+            if cp.returncode != 0:
+                raise subprocess.CalledProcessError(cp.returncode, cmd, output="".join(stdout_lines))
+            stdout = "".join(stdout_lines)
+        except Exception as e:
+            cp.terminate()
+            raise e
+        
     except subprocess.CalledProcessError as e:
         if "torch.OutOfMemoryError" in e.stdout:
             LOG.warning("Trial %d failed:\n", trial.number)
