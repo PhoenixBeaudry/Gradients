@@ -158,6 +158,7 @@ def objective(trial: optuna.Trial,
     cmd = [
         "accelerate", "launch",
         "--use_deepspeed",
+        "--zero_stage", "3",
         "--mixed_precision", "bf16",
         path_to_train_file,
         "--config", str(tmp_cfg),
