@@ -62,6 +62,10 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params |= {
             "adapter":                        trial.suggest_categorical("adapter", ["lora"]),
         }
+    elif "bloomz" in cfg["base_model"].lower():
+        params |= {
+            "adapter":                        trial.suggest_categorical("adapter", ["None"]),
+        }
     else:
         params |= {
             "adapter":                        trial.suggest_categorical("adapter", ["lora", "None"]),
