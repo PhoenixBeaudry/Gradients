@@ -191,11 +191,9 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
             model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
-
-    # Model Dependant
+        
     if "bloomz" in model_name.lower(): 
-        model.accepts_loss_kwargs = False
-
+            model.accepts_loss_kwargs = False
     model.config.use_cache = False
     model.generation_config.temperature=None
     model.generation_config.top_p=None
@@ -349,10 +347,6 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         **hf_kwargs,
     )
     
-    # Model Dependant
-    if "bloomz" in cfg["base_model"].lower(): 
-        tf_args.logits_to_keep = 0
-
     #####################################
     logger = setup_logger()
     logger.info("Initializing GRPO Trainer")
