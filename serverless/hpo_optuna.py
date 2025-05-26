@@ -22,7 +22,7 @@ LOG = logging.getLogger("hpo_optuna")
 
 MAX_TRIALS_TO_RUN = 30
 TRIAL_MAX_STEPS = 400
-TRIAL_EVAL_STEPS = 40
+TRIAL_EVAL_STEPS = 80
 TESTING_TRIAL_MAX_STEPS = 50
 TESTING_TRIAL_EVAL_STEPS = 25
 PERCENT_TIME_FOR_HPO = 0.30
@@ -278,7 +278,7 @@ def run_optuna(base_cfg_path: str) -> dict:
                                 study_name=base_cfg["job_id"],
                                 load_if_exists=False,
                                 storage=storage,
-                                pruner=HyperbandPruner(min_resource=3, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
+                                pruner=HyperbandPruner(min_resource=2, max_resource=int(TRIAL_MAX_STEPS/TRIAL_EVAL_STEPS), reduction_factor=3))
     
     # calculate how much time we have left for job:
     time_remaining = datetime.fromisoformat(base_cfg['required_finish_time']) - datetime.now()
