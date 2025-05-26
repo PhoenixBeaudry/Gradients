@@ -196,11 +196,14 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     if "bloomz" in model_name.lower(): 
         model.accepts_loss_kwargs = False
         def _safe_forward(self, *args,
-            num_items_in_batch=None, # already patched earlier
-            logits_to_keep=None, # NEW – just swallow it
-            **kw):
-            return super(type(self), self).forward(*args, **kw)
-        model.forward = _safe_forward.get(model, type(model))
+                  num_items_in_batch=None,
+                  logits_to_keep=None,
+                  **kwargs):
+            # delegate everything else to the original implementation
+            return super(type(self), self).forward(*args, **kwargs)
+
+        # bind it correctly
+        model.forward = _safe_forward.__get__(model, type(model))
 
 
     model.config.use_cache = False
