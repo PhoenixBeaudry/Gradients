@@ -193,12 +193,12 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
 
+    # Model Dependant Monkey Patches
     if "bloomz" in model_name.lower(): 
             model.accepts_loss_kwargs = False
             original_forward = model.forward
-            def forward_ignore_logits_to_keep(*args, logits_to_keep=None, input_ids=None, **kwargs):
+            def forward_ignore_logits_to_keep(*args, logits_to_keep=None, **kwargs):
                 kwargs.pop('logits_to_keep', None)
-                kwargs.pop('input_ids', None)
                 # Call the original forward without passing logits_to_keep
                 return original_forward(*args, **kwargs)
             model.forward = forward_ignore_logits_to_keep
