@@ -195,16 +195,6 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     # Model Dependant
     if "bloomz" in model_name.lower(): 
         model.accepts_loss_kwargs = False
-        def _safe_forward(self, *args,
-                  num_items_in_batch=None,
-                  logits_to_keep=None,
-                  **kwargs):
-            # delegate everything else to the original implementation
-            return super(type(self), self).forward(*args, **kwargs)
-
-        # bind it correctly
-        model.forward = _safe_forward.__get__(model, type(model))
-
 
     model.config.use_cache = False
     model.generation_config.temperature=None
@@ -359,6 +349,9 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         **hf_kwargs,
     )
     
+    # Model Dependant
+    if "bloomz" in cfg["base_model"].lower(): 
+        tf_args.logits_to_keep = 0
 
     #####################################
     logger = setup_logger()
