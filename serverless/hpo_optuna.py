@@ -38,25 +38,33 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     else:
         model_params_count = 1_000_000_000
 
-    # Scaler based on task type
-    if cfg["rl"] == "dpo":
-        task_scaler = 0.3
-    elif cfg["rl"] == "grpo":
-        task_scaler = 0.1
-    else:
-        task_scaler = 1
-
-    lr_mid   = (3e-5 * (model_params_count / 7e9) ** -0.5)*task_scaler
-    lr_low = lr_mid / 6
-    lr_high = lr_mid * 2
-
     # Invariant Params
     params = {
         "optimizer":                      trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
-        "learning_rate":                  trial.suggest_float("learning_rate", lr_low, lr_high, log=True),
-        "weight_decay":                   trial.suggest_float("weight_decay", 0.0, 0.1),
     }
 
+    # DPO Params
+    if cfg["rl"] == "dpo":
+        params |= {
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
+            "beta":                        trial.suggest_float("beta", 0.01, 0.5, log=True),
+            "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.2),
+        }
+    # GRPO Params
+    elif cfg["rl"] == "grpo":
+        params |= {
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-7, 1e-5, log=True),
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.05),
+            "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
+        }
+    # SFT Params
+    else:
+        params |= {
+            "learning_rate":               trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True),
+            "weight_decay":                trial.suggest_float("weight_decay", 0.0, 0.15),
+        }
+        
     # Always lora for models > 8b
     if model_params_count > 8_000_000_000:
         params |= {
@@ -71,18 +79,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
             "adapter":                        trial.suggest_categorical("adapter", ["lora", "None"]),
         }
 
-    # DPO Params
-    if cfg["rl"] == "dpo":
-        params |= {
-            "beta":                        trial.suggest_float("beta", 0.01, 0.5, log=True),
-            "label_smoothing":             trial.suggest_float("label_smoothing", 0.0, 0.2),
-        }
-
-    # GRPO Params
-    elif cfg["rl"] == "grpo":
-        params |= {
-            "beta":                        trial.suggest_float("beta", 0.01, 0.3, log=True),
-        }
 
     # LORA Params
     if params["adapter"] == "lora":
