@@ -208,7 +208,10 @@ async def task_offer(
             logger.info(f"Rejecting offer: Model size too large ({request.model_params_count / 1_000_000_000:.1f}B >= 40B)")
             return MinerTaskResponse(message="Model size too large (>= 40B)", accepted=False)
         
-        if "falcon" in request.model.lower():
+
+        # Blacklisted Models
+        blacklist_models = ["falcon", "codegemma", "gemma"]
+        if any(sub in request.model.lower() for sub in blacklist_models):
             logger.info(f"Rejecting offer: Unsupported Model: ({request.model.lower()})")
             return MinerTaskResponse(
                 message=f"This endpoint does not currently support that model.", accepted=False)
