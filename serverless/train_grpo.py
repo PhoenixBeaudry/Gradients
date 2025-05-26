@@ -306,7 +306,14 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         lr_scheduler=SchedulerType.COSINE
     else:
         lr_scheduler=SchedulerType.CONSTANT_WITH_WARMUP
-        
+
+    # Model Patches
+    model_dep_args = {}
+    if "bloomz" in cfg["base_model"].lower():
+        model_dep_args = {
+            'logits_to_keep': None
+        }
+
     tf_args = GRPOConfig(
         output_dir=cfg['output_dir'],
         # GRPO params
@@ -344,7 +351,10 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
         **hf_kwargs,
+        **model_dep_args
     )
+    
+
     #####################################
     logger = setup_logger()
     logger.info("Initializing GRPO Trainer")
