@@ -264,8 +264,8 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         dataloader_pin_memory=False,
         use_liger_kernel=cfg['use_liger_kernel'],
         load_best_model_at_end=True,
-        dataset_num_proc=4,
-        dataloader_num_workers=4,
+        dataset_num_proc=6,
+        dataloader_num_workers=6,
         **hf_kwargs,
     )
     #####################################
