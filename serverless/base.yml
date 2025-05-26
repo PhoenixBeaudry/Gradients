@@ -30,7 +30,7 @@ max_steps: 10000
 save_steps: 100
 warmup_steps: 150
 save_strategy: steps
-logging_steps: 100
+logging_steps: 20
 save_total_limit: 5
 
 do_hpo: true
