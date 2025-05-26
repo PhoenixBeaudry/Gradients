@@ -374,7 +374,7 @@ def main():
     elif cfg["hpo_run"]:
         # ── HPO trial: auto‑subset the corpus ───────────────────────────────────
         # 1. compute target subset sizes
-        SUBSET_FRAC   = 0.05          # 5 %
+        SUBSET_FRAC   = 0.02          # 5 %
         MIN_PAIRS     = 1_000         # never go below this
         MAX_PAIRS     = 10_000        # never go above this
         target_train = int(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)))
