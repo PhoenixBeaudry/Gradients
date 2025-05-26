@@ -376,7 +376,7 @@ def main():
         # 1. compute target subset sizes
         SUBSET_FRAC   = 0.02          # 5 %
         MIN_PAIRS     = 1_000         # never go below this
-        MAX_PAIRS     = 10_000        # never go above this
+        MAX_PAIRS     = 5_000        # never go above this
         target_train = int(max(MIN_PAIRS, min(MAX_PAIRS, len(train_dataset) * SUBSET_FRAC)))
         target_eval = int(max(MIN_PAIRS, min(MAX_PAIRS, len(eval_dataset) * SUBSET_FRAC)))
 
