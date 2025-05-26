@@ -47,7 +47,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         task_scaler = 1
 
     lr_mid   = (3e-5 * (model_params_count / 7e9) ** -0.5)*task_scaler
-    lr_low = lr_mid / 4
+    lr_low = lr_mid / 6
     lr_high = lr_mid * 2
 
     # Invariant Params
