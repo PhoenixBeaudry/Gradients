@@ -167,6 +167,8 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
 
+    if "bloomz" in model_name.lower(): 
+        model.accepts_loss_kwargs = False
     model.config.use_cache = False
     model.generation_config.temperature=None
     model.generation_config.top_p=None
