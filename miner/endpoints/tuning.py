@@ -210,7 +210,7 @@ async def task_offer(
         
 
         # Blacklisted Models
-        blacklist_models = ["falcon", "codegemma", "gemma"]
+        blacklist_models = ["falcon", "codegemma", "gemma", "phi-3-mini-128k-instruct"]
         if any(sub in request.model.lower() for sub in blacklist_models):
             logger.info(f"Rejecting offer: Unsupported Model: ({request.model.lower()})")
             return MinerTaskResponse(
