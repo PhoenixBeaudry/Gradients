@@ -4,6 +4,7 @@ import os
 import argparse
 import logging
 import yaml
+import aiohttp
 import torch
 from datetime import datetime
 from trl import DPOConfig, DPOTrainer
@@ -117,7 +118,8 @@ def load_dpo_datasets(cfg: dict):
     ds_train = load_dataset(
         "json",
         data_files=cfg["datasets"][0]["path"],
-        split="train"
+        split="train",
+        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
     )
 
     # Standardise column names

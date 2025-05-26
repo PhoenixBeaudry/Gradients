@@ -6,6 +6,7 @@ import yaml
 import importlib
 import sys
 import inspect
+import aiohttp
 import torch
 from datetime import datetime
 from datasets import load_dataset
@@ -235,7 +236,8 @@ def load_grpo_datasets(cfg: dict):
     ds_train = load_dataset(
         "json",
         data_files=cfg["datasets"][0]["path"],
-        split="train"          # guarantees Dataset, not DatasetDict
+        split="train",          # guarantees Dataset, not DatasetDict
+        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
     )
 
     # Standardise column names

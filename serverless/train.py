@@ -3,6 +3,7 @@ import os
 import argparse
 import logging
 import yaml
+import aiohttp
 from datetime import datetime
 import torch
 from transformers import (
@@ -178,7 +179,8 @@ def load_sft_datasets(cfg: dict):
     ds_train = load_dataset(
         "json",
         data_files=cfg["datasets"][0]["path"],
-        split="train"          # guarantees Dataset, not DatasetDict
+        split="train",          # guarantees Dataset, not DatasetDict
+        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
     )
 
     def combine_prompt(example):
