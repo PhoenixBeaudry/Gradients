@@ -11,6 +11,7 @@ import torch
 from datetime import datetime
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
+from types import MethodType
 from trl.trainer.grpo_trainer import RewardFunc
 from transformers import (
     EarlyStoppingCallback,
@@ -191,9 +192,18 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
             model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
-        
+
     if "bloomz" in model_name.lower(): 
             model.accepts_loss_kwargs = False
+            def _safe_forward(self, *args,
+                    num_items_in_batch=None,
+                    logits_to_keep=None,
+                    **kwargs):
+                # delegate everything else to the original implementation
+                return super(type(self), self).forward(*args, **kwargs)
+            # bind it correctly
+            model.forward = _safe_forward.__get__(model, type(model))
+            
     model.config.use_cache = False
     model.generation_config.temperature=None
     model.generation_config.top_p=None
