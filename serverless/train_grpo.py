@@ -195,15 +195,12 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
 
     if "bloomz" in model_name.lower(): 
             model.accepts_loss_kwargs = False
-            def _safe_forward(self, *args,
-                    num_items_in_batch=None,
-                    logits_to_keep=None,
-                    **kwargs):
-                # delegate everything else to the original implementation
+            original_forward = model.forward
+            def forward_ignore_logits_to_keep(*args, logits_to_keep=None, **kwargs):
                 kwargs.pop('logits_to_keep', None)
-                return super(type(self), self).forward(*args, **kwargs)
-            # bind it correctly
-            model.forward = _safe_forward.__get__(model, type(model))
+                # Call the original forward without passing logits_to_keep
+                return original_forward(*args, **kwargs)
+            model.forward = forward_ignore_logits_to_keep
             
     model.config.use_cache = False
     model.generation_config.temperature=None
