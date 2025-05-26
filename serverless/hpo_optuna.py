@@ -53,7 +53,6 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
     # Invariant Params
     params = {
         "optimizer":                      trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
-        "adapter":                        trial.suggest_categorical("adapter", ["lora", "None"]),
         "learning_rate":                  trial.suggest_float("learning_rate", lr_low, lr_high, log=True),
         "weight_decay":                   trial.suggest_float("weight_decay", 0.0, 0.1),
     }
