@@ -58,6 +58,16 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         "weight_decay":                   trial.suggest_float("weight_decay", 0.0, 0.1),
     }
 
+    # Always lora for models > 8b
+    if model_params_count > 8_000_000_000:
+        params |= {
+            "adapter":                        trial.suggest_categorical("adapter", ["lora"]),
+        }
+    else:
+        params |= {
+            "adapter":                        trial.suggest_categorical("adapter", ["lora", "None"]),
+        }
+
     # DPO Params
     if cfg["rl"] == "dpo":
         params |= {
