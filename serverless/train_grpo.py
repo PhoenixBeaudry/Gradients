@@ -191,8 +191,18 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
             model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
+
+    # Model Dependant
     if "bloomz" in model_name.lower(): 
         model.accepts_loss_kwargs = False
+        def _safe_forward(self, *args,
+            num_items_in_batch=None, # already patched earlier
+            logits_to_keep=None, # NEW – just swallow it
+            **kw):
+            return super(type(self), self).forward(*args, **kw)
+        model.forward = _safe_forward.get(model, type(model))
+
+
     model.config.use_cache = False
     model.generation_config.temperature=None
     model.generation_config.top_p=None
