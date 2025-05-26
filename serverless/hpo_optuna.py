@@ -202,11 +202,18 @@ def objective(
             text=True,
             bufsize=1,
         ) as cp:
-            stdout, _ = cp.communicate()  # No live streaming
-            if cp.returncode != 0:
-                process_error = subprocess.CalledProcessError(
-                    cp.returncode, cmd, output=stdout
-                )
+            try:
+                stdout, _ = cp.communicate(timeout=MAX_MINUTES_PER_TRIAL*60 + 60)  # No live streaming
+                if cp.returncode != 0:
+                    process_error = subprocess.CalledProcessError(
+                        cp.returncode, cmd, output=stdout
+                    )
+            except subprocess.TimeoutExpired:
+                cp.kill()
+                stdout, _ = cp.communicate()
+                LOG.warning(f"Subprocess exceeded max_seconds ({MAX_MINUTES_PER_TRIAL*60}); killed.")
+                process_error = subprocess.TimeoutExpired(cmd, MAX_MINUTES_PER_TRIAL*60 + 60, output=stdout)
+                            
     except Exception as e:
         LOG.error(f"Subprocess failed for trial {trial.number}: {e}")
         process_error = e
@@ -227,7 +234,7 @@ def objective(
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             time.sleep(5)
             return float("-inf") if cfg["rl"] == "grpo" else float("inf")
-        elif "Reached time limit of" in msg:
+        elif "Reached time limit of" in msg or "Subprocess exceeded max_seconds" in msg:
             LOG.info("Trial ran out of time: attempting to find last loss...")
         else:
             LOG.warning("Trial %d failed:\n%s", trial.number, msg)
