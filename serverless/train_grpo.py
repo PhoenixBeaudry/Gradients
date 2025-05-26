@@ -195,48 +195,16 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
 
     if "bloomz" in model_name.lower(): 
             model.accepts_loss_kwargs = False
-            def monkey_patch_bloom_for_grpo(model):
-                """Patch BLOOM model to accept logits_to_keep parameter"""
-                original_forward = model.forward
-                
-                def forward_with_logits_to_keep(
-                    input_ids=None,
-                    past_key_values=None,
-                    attention_mask=None,
-                    head_mask=None,
-                    inputs_embeds=None,
-                    labels=None,
-                    use_cache=None,
-                    output_attentions=None,
-                    output_hidden_states=None,
-                    return_dict=None,
-                    cache_position=None,
-                    logits_to_keep=None,  # Accept but ignore this parameter
-                    **kwargs
-                ):
-                    # Remove logits_to_keep from kwargs if it somehow ends up there
-                    kwargs.pop('logits_to_keep', None)
-                    
-                    # Call original forward without logits_to_keep
-                    return original_forward(
-                        input_ids=input_ids,
-                        past_key_values=past_key_values,
-                        attention_mask=attention_mask,
-                        head_mask=head_mask,
-                        inputs_embeds=inputs_embeds,
-                        labels=labels,
-                        use_cache=use_cache,
-                        output_attentions=output_attentions,
-                        output_hidden_states=output_hidden_states,
-                        return_dict=return_dict,
-                        cache_position=cache_position,
-                        **kwargs
-                    )
-                
-                model.forward = forward_with_logits_to_keep
-                return model
-            model = monkey_patch_bloom_for_grpo(model)
-
+            def _safe_forward(self, *args,
+                    num_items_in_batch=None,
+                    logits_to_keep=None,
+                    **kwargs):
+                # delegate everything else to the original implementation
+                kwargs.pop('logits_to_keep', None)
+                return super(type(self), self).forward(*args, **kwargs)
+            # bind it correctly
+            model.forward = _safe_forward.__get__(model, type(model))
+            
     model.config.use_cache = False
     model.generation_config.temperature=None
     model.generation_config.top_p=None
