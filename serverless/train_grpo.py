@@ -166,7 +166,10 @@ def setup_logger() -> logging.Logger:
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     try:
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        if "phi-3-mini" in model_name.lower():
+            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=False, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        else:
+            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
         model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
 
