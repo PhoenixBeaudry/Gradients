@@ -27,29 +27,47 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 ###### Custom Callbacks ########################
 
 class TimeLimitCallback(TrainerCallback):
-    """Stop training after a fixed number of hours."""
+    """
+    Stop training after `max_seconds` of wall-clock time.
 
-    def __init__(self, max_seconds: float):
-        """
-        Args:
-            max_hours: training time budget in hours
-        """
-        self.max_seconds = max_seconds
-        self.start_time: float | None = None
+    • Checks the clock only every `check_interval` steps (default 50).
+    • Computes `deadline` once instead of recomputing `elapsed` each step.
+    • Runs the check only on the local-process-zero rank to avoid redundant work
+      in distributed/DeepSpeed jobs; other ranks receive the stop signal
+      through the shared `TrainerControl` object.
+    """
 
-    def on_train_begin(self, args, state: TrainerState, control: TrainerControl, **kwargs):
-        # record the training start time
-        self.start_time = time.time()
-        return control
+    __slots__ = ("deadline", "check_interval", "next_check_step")
 
-    def on_step_end(self, args, state: TrainerState, control: TrainerControl, **kwargs):
-        # only check once we've started
-        if self.start_time is None:
+    def __init__(self, max_seconds: float, check_interval: int = 10) -> None:
+        self.deadline = time.perf_counter() + max_seconds
+        self.check_interval = max(1, check_interval)          # at least 1 step
+        self.next_check_step = self.check_interval
+
+    # ────────────────────────────────────────────────────────────────
+    def on_step_end(
+        self,
+        args,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        # Only rank-0 performs the lightweight time check.
+        if not state.is_local_process_zero:
             return control
-        elapsed = time.time() - self.start_time
-        if elapsed >= self.max_seconds:
-            print(f"\nReached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+
+        # Skip until the next scheduled check step.
+        if state.global_step < self.next_check_step:
+            return control
+
+        # Schedule the following check now, before doing any work.
+        self.next_check_step += self.check_interval
+
+        # Single high-resolution clock read.
+        if time.perf_counter() >= self.deadline:
             control.should_training_stop = True
+            print(f"\nReached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+
         return control
     
 class OptunaPruningCallback(TrainerCallback):
