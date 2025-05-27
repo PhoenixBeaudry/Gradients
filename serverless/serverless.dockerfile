@@ -67,7 +67,7 @@ RUN pip install --no-cache-dir \
     psutil
 
 # RunPod specific
-RUN pip install runpod
+RUN pip install -U runpod
 
 
 WORKDIR /workspace
