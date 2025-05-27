@@ -323,7 +323,9 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         max_completion_length=int(cfg["trl"]["max_completion_length"]),
         reward_weights=cfg["trl"]["reward_weights"],
         beta=float(cfg['beta']),
-        use_vllm=cfg["trl"]["use_vllm"],
+        use_vllm=True,
+        vllm_mode="colocate",
+        vllm_gpu_memory_utilization=0.4,
         num_generations=int(cfg["trl"]["num_generations"]),
         #####
         gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
