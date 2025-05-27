@@ -6,7 +6,8 @@ import logging
 import yaml
 import aiohttp
 import torch
-from datetime import datetime
+from datetime import datetime, timedelta
+import torch.distributed as dist
 from trl import DPOConfig, DPOTrainer
 from transformers import (
     AutoModelForCausalLM,
@@ -324,6 +325,7 @@ def main():
     # Performance flags
     torch.backends.cudnn.benchmark = True
     torch.cuda.empty_cache()
+    dist.init_process_group(backend='nccl', init_method='env://', timeout=timedelta(hours=2))
 
     logger.info("Loaded config from %s", args.config)
     

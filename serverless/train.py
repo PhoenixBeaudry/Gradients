@@ -4,13 +4,14 @@ import argparse
 import logging
 import yaml
 import aiohttp
-from datetime import datetime
+from datetime import datetime, timedelta
 import torch
 from transformers import (
     AutoModelForCausalLM,
     EarlyStoppingCallback,
     SchedulerType,
 )
+import torch.distributed as dist
 import time
 from trl import SFTConfig, SFTTrainer
 from datasets import load_dataset
@@ -343,6 +344,7 @@ def main():
     # Performance flags
     torch.backends.cudnn.benchmark = True
     torch.cuda.empty_cache()
+    dist.init_process_group(backend='nccl', init_method='env://', timeout=timedelta(hours=2))
     
     logger.info("Loaded config from %s", args.config)
     

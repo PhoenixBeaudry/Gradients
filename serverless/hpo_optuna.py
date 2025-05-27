@@ -228,6 +228,13 @@ def objective(
             LOG.info("Waiting 3s before starting next trial for cleanup...")
             time.sleep(5)
             return float("-inf") if cfg["rl"] == "grpo" else float("inf")
+        elif "Watchdog caught collective operation timeout" in msg:
+            LOG.warning("Trial %d failed: NCCL Timeout.", trial.number)
+            hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
+            LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
+            LOG.info("Waiting 3s before starting next trial for cleanup...")
+            time.sleep(5)
+            return float("-inf") if cfg["rl"] == "grpo" else float("inf")
         elif "optuna.exceptions.TrialPruned" in msg:
             LOG.info("Trial was pruned.")
             hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
