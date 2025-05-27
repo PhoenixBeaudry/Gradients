@@ -67,7 +67,7 @@ class TimeLimitCallback(TrainerCallback):
         # Single high-resolution clock read.
         if time.perf_counter() >= self.deadline:
             control.should_training_stop = True
-            print(f"\nReached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+            print(f"\nReached time limit — stopping training.")
 
         return control
     

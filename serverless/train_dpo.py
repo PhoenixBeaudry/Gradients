@@ -63,7 +63,7 @@ class TimeLimitCallback(TrainerCallback):
         # Single high-resolution clock read.
         if time.perf_counter() >= self.deadline:
             control.should_training_stop = True
-            print(f"\nReached time limit of {self.max_seconds/3600:.2f}h — stopping training.")
+            print(f"\nReached time limit — stopping training.")
 
         return control
     
@@ -177,7 +177,7 @@ def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
                 return original_forward(*args, **kwargs)
             model.forward = forward_ignore_logits_to_keep
 
-            
+
     model.config.use_cache = False
     model.generation_config.temperature=None
     model.generation_config.top_p=None
