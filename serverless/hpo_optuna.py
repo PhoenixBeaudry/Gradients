@@ -234,7 +234,7 @@ def objective(
             LOG.info(f"Time remaining for HPO: {hpo_hours_left}h")
             time.sleep(5)
             return float("-inf") if cfg["rl"] == "grpo" else float("inf")
-        elif "Reached time limit of" in msg or "Subprocess exceeded max_seconds" in msg:
+        elif "Reached time limit" in msg or "Subprocess exceeded max_seconds" in msg:
             LOG.info("Trial ran out of time: attempting to find last loss...")
         else:
             LOG.warning("Trial %d failed:\n%s", trial.number, msg)
