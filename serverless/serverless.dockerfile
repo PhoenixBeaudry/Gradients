@@ -68,6 +68,8 @@ RUN pip install --no-cache-dir \
 # RunPod specific
 RUN pip install runpod
 
+RUN pip install vllm --extra-index-url https://download.pytorch.org/whl/cu128
+
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/input_data /workspace/training
