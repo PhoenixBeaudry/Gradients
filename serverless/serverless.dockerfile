@@ -77,7 +77,9 @@ RUN mkdir -p /workspace/configs /workspace/outputs /workspace/data /workspace/in
 ENV TOKENIZERS_PARALLELISM=false
 
 # Ensure high-speed P2P/NCCL comms and fault tolerance
-ENV NCCL_DEBUG=WARN 
+ENV NCCL_DEBUG=WARN
+ENV NCCL_BLOCKING_WAIT=1
+ENV NCCL_IB_TIMEOUT=2000
 
 # AWS credentials (keep existing)
 ENV CONFIG_DIR="/workspace/configs"
