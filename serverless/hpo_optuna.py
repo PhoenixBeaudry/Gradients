@@ -186,6 +186,7 @@ def objective(
         "--use_deepspeed",
         "--zero_stage", "2",
         "--mixed_precision", "bf16",
+        "--nccl_timeout", "100000",
         path_to_train_file,
         "--config", str(tmp_cfg),
     ]
@@ -339,6 +340,7 @@ def launch_training(cfg_path: str):
         "--use_deepspeed",
         "--zero_stage", "2",
         "--mixed_precision", "bf16",
+        "--nccl_timeout", "100000",
         path_to_train_file,
         "--config", cfg_path,
     ]
