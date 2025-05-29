@@ -33,7 +33,6 @@ TESTING_TRIAL_EVAL_STEPS = 25
 PERCENT_TIME_FOR_HPO = 0.30
 MAX_MINUTES_PER_TRIAL = 30
 GPU_CLEANUP_WAIT_TIME = 10  # seconds to wait for GPU cleanup
-MAX_RETRIES_PER_TRIAL = 2   # retry failed trials
 
 # ── Stability utilities ─────────────────────────────────────────────────────
 def cleanup_resources():
@@ -210,8 +209,7 @@ def objective(
     hpo_project: str,
     study_name: str,
     storage_path: str,
-    time_when_hpo_finished: datetime,
-    retries_left: int = MAX_RETRIES_PER_TRIAL,
+    time_when_hpo_finished: datetime
 ) -> float:
     """Run a single trial with enhanced stability and retry logic"""
     
@@ -334,7 +332,6 @@ def objective(
         msg = stdout or str(e)
         
         # Categorize errors
-        is_retryable = False
         penalty_value = float("-inf") if cfg["rl"] == "grpo" else float("inf")
         
         if "torch.OutOfMemoryError" in msg:
@@ -345,7 +342,6 @@ def objective(
             
         elif "Watchdog caught collective operation timeout" in msg or "NCCL" in msg:
             LOG.warning("Trial %d failed: NCCL/Communication error.", trial.number)
-            is_retryable = True  # Network issues might be transient
             cleanup_resources()
             time.sleep(GPU_CLEANUP_WAIT_TIME)
             
@@ -360,16 +356,7 @@ def objective(
                     
         else:
             LOG.warning("Trial %d failed with unknown error:\n%s", trial.number, msg[:500])
-            is_retryable = True
             
-        # Retry logic
-        if is_retryable and retries_left > 0:
-            LOG.info(f"Retrying trial {trial.number} ({retries_left} retries left)")
-            cleanup_resources()
-            time.sleep(GPU_CLEANUP_WAIT_TIME)
-            return objective(trial, base_cfg, hpo_project, study_name, storage_path, 
-                           time_when_hpo_finished, retries_left - 1)
-        
         return penalty_value
         
     except optuna.exceptions.TrialPruned:
