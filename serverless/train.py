@@ -3,17 +3,14 @@ import os
 import argparse
 import logging
 import yaml
-from datetime import datetime, timedelta
+from datetime import datetime
 import torch
-from transformers import (
-    EarlyStoppingCallback,
-    SchedulerType
-)
-import torch.distributed as dist
-from trl import SFTConfig, SFTTrainer
+from transformers import EarlyStoppingCallback
+from trl import SFTConfig, SFTTrainer, DPOConfig, DPOTrainer, GRPOConfig, GRPOTrainer
 from training_helpers.custom_callbacks import TimeLimitCallback, add_optuna_callback_if_needed
 from training_helpers.dataset_helpers import load_sft_datasets, load_tokenizer
 from training_helpers.model_helpers import load_model, get_lora_adapter
+from training_helpers.trainer_helpers import build_trainer_args, reward_functions
 
 
 
@@ -38,7 +35,7 @@ def setup_logger() -> logging.Logger:
         
 
 def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
-    # ── SFT Trainer ────────────────────────────────────────
+
     #### Callbacks ####
     callbacks = []
     if cfg.get('early_stopping', True):
@@ -57,66 +54,56 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
         add_optuna_callback_if_needed(callbacks)
     ###################
 
+
     ##### Training Arguments ####
-    hf_kwargs = {}
-    if not cfg["hpo_run"]:
-        hf_kwargs = {
-            'hub_model_id': cfg['hub_model_id'],
-            'hub_token': cfg['hub_token'],
-            'hub_strategy': "end",
-            'push_to_hub': True,
-        }
-        lr_scheduler=SchedulerType.COSINE
-    else:
-        lr_scheduler=SchedulerType.CONSTANT_WITH_WARMUP
-    tf_args = SFTConfig(
-        output_dir=cfg['output_dir'],
-        gradient_accumulation_steps=int(cfg['gradient_accumulation_steps']),
-        per_device_train_batch_size=int(cfg['micro_batch_size']),
-        per_device_eval_batch_size=int(cfg['micro_batch_size']),
-        max_steps=int(cfg['max_steps']),
-        learning_rate=float(cfg['learning_rate']),
-        optim=cfg['optimizer'],
-        lr_scheduler_type=lr_scheduler,
-        logging_steps=int(cfg['logging_steps']),
-        eval_strategy='steps',
-        save_strategy='best',
-        eval_steps=int(cfg['eval_steps']),
-        save_steps=int(cfg['save_steps']),
-        save_total_limit=int(cfg['save_total_limit']),
-        metric_for_best_model=cfg['metric_for_best_model'],
-        greater_is_better=bool(cfg['greater_is_better']),
-        weight_decay=float(cfg['weight_decay']),
-        run_name=cfg['wandb_run'],
-        warmup_steps=cfg['warmup_steps'],
-        report_to="wandb",
-        auto_find_batch_size=True,
-        gradient_checkpointing=cfg['gradient_checkpointing'],
-        gradient_checkpointing_kwargs={"use_reentrant": False},
-        bf16=True,
-        ddp_find_unused_parameters=False,
-        ddp_timeout=3600,
-        dataloader_pin_memory=False,
-        use_liger_kernel=cfg['use_liger_kernel'],
-        load_best_model_at_end=True,
-        packing=cfg['packing'],
-        eval_packing=cfg['packing'],
-        dataset_num_proc=6,
-        dataloader_num_workers=6,
-        **hf_kwargs,
-    )
+    trainer_kwargs = build_trainer_args(cfg)
+
+    
+
     #####################################
     logger = setup_logger()
-    logger.info("Initializing SFT Trainer")
-    return SFTTrainer(
-        model=model,
-        args=tf_args,
-        train_dataset=train_ds,
-        eval_dataset=eval_ds,
-        processing_class=tokenizer,
-        callbacks=callbacks,
-        peft_config=peft_config
-    )
+    logger.info("Initializing Trainer")
+    if cfg["rl"] == "dpo":
+        trainer_args = DPOConfig(
+            **trainer_kwargs,
+        )
+        return DPOTrainer(
+            model=model,
+            ref_model=None,
+            args=trainer_args,
+            train_dataset=train_ds,
+            eval_dataset=eval_ds,
+            processing_class=tokenizer,
+            callbacks=callbacks,
+            peft_config=peft_config
+        )
+    elif cfg["rl"] == "grpo":
+        trainer_args = GRPOConfig(
+            **trainer_kwargs,
+        )
+        return GRPOTrainer(
+            model=model,
+            args=trainer_args,
+            reward_funcs=reward_functions(cfg),
+            train_dataset=train_ds,
+            eval_dataset=eval_ds,
+            processing_class=tokenizer,
+            callbacks=callbacks,
+            peft_config=peft_config
+        )
+    else:
+        trainer_args = SFTConfig(
+            **trainer_kwargs,
+        )
+        return SFTTrainer(
+            model=model,
+            args=trainer_args,
+            train_dataset=train_ds,
+            eval_dataset=eval_ds,
+            processing_class=tokenizer,
+            callbacks=callbacks,
+            peft_config=peft_config
+        )
 
 
 def main():
@@ -129,7 +116,6 @@ def main():
     # Performance flags
     torch.backends.cudnn.benchmark = True
     torch.cuda.empty_cache()
-    dist.init_process_group(backend='nccl', init_method='env://', timeout=timedelta(hours=2))
     
     logger.info("Loaded config from %s", args.config)
     
@@ -181,8 +167,6 @@ def main():
         if not cfg["hpo_run"]:
             trainer.push_to_hub()
         
-    
-
 
 
 if __name__ == '__main__':
