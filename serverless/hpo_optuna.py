@@ -268,10 +268,6 @@ def objective(
     env["OPTUNA_STUDY_NAME"] = study_name
     env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
     
-    # Add stability environment variables
-    env["TOKENIZERS_PARALLELISM"] = "false"  # Avoid tokenizer warnings
-    env["CUDA_LAUNCH_BLOCKING"] = "0"  # Don't block on CUDA operations
-    env["NCCL_TIMEOUT"] = "1800"  # 30 minutes for NCCL operations
 
     if cfg["rl"] == "grpo":
         cfg["trl"]["max_completion_length"] = 32
