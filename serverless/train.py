@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import os
+import multiprocessing as mp
+if __name__ == "__main__":          # important when Accelerate spawns ranks
+    mp.set_start_method("forkserver", force=True)
 import argparse
 import logging
 import yaml
