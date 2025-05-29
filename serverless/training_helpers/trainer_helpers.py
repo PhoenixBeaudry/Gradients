@@ -56,7 +56,6 @@ def build_trainer_args(cfg: dict):
 
         # Best Metric Args
         "metric_for_best_model": cfg['metric_for_best_model'],
-        "greater_is_better": False,
         "load_best_model_at_end": True,
 
         # Optimization Args
@@ -81,6 +80,7 @@ def build_trainer_args(cfg: dict):
         type_spec_args = {
             'beta': float(cfg['beta']),
             'label_smoothing': float(cfg['label_smoothing']),
+            "greater_is_better": False,
             "dataset_num_proc": 6,
             "dataloader_num_workers": 6,
         }
@@ -97,6 +97,7 @@ def build_trainer_args(cfg: dict):
         type_spec_args = {
             "dataset_num_proc": 6,
             "dataloader_num_workers": 6,
+            "greater_is_better": False,
         }
 
     trainer_kwargs |= type_spec_args
