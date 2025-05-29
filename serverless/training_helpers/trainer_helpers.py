@@ -32,6 +32,7 @@ def build_trainer_args(cfg: dict):
         "optim": cfg['optimizer'],
         "weight_decay": float(cfg['weight_decay']),
         "gradient_checkpointing": cfg['gradient_checkpointing'],
+        "gradient_checkpointing_kwargs": {'use_reentrant':False},
 
         # LR Args
         "learning_rate": float(cfg['learning_rate']),
