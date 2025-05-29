@@ -17,7 +17,7 @@ from training_helpers.model_helpers import load_model, get_lora_adapter
 from training_helpers.trainer_helpers import build_trainer_args, reward_functions
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
+    parser = argparse.ArgumentParser(description="Train a causal LM with SFT, DPO, or GRPO")
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
     return parser.parse_args()
 
