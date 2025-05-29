@@ -10,19 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ninja-build \
     ccache \
-    numactl \
-    libnuma-dev \
-    infiniband-diags \
-    libibverbs-dev \
-    ibutils \
-    rdma-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and install build tools
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel ninja
 
 # Install ML packages with specific versions for compatibility
-RUN pip install --no-cache-dir \
+RUN pip install -U --no-cache-dir \
     numpy \
     transformers \
     accelerate \
@@ -36,10 +30,9 @@ RUN pip install --no-cache-dir \
     tokenizers
 
 # Install training frameworks
-RUN pip install --no-cache-dir \
+RUN pip install -U --no-cache-dir \
     trl \
     liger-kernel \
-    pytorch-ignite \
     optuna \
     mlflow \
     protobuf
@@ -50,10 +43,7 @@ RUN pip install --no-cache-dir flash-attn==2.7.3 --no-build-isolation
 # Install Triton for kernel compilation
 RUN pip install --no-cache-dir triton
 
-# Install xFormers for additional memory-efficient attention
-RUN pip install --no-cache-dir xformers
-
-# Install DeepSpeed with CPU Adam and other optimizations
+# Install DeepSpeed
 RUN pip install --no-cache-dir -U deepspeed
 
 # Install additional optimizations
