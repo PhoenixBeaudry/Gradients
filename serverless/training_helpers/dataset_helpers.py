@@ -8,8 +8,7 @@ def load_tokenizer(model_name: str, cfg: dict):
         use_auth_token=cfg.get("hub_token"),
         trust_remote_code=True,
         padding_side="left", 
-        truncation_side="right",
-        use_fast=False
+        truncation_side="right"
     )
     if tok.pad_token_id is None:      # e.g. Llama‑3, Qwen‑2 FlashAttn
         tok.pad_token = tok.eos_token
