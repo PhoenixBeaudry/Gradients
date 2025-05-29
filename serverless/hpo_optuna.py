@@ -191,36 +191,14 @@ def objective(
     ]
 
     # ── Run subprocess, capture output after process completes ────────
-    stdout = ""
-    process_error = None
     try:
-        with subprocess.Popen(
-            cmd,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        ) as cp:
-            try:
-                stdout, _ = cp.communicate(timeout=MAX_MINUTES_PER_TRIAL*60 + 60)  # No live streaming
-                if cp.returncode != 0:
-                    process_error = subprocess.CalledProcessError(
-                        cp.returncode, cmd, output=stdout
-                    )
-            except subprocess.TimeoutExpired:
-                cp.kill()
-                stdout, _ = cp.communicate()
-                LOG.warning(f"Subprocess exceeded max_seconds ({MAX_MINUTES_PER_TRIAL*60}); killed.")
-                process_error = subprocess.TimeoutExpired(cmd, MAX_MINUTES_PER_TRIAL*60 + 60, output=stdout)
-                            
-    except Exception as e:
-        LOG.error(f"Subprocess failed for trial {trial.number}: {e}")
-        process_error = e
+        cp = subprocess.run(cmd, env=env, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, check=True)
+        stdout = cp.stdout
 
     # ── Error handling (match your original structure) ──────────────
-    if process_error:
-        msg = str(getattr(process_error, "output", "")) + "\n" + str(process_error)
+    except subprocess.CalledProcessError as e:
+        msg = e.stdout
         if "torch.OutOfMemoryError" in msg:
             LOG.warning("Trial %d failed: OOM error.", trial.number)
             hpo_hours_left = (time_when_hpo_finished - datetime.now()).total_seconds() / 3600
