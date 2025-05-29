@@ -4,7 +4,8 @@ import multiprocessing as mp
 if __name__ == "__main__":          # important when Accelerate spawns ranks
     mp.set_start_method("forkserver", force=True)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"    # fork-safe, see below
-os.environ.setdefault("DEEPSPEED_TIMEOUT", "3600")   # 1 h NCCL watchdog  :contentReference[oaicite:0]{index=0}
+os.environ.setdefault("DEEPSPEED_TIMEOUT", "3600")   # 1 h NCCL watchdog
+
 import argparse
 import logging
 import yaml
