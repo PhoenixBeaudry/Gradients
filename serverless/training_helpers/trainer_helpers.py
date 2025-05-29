@@ -44,8 +44,6 @@ def build_trainer_args(cfg: dict):
         "per_device_train_batch_size": int(cfg['micro_batch_size']),
         "per_device_eval_batch_size": int(cfg['micro_batch_size']),
         "gradient_accumulation_steps": int(cfg['gradient_accumulation_steps']),
-        "packing": cfg['packing'],
-        "eval_packing": cfg['packing'],    
 
         # Evaluation and Saving Args
         "eval_strategy": 'steps', 
@@ -94,6 +92,8 @@ def build_trainer_args(cfg: dict):
     else:
         type_spec_args = {
             "greater_is_better": False,
+            "packing": cfg['packing'],
+            "eval_packing": cfg['packing'],    
         }
 
     trainer_kwargs |= type_spec_args
