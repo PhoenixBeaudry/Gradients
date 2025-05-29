@@ -10,6 +10,7 @@ import inspect
 def build_trainer_args(cfg: dict):
 
     # Hub Args for HPO Trials
+    hub_kwargs = {}
     if not cfg["hpo_run"]:
         hub_kwargs = {
             'hub_model_id': cfg['hub_model_id'],
@@ -73,6 +74,8 @@ def build_trainer_args(cfg: dict):
         "run_name": cfg['wandb_run'],
         "report_to": "wandb",
     }
+
+    trainer_kwargs |= hub_kwargs
 
     # Training Type Specific Args
     type_spec_args = {}
