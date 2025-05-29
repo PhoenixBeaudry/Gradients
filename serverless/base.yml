@@ -37,6 +37,7 @@ do_hpo: true
 dataloader_num_workers: 8
 val_set_size: 0.05
 sequence_len: 32768
+testing: false
 
 
 ##### AUTOSET PARAMS #####

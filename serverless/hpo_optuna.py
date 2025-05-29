@@ -173,13 +173,11 @@ def objective(
     env["OPTUNA_STUDY_NAME"] = study_name
     env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
 
-    if cfg["rl"] == "dpo":
-        path_to_train_file = "/workspace/training/train_dpo.py"
-    elif cfg["rl"] == "grpo":
+    if cfg["rl"] == "grpo":
         cfg["trl"]["max_completion_length"] = 32
-        path_to_train_file = "/workspace/training/train_grpo.py"
-    else:
-        path_to_train_file = "/workspace/training/train.py"
+
+
+    path_to_train_file = "/workspace/training/train.py"
 
     cmd = [
         "accelerate", "launch",
@@ -304,12 +302,7 @@ def launch_training(cfg_path: str):
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)
 
-    if cfg["rl"] == "dpo":
-        path_to_train_file = "/workspace/training/train_dpo.py"
-    elif cfg["rl"] == "grpo":
-        path_to_train_file = "/workspace/training/train_grpo.py"
-    else:
-        path_to_train_file = "/workspace/training/train.py"
+    path_to_train_file = "/workspace/training/train.py"
 
 
     cmd = [
