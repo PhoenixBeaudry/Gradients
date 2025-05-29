@@ -81,8 +81,6 @@ def build_trainer_args(cfg: dict):
             'beta': float(cfg['beta']),
             'label_smoothing': float(cfg['label_smoothing']),
             "greater_is_better": False,
-            "dataset_num_proc": 6,
-            "dataloader_num_workers": 6,
         }
     elif cfg["rl"] == "grpo":
         type_spec_args = {
@@ -95,8 +93,6 @@ def build_trainer_args(cfg: dict):
         }
     else:
         type_spec_args = {
-            "dataset_num_proc": 6,
-            "dataloader_num_workers": 6,
             "greater_is_better": False,
         }
 
