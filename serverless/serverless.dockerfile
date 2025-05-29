@@ -86,12 +86,10 @@ RUN mkdir -p /root/.aws && \
 COPY serverless/runpod_handler.py /workspace/configs
 COPY serverless/serverless_config_handler.py /workspace/configs
 COPY serverless/base.yml /workspace/configs
-COPY serverless/base_testing.yml /workspace/configs
-
+COPY serverless/training_helpers /workspace/training/training_helpers
 COPY serverless/hpo_optuna.py /workspace/training
 COPY serverless/train.py /workspace/training
-COPY serverless/train_dpo.py /workspace/training
-COPY serverless/train_grpo.py /workspace/training
+
 
 CMD echo 'Preparing logging...' && \
     echo "Attempting to log in to Hugging Face" && \
