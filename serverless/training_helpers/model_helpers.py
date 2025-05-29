@@ -38,9 +38,6 @@ def get_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCaus
     if get_peft_model is None:
         raise ImportError("peft library is required for LoRA adapters.")
 
-    if cfg.get('load_in_8bit', False):
-        model = prepare_model_for_kbit_training(model)
-
     # Determine target modules for LoRA
     targets = cfg.get('target_modules') or []
     if not targets:
