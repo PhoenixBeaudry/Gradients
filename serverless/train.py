@@ -8,11 +8,9 @@ import torch
 from transformers import EarlyStoppingCallback
 from trl import SFTConfig, SFTTrainer, DPOConfig, DPOTrainer, GRPOConfig, GRPOTrainer
 from training_helpers.custom_callbacks import TimeLimitCallback, add_optuna_callback_if_needed
-from training_helpers.dataset_helpers import load_sft_datasets, load_tokenizer
+from training_helpers.dataset_helpers import load_sft_datasets, load_dpo_datasets, load_grpo_datasets, load_tokenizer
 from training_helpers.model_helpers import load_model, get_lora_adapter
 from training_helpers.trainer_helpers import build_trainer_args, reward_functions
-
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a causal LM with SFT or DPO")
@@ -32,7 +30,6 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-        
 
 def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
 
@@ -121,7 +118,13 @@ def main():
     
     # after loading cfg...
     tokenizer = load_tokenizer(cfg['base_model'], cfg)
-    train_dataset, eval_dataset = load_sft_datasets(cfg)
+
+    if cfg["rl"] == "dpo":
+        train_dataset, eval_dataset = load_dpo_datasets(cfg)
+    elif cfg["rl"] == "grpo":
+        train_dataset, eval_dataset = load_grpo_datasets(cfg)
+    else:
+        train_dataset, eval_dataset = load_sft_datasets(cfg)
 
     model = load_model(cfg['base_model'], cfg)
 
