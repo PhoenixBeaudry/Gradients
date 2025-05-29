@@ -342,6 +342,7 @@ def objective(
             
         elif "Watchdog caught collective operation timeout" in msg or "NCCL" in msg:
             LOG.warning("Trial %d failed: NCCL/Communication error.", trial.number)
+            LOG.warning(msg)
             cleanup_resources()
             time.sleep(GPU_CLEANUP_WAIT_TIME)
             
