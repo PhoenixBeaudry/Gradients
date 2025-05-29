@@ -47,37 +47,3 @@ class TimeLimitCallback(TrainerCallback):
 
         return control
 
-    
-class OptunaPruningCallback(TrainerCallback):
-    """
-    Reports ``eval_loss`` back to Optuna at every evaluation and raises
-    ``optuna.TrialPruned`` when the trial should stop early.
-    """
-
-    def __init__(self, trial: optuna.Trial, monitor: str = "eval_loss"):
-        self._trial = trial
-        self._monitor = monitor
-
-    def on_evaluate(self, args, state, control, metrics, **kwargs):
-        if self._monitor not in metrics:
-            return  # nothing to report
-        step = state.global_step
-        value = float(metrics[self._monitor])
-        # Send metric to Optuna
-        self._trial.report(value, step)
-        # Ask Optuna whether the trial should be pruned
-        if self._trial.should_prune():
-            raise optuna.TrialPruned(
-                f"Trial pruned at step {step}: {self._monitor}={value}"
-            )
-        
-def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
-    storage_url = os.getenv("OPTUNA_STORAGE")
-    study_name  = os.getenv("OPTUNA_STUDY_NAME")
-    trial_id    = os.getenv("OPTUNA_TRIAL_ID")
-    if not (storage_url and study_name and trial_id):
-        return  # not an HPO child
-
-    study = optuna.load_study(study_name=study_name, storage=storage_url)
-    trial  = optuna.trial.Trial(study, trial_id=int(trial_id))
-    callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))

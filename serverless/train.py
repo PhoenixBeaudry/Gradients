@@ -7,7 +7,7 @@ from datetime import datetime
 import torch
 from transformers import EarlyStoppingCallback
 from trl import SFTConfig, SFTTrainer, DPOConfig, DPOTrainer, GRPOConfig, GRPOTrainer
-from training_helpers.custom_callbacks import TimeLimitCallback, add_optuna_callback_if_needed
+from training_helpers.custom_callbacks import TimeLimitCallback
 from training_helpers.dataset_helpers import load_sft_datasets, load_dpo_datasets, load_grpo_datasets, load_tokenizer
 from training_helpers.model_helpers import load_model, get_lora_adapter
 from training_helpers.trainer_helpers import build_trainer_args, reward_functions
@@ -46,9 +46,6 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
 
     if seconds_remaining is not None:
         callbacks.append(TimeLimitCallback(seconds_remaining*0.95))
-
-    if cfg["hpo_run"]:
-        add_optuna_callback_if_needed(callbacks)
     ###################
 
 
