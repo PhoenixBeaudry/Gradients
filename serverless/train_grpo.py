@@ -6,109 +6,18 @@ import yaml
 import importlib
 import sys
 import inspect
-import aiohttp
 import torch
 from datetime import datetime, timedelta
 import torch.distributed as dist
-from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
-from types import MethodType
 from trl.trainer.grpo_trainer import RewardFunc
 from transformers import (
     EarlyStoppingCallback,
-    SchedulerType,
-    AutoModelForCausalLM
+    SchedulerType
 )
-import time
-from transformers import TrainerCallback, TrainerControl, TrainerState, AutoTokenizer
-import optuna
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-
-
-
-###### Custom Callbacks ########################
-
-class TimeLimitCallback(TrainerCallback):
-    """
-    Stop training after `max_seconds` of wall-clock time.
-
-    • Checks the clock only every `check_interval` steps (default 50).
-    • Computes `deadline` once instead of recomputing `elapsed` each step.
-    • Runs the check only on the local-process-zero rank to avoid redundant work
-      in distributed/DeepSpeed jobs; other ranks receive the stop signal
-      through the shared `TrainerControl` object.
-    """
-
-    __slots__ = ("deadline", "check_interval", "next_check_step")
-
-    def __init__(self, max_seconds: float, check_interval: int = 10) -> None:
-        self.deadline = time.perf_counter() + max_seconds
-        self.check_interval = max(1, check_interval)          # at least 1 step
-        self.next_check_step = self.check_interval
-
-    # ────────────────────────────────────────────────────────────────
-    def on_step_end(
-        self,
-        args,
-        state: TrainerState,
-        control: TrainerControl,
-        **kwargs,
-    ):
-        # Only rank-0 performs the lightweight time check.
-        if not state.is_local_process_zero:
-            return control
-
-        # Skip until the next scheduled check step.
-        if state.global_step < self.next_check_step:
-            return control
-
-        # Schedule the following check now, before doing any work.
-        self.next_check_step += self.check_interval
-
-        # Single high-resolution clock read.
-        if time.perf_counter() >= self.deadline:
-            control.should_training_stop = True
-            print(f"\nReached time limit — stopping training.")
-
-        return control
-    
-class OptunaPruningCallback(TrainerCallback):
-    """
-    Reports ``eval_loss`` back to Optuna at every evaluation and raises
-    ``optuna.TrialPruned`` when the trial should stop early.
-    """
-
-    def __init__(self, trial: optuna.Trial, monitor: str = "eval_loss"):
-        self._trial = trial
-        self._monitor = monitor
-
-    def on_evaluate(self, args, state, control, metrics, **kwargs):
-        if self._monitor not in metrics:
-            return  # nothing to report
-        step = state.global_step
-        value = float(metrics[self._monitor])
-        # Send metric to Optuna
-        self._trial.report(value, step)
-        # Ask Optuna whether the trial should be pruned
-        if self._trial.should_prune():
-            raise optuna.TrialPruned(
-                f"Trial pruned at step {step}: {self._monitor}={value}"
-            )
-        
-def add_optuna_callback_if_needed(callbacks: list[TrainerCallback]):
-    storage_url = os.getenv("OPTUNA_STORAGE")
-    study_name  = os.getenv("OPTUNA_STUDY_NAME")
-    trial_id    = os.getenv("OPTUNA_TRIAL_ID")
-    if not (storage_url and study_name and trial_id):
-        return  # not an HPO child
-
-    study = optuna.load_study(study_name=study_name, storage=storage_url)
-    trial  = optuna.trial.Trial(study, trial_id=int(trial_id))
-    callbacks.append(OptunaPruningCallback(trial, monitor="eval_loss"))
-
-#######################################################
-
-
+from training_helpers.custom_callbacks import TimeLimitCallback, add_optuna_callback_if_needed
+from training_helpers.dataset_helpers import load_grpo_datasets, load_tokenizer
+from training_helpers.model_helpers import load_model, get_lora_adapter
 
 
 CONFIG_DIR = os.path.abspath("/workspace/configs/")
@@ -184,106 +93,6 @@ def setup_logger() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-
-def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
-    try:
-        if "phi-3-mini" in model_name.lower():
-            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=False, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
-        else:
-            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
-    except:
-        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
-
-    # Model Dependant Monkey Patches
-    if "bloomz" in model_name.lower(): 
-            model.accepts_loss_kwargs = False
-            original_forward = model.forward
-            def forward_ignore_logits_to_keep(*args, logits_to_keep=None, **kwargs):
-                kwargs.pop('logits_to_keep', None)
-                # Call the original forward without passing logits_to_keep
-                return original_forward(*args, **kwargs)
-            model.forward = forward_ignore_logits_to_keep
-            
-    model.config.use_cache = False
-    model.generation_config.temperature=None
-    model.generation_config.top_p=None
-    model.generation_config.top_k=None
-    model.train()
-
-    return model
-
-        
-def get_lora_adapter(model: AutoModelForCausalLM, cfg: dict) -> AutoModelForCausalLM:
-    if get_peft_model is None:
-        raise ImportError("peft library is required for LoRA adapters.")
-
-    if cfg.get('load_in_8bit', False):
-        model = prepare_model_for_kbit_training(model)
-
-    # Determine target modules for LoRA
-    targets = cfg.get('target_modules') or []
-    if not targets:
-        for name, module in model.named_modules():
-            if isinstance(module, torch.nn.Linear) and any(x in name.lower() for x in ('attn', 'attention')):
-                targets.append(name.split('.')[-1])
-        targets = list(set(targets))
-        if not targets:
-            raise ValueError("Could not auto-detect attention modules for LoRA. Please set 'target_modules' in config.")
-
-    peft_config = LoraConfig(
-        r=int(cfg.get('lora_r', 16)),
-        lora_alpha=int(cfg.get('lora_alpha', 16)),
-        target_modules=targets,
-        lora_dropout=float(cfg.get('lora_dropout', 0.05)),
-        bias='none',
-        task_type='CAUSAL_LM'
-    )
-    return peft_config
-
-
-
-def load_tokenizer(model_name: str, cfg: dict):
-    tok = AutoTokenizer.from_pretrained(
-        model_name,
-        use_auth_token=cfg.get("hub_token"),
-        trust_remote_code=True,
-        padding_side="left",          # DPO prefers left‑padding
-        truncation_side="right"
-    )
-    if tok.pad_token_id is None:      # e.g. Llama‑3, Qwen‑2 FlashAttn
-        tok.pad_token = tok.eos_token
-    tok.add_eos_token = True
-    tok.truncation = True
-    return tok
-
-
-def load_grpo_datasets(cfg: dict):
-    """
-    Return (train_ds, eval_ds) ready for TRL‑DPO.
-    If cfg["val_set_size"] is 0 → eval_ds is None.
-    """
-    # Load **only one** split so we always get a Dataset, never a DatasetDict
-    ds_train = load_dataset(
-        "json",
-        data_files=cfg["datasets"][0]["path"],
-        split="train",          # guarantees Dataset, not DatasetDict
-        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
-    )
-
-    # Standardise column names
-    ds_train = ds_train.rename_columns({
-        cfg["datasets"][0]["field_prompt"]:   "prompt",
-    })
-
-    # Optional random split
-    val_size = cfg.get("val_set_size", 0)
-    if val_size:
-        split = ds_train.train_test_split(test_size=val_size, seed=42)
-        train_ds, eval_ds = split["train"], split["test"]
-    else:
-        train_ds, eval_ds = ds_train, None
-
-    return train_ds, eval_ds
 
 
 def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
