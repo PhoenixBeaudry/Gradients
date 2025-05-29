@@ -267,7 +267,7 @@ def objective(
     env["OPTUNA_STORAGE"] = storage_path
     env["OPTUNA_STUDY_NAME"] = study_name
     env["OPTUNA_TRIAL_ID"] = str(trial._trial_id)
-    
+    env["PYTHONUNBUFFERED"] = "1"
 
     if cfg["rl"] == "grpo":
         cfg["trl"]["max_completion_length"] = 32
@@ -302,8 +302,9 @@ def objective(
         
         # Collect output
         stdout_lines = []
-        for line in proc.stdout:
+        for line in iter(proc.stdout.readline, ""):   # keep reading until EOF
             stdout_lines.append(line)
+            print(line, end="", flush=True)           # <-- live stream
             # Check for early termination signals
             if "eval_loss" in line:
                 LOG.info(f"Trial {trial.number}: {line.strip()}")
@@ -349,10 +350,9 @@ def objective(
                 val = extractor(out_dir) if extractor is loss_from_wandb or extractor is loss_from_state else extractor(None)
                 if val is not None:
                     LOG.info("Partial result found for trial %d: %.4f", trial.number, val)
-                    return val
-                    
+                    return val       
         else:
-            LOG.warning("Trial %d failed with unknown error:\n%s", trial.number, msg[:500])
+            LOG.warning("Trial %d failed with unknown error:\n%s", trial.number, msg)
             
         return penalty_value
         

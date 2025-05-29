@@ -1,7 +1,6 @@
 from transformers import AutoModelForCausalLM
 import torch
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from accelerate import PartialState
 
 
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
