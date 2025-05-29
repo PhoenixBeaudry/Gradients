@@ -46,8 +46,6 @@ def build_trainer_args(cfg: dict):
         "gradient_accumulation_steps": int(cfg['gradient_accumulation_steps']),
         "packing": cfg['packing'],
         "eval_packing": cfg['packing'],    
-        "dataset_num_proc": 6,
-        "dataloader_num_workers": 6,
 
         # Evaluation and Saving Args
         "eval_strategy": 'steps', 
@@ -82,7 +80,9 @@ def build_trainer_args(cfg: dict):
     if cfg["rl"] == "dpo":
         type_spec_args = {
             'beta': float(cfg['beta']),
-            'label_smoothing': float(cfg['label_smoothing'])
+            'label_smoothing': float(cfg['label_smoothing']),
+            "dataset_num_proc": 6,
+            "dataloader_num_workers": 6,
         }
     elif cfg["rl"] == "grpo":
         type_spec_args = {
@@ -92,6 +92,11 @@ def build_trainer_args(cfg: dict):
             'reward_weights': cfg["trl"]["reward_weights"],
             'use_vllm': False,
             'greater_is_better': True,
+        }
+    else:
+        type_spec_args = {
+            "dataset_num_proc": 6,
+            "dataloader_num_workers": 6,
         }
 
     trainer_kwargs |= type_spec_args
