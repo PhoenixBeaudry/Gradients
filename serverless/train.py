@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import os
 import multiprocessing as mp
-if __name__ == "__main__":          # important when Accelerate spawns ranks
-    mp.set_start_method("forkserver", force=True)
+if __name__ == "__main__":
+    mp.set_start_method("spawn", force=True)
 
 import argparse
 import logging
@@ -55,8 +55,6 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
 
     ##### Training Arguments ####
     trainer_kwargs = build_trainer_args(cfg)
-
-    
 
     #####################################
     logger = setup_logger()
