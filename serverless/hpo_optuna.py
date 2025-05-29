@@ -540,9 +540,6 @@ def launch_training(cfg_path: str):
     
     # Set stability environment variables
     env = os.environ.copy()
-    env["TOKENIZERS_PARALLELISM"] = "false"
-    env["CUDA_LAUNCH_BLOCKING"] = "0"
-    env["NCCL_TIMEOUT"] = "3600"  # 1 hour for full training
     
     try:
         subprocess.run(cmd, check=True, env=env)
