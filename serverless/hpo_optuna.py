@@ -15,9 +15,6 @@ from optuna.pruners import HyperbandPruner
 from optuna.storages import RDBStorage
 import gc
 import torch
-import signal
-from contextlib import contextmanager
-import threading
 import psutil
 
 # ── logging ────────────────────────────────────────────────────────────────
@@ -57,47 +54,6 @@ def cleanup_resources():
                 pass
     except Exception as e:
         LOG.warning(f"Resource cleanup error: {e}")
-
-@contextmanager
-def timeout_context(seconds):
-    """Context manager for timeout handling"""
-    def timeout_handler(signum, frame):
-        raise TimeoutError(f"Operation timed out after {seconds} seconds")
-    
-    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
-
-class ProcessMonitor:
-    """Monitor subprocess and kill if it exceeds resource limits"""
-    def __init__(self, proc, max_seconds, check_interval=5):
-        self.proc = proc
-        self.max_seconds = max_seconds
-        self.check_interval = check_interval
-        self.start_time = time.time()
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._monitor)
-        self._thread.start()
-    
-    def _monitor(self):
-        while not self._stop.is_set() and self.proc.poll() is None:
-            elapsed = time.time() - self.start_time
-            if elapsed > self.max_seconds:
-                LOG.warning(f"Process exceeded time limit ({self.max_seconds}s), terminating...")
-                self.proc.terminate()
-                time.sleep(5)
-                if self.proc.poll() is None:
-                    self.proc.kill()
-                break
-            time.sleep(self.check_interval)
-    
-    def stop(self):
-        self._stop.set()
-        self._thread.join()
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
@@ -299,14 +255,10 @@ def objective(
             preexec_fn=os.setsid  # Create new process group for cleanup
         )
         
-        # Monitor the process
-        monitor = ProcessMonitor(proc, MAX_MINUTES_PER_TRIAL * 60)
-        
         # Collect output
         stdout_lines = []
         for line in iter(proc.stdout.readline, ""):   # keep reading until EOF
             stdout_lines.append(line)
-            print(line, end="", flush=True)           # <-- live stream
             # Check for early termination signals
             if "eval_loss" in line:
                 LOG.info(f"Trial {trial.number}: {line.strip()}")
@@ -321,14 +273,13 @@ def objective(
         
         stdout = "".join(stdout_lines)
         proc.wait()
-        monitor.stop()
         
         if proc.returncode != 0:
             raise subprocess.CalledProcessError(proc.returncode, cmd, stdout)
 
     # ── Error handling with categorization ──────────────────────────
     except subprocess.CalledProcessError as e:
-        msg = stdout or str(e)
+        msg = str(e.stdout)
         
         # Categorize errors
         penalty_value = float("-inf") if cfg["rl"] == "grpo" else float("inf")
