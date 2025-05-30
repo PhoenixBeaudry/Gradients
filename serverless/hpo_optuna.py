@@ -109,7 +109,8 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
 
     # Invariant Params
     params = {
-        "optimizer": trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
+        "optimizer":                   trial.suggest_categorical("optimizer", ["adamw_8bit", "lion_8bit", "adamw_torch"]),
+        "micro_batch_size":            trial.suggest_categorical("micro_batch_size", [2, 4, 8, 16, 32]),
     }
 
     # DPO Params
@@ -277,7 +278,8 @@ def objective(
     cmd = [
         "accelerate", "launch",
         "--use_deepspeed",
-        "--zero_stage", "2",
+        "--zero_stage", "3",
+        "--zero3_init_flag", "true",
         "--mixed_precision", "bf16",
         "--num_processes", str(torch.cuda.device_count()),  # Explicit GPU count
         path_to_train_file,
@@ -529,7 +531,8 @@ def launch_training(cfg_path: str):
     cmd = [
         "accelerate", "launch",
         "--use_deepspeed",
-        "--zero_stage", "2",
+        "--zero_stage", "3",
+        "--zero3_init_flag", "true",
         "--mixed_precision", "bf16",
         "--num_processes", str(torch.cuda.device_count()),
         path_to_train_file,

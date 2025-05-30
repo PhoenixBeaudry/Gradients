@@ -62,7 +62,6 @@ def build_trainer_args(cfg: dict):
         "ddp_timeout": 7200,
         "dataloader_pin_memory": False,
         "use_liger_kernel": cfg['use_liger_kernel'],
-        "auto_find_batch_size": True,
 
         # Misc Args
         "output_dir": cfg['output_dir'],
