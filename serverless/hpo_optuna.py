@@ -278,6 +278,7 @@ def objective(
         "accelerate", "launch",
         "--use_deepspeed",
         "--zero_stage", "2",
+        "--zero3_init_flag", "true",
         "--mixed_precision", "bf16",
         "--num_processes", str(torch.cuda.device_count()),  # Explicit GPU count
         path_to_train_file,
@@ -530,6 +531,7 @@ def launch_training(cfg_path: str):
         "accelerate", "launch",
         "--use_deepspeed",
         "--zero_stage", "2",
+        "--zero3_init_flag", "true",
         "--mixed_precision", "bf16",
         "--num_processes", str(torch.cuda.device_count()),
         path_to_train_file,
