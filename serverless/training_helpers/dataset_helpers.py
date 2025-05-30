@@ -27,7 +27,7 @@ def load_sft_datasets(cfg: dict):
         "json",
         data_files=cfg["datasets"][0]["path"],
         split="train",          # guarantees Dataset, not DatasetDict
-        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
+        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600), "connector": aiohttp.TCPConnector(ssl=False)}}
     )
 
     def combine_prompt(example):
@@ -76,7 +76,7 @@ def load_dpo_datasets(cfg: dict):
         "json",
         data_files=cfg["datasets"][0]["path"],
         split="train",
-        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
+        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600), "connector": aiohttp.TCPConnector(ssl=False)}}
     )
 
     # Standardise column names
@@ -107,7 +107,7 @@ def load_grpo_datasets(cfg: dict):
         "json",
         data_files=cfg["datasets"][0]["path"],
         split="train",          # guarantees Dataset, not DatasetDict
-        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600)}}
+        storage_options={'client_kwargs': {'timeout': aiohttp.ClientTimeout(total=3600), "connector": aiohttp.TCPConnector(ssl=False)}}
     )
 
     # Standardise column names
