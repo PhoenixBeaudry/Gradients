@@ -7,11 +7,11 @@ from accelerate import PartialState
 def load_model(model_name: str, cfg: dict) -> AutoModelForCausalLM:
     try:
         if "phi-3-mini" in model_name.lower():
-            model = AutoModelForCausalLM.from_pretrained(model_name, device_map=None, trust_remote_code=False, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=False, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
         else:
-            model = AutoModelForCausalLM.from_pretrained(model_name, device_map=None, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+            model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
     except:
-        model = AutoModelForCausalLM.from_pretrained(model_name, device_map=None, trust_remote_code=True, torch_dtype=torch.bfloat16)
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16)
 
     # Model Dependant Monkey Patches
     if "bloomz" in model_name.lower(): 
