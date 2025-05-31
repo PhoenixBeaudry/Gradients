@@ -291,13 +291,12 @@ def objective(
     ]
 
     # ── Run subprocess with monitoring ────────────────────────────────
-    stdout = ""
     try:
         stdout = run_subprocess(cmd, env, trial, timeout=MAX_MINUTES_PER_TRIAL*60+120)
 
     # ── Error handling with categorization ──────────────────────────
     except subprocess.CalledProcessError as e:
-        msg = stdout or str(e)
+        msg = str(e)
         
         # Categorize errors
         penalty_value = float("-inf") if cfg["rl"] == "grpo" else float("inf")
