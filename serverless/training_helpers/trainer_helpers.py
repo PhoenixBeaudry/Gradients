@@ -93,8 +93,12 @@ def build_trainer_args(cfg: dict):
         type_spec_args = {
             "greater_is_better": False,
             "packing": cfg['packing'],
-            "eval_packing": cfg['packing'],    
+            "eval_packing": cfg['packing'],   
         }
+        if cfg['use_neftune']:
+            type_spec_args |= {
+                "neftune_noise_alpha": 5
+            }
 
     trainer_kwargs |= type_spec_args
 

@@ -66,6 +66,7 @@ def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
         params |= {
             "learning_rate": trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.15),
+            "use_neftune": trial.suggest_categorical("use_neftune", [True, False]),
         }
         
     # Always lora for models > 8b
