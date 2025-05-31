@@ -232,7 +232,7 @@ def objective(
     cmd = [
         "accelerate", "launch",
         "--use_deepspeed",
-        "--deepspeed_config_file", "/workspace/training_helpers/deepspeed.json",
+        "--zero_stage", "2",
         "--mixed_precision", "bf16",
         "--num_processes", str(torch.cuda.device_count()),  # Explicit GPU count
         path_to_train_file,
@@ -480,7 +480,7 @@ def launch_training(cfg_path: str):
     cmd = [
         "accelerate", "launch",
         "--use_deepspeed",
-        "--deepspeed_config_file", "/workspace/training_helpers/deepspeed.json",
+        "--zero_stage", "2",
         "--mixed_precision", "bf16",
         "--num_processes", str(torch.cuda.device_count()),
         path_to_train_file,
