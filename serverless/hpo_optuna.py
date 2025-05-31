@@ -162,11 +162,10 @@ def cleanup_resources():
         LOG.warning(f"Resource cleanup error: {e}")
 
 def run_subprocess(cmd, env, trial, timeout=60*60):
-    """Launch training, stream output, kill on prune/timeout."""
     proc = subprocess.Popen(
         cmd,
         env=env,
-        start_new_session=True,      # replaces preexec_fn=os.setsid
+        start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -174,27 +173,30 @@ def run_subprocess(cmd, env, trial, timeout=60*60):
     )
 
     lines = []
-    # read in a background thread so communicate() never blocks the main thread
+
     def _pump():
-        for ln in proc.stdout:
+        for ln in iter(proc.stdout.readline, ''):   # '' == EOF
+            if not ln:
+                break
             lines.append(ln)
-            if "eval_loss" in ln:
-                if m := _EVAL_RE.search(ln):
-                    trial.report(float(m.group(1)), len(lines))
-                    if trial.should_prune():
-                        kill_pg(proc)
+            if "eval_loss" in ln and (m := _EVAL_RE.search(ln)):
+                trial.report(float(m.group(1)), len(lines))
+                if trial.should_prune():
+                    kill_pg(proc)
+
     t = threading.Thread(target=_pump, daemon=True)
     t.start()
 
     try:
-        proc.communicate(timeout=timeout)  # drains both pipes
+        proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         kill_pg(proc)
-        proc.communicate()                 # collect what’s left
-    finally:
-        t.join()
+        proc.wait()
 
-    if proc.returncode != 0:
+    t.join()               # make sure reader has finished
+    proc.stdout.close()    # we own the close now
+
+    if proc.returncode:
         raise subprocess.CalledProcessError(proc.returncode, cmd, "".join(lines))
 
     return "".join(lines)
