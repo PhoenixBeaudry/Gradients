@@ -15,6 +15,7 @@ from optuna.pruners import HyperbandPruner
 from optuna.storages import RDBStorage
 import gc
 import torch
+import signal, threading
 import psutil
 
 # ── logging ────────────────────────────────────────────────────────────────
@@ -31,29 +32,6 @@ PERCENT_TIME_FOR_HPO = 0.30
 MAX_MINUTES_PER_TRIAL = 30
 GPU_CLEANUP_WAIT_TIME = 10  # seconds to wait for GPU cleanup
 
-# ── Stability utilities ─────────────────────────────────────────────────────
-def cleanup_resources():
-    """Force cleanup of GPU memory and other resources"""
-    try:
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-        gc.collect()
-        # Kill any zombie processes
-        current_process = psutil.Process()
-        for child in current_process.children(recursive=True):
-            try:
-                child.terminate()
-            except psutil.NoSuchProcess:
-                pass
-        time.sleep(2)  # Give processes time to terminate
-        for child in current_process.children(recursive=True):
-            try:
-                child.kill()
-            except psutil.NoSuchProcess:
-                pass
-    except Exception as e:
-        LOG.warning(f"Resource cleanup error: {e}")
 
 # ╭──────────────────────── Hyper‑parameter space ───────────────────────────╮
 def sample_space(trial: optuna.Trial, cfg: dict) -> dict:
@@ -158,6 +136,79 @@ def loss_from_state(out_dir: Path) -> float | None:
     return None
 # ╰──────────────────────────────────────────────────────────────────────────╯
 
+# ── Stability utilities ─────────────────────────────────────────────────────
+def cleanup_resources():
+    """Force cleanup of GPU memory and other resources"""
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        gc.collect()
+        # Kill any zombie processes
+        current_process = psutil.Process()
+        for child in current_process.children(recursive=True):
+            try:
+                child.terminate()
+            except psutil.NoSuchProcess:
+                pass
+        time.sleep(2)  # Give processes time to terminate
+        for child in current_process.children(recursive=True):
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                pass
+    except Exception as e:
+        LOG.warning(f"Resource cleanup error: {e}")
+
+def run_subprocess(cmd, env, trial, timeout=60*60):
+    """Launch training, stream output, kill on prune/timeout."""
+    proc = subprocess.Popen(
+        cmd,
+        env=env,
+        start_new_session=True,      # replaces preexec_fn=os.setsid
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    lines = []
+    # read in a background thread so communicate() never blocks the main thread
+    def _pump():
+        for ln in proc.stdout:
+            lines.append(ln)
+            if "eval_loss" in ln:
+                if m := _EVAL_RE.search(ln):
+                    trial.report(float(m.group(1)), len(lines))
+                    if trial.should_prune():
+                        kill_pg(proc)
+    t = threading.Thread(target=_pump, daemon=True)
+    t.start()
+
+    try:
+        proc.communicate(timeout=timeout)  # drains both pipes
+    except subprocess.TimeoutExpired:
+        kill_pg(proc)
+        proc.communicate()                 # collect what’s left
+    finally:
+        t.join()
+
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd, "".join(lines))
+
+    return "".join(lines)
+
+def kill_pg(proc, sig=signal.SIGTERM):
+    """Kill the whole process group that accelerate launched."""
+    pgid = os.getpgid(proc.pid)
+    os.killpg(pgid, sig)
+    try:
+        proc.wait(10)
+    except subprocess.TimeoutExpired:
+        os.killpg(pgid, signal.SIGKILL)
+        proc.wait()
+
+
 # ╭──────────────────────── Objective (single trial) ─────────────────────────╮
 def objective(
     trial: optuna.Trial,
@@ -240,40 +291,8 @@ def objective(
     ]
 
     # ── Run subprocess with monitoring ────────────────────────────────
-    stdout = ""
     try:
-        proc = subprocess.Popen(
-            cmd, 
-            env=env, 
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, 
-            text=True,
-            bufsize=1,  # Line buffered
-            start_new_session=True, 
-        )
-        
-        
-        # Collect output
-        stdout_lines = []
-        for line in iter(proc.stdout.readline, ""):   # keep reading until EOF
-            stdout_lines.append(line)
-            # Check for early termination signals
-            if "eval_loss" in line:
-                LOG.info(f"Trial {trial.number}: {line.strip()}")
-                # Report intermediate value for pruning
-                match = _EVAL_RE.search(line)
-                if match:
-                    intermediate_value = float(match.group(1))
-                    trial.report(intermediate_value, len(stdout_lines))
-                    if trial.should_prune():
-                        proc.terminate()
-                        raise optuna.exceptions.TrialPruned()
-        
-        stdout = "".join(stdout_lines)
-        proc.wait()
-        
-        if proc.returncode != 0:
-            raise subprocess.CalledProcessError(proc.returncode, cmd, stdout)
+        stdout = run_subprocess(cmd, env, trial, timeout=MAX_MINUTES_PER_TRIAL*60+120)
 
     # ── Error handling with categorization ──────────────────────────
     except subprocess.CalledProcessError as e:
