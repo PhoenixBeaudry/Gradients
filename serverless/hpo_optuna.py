@@ -249,7 +249,7 @@ def objective(
             stderr=subprocess.STDOUT, 
             text=True,
             bufsize=1,  # Line buffered
-            preexec_fn=os.setsid  # Create new process group for cleanup
+            start_new_session=True, 
         )
         
         
