@@ -37,7 +37,7 @@ def build_trainer(cfg: dict, model, peft_config, tokenizer, train_ds, eval_ds):
     callbacks = []
     if cfg.get('early_stopping', True):
         callbacks.append(
-            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 8))
+            EarlyStoppingCallback(early_stopping_patience=cfg.get('early_stopping_patience', 4), early_stopping_threshold=1e-4)
         )
     
     # calculate time left for job
