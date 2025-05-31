@@ -299,7 +299,7 @@ def objective(
 
     # ── Error handling with categorization ──────────────────────────
     except subprocess.CalledProcessError as e:
-        msg = str(e)
+        msg = str(e.output)
         
         # Categorize errors
         penalty_value = float("-inf") if cfg["rl"] == "grpo" else float("inf")
