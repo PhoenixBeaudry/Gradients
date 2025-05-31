@@ -291,6 +291,7 @@ def objective(
     ]
 
     # ── Run subprocess with monitoring ────────────────────────────────
+    stdout = ""
     try:
         stdout = run_subprocess(cmd, env, trial, timeout=MAX_MINUTES_PER_TRIAL*60+120)
 
